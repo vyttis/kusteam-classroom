@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { SchoolPicker, type SchoolValue } from "@/components/access/school-picker"
 import { CONSENT_TEXT } from "@/lib/access/profile-fields"
 import { CheckCircle2, Loader2 } from "lucide-react"
+import { PrivacyLink } from "@/components/privacy-link"
 
 export interface RequestDoor {
   game_code?: string
@@ -165,6 +166,9 @@ export function AccessRequestForm({ door, compact }: AccessRequestFormProps) {
           {CONSENT_TEXT}
         </Label>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Plačiau: <PrivacyLink />
+      </p>
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
           {error}

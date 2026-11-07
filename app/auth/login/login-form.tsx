@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Mail, KeyRound, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { PrivacyLink } from "@/components/privacy-link"
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -323,7 +324,7 @@ export function LoginForm() {
             </Button>
           </Link>
           <p className="text-xs text-muted-foreground">
-            STEAM LT Klaipėda &middot; Klaipėdos universitetas
+            STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
           </p>
         </div>
       </motion.div>

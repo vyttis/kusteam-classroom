@@ -10,6 +10,7 @@ import { SchoolPicker, type SchoolValue } from "@/components/access/school-picke
 import { ChipGroup } from "@/components/access/chip-group"
 import { CONSENT_TEXT, GRADE_BANDS, SUBJECTS } from "@/lib/access/profile-fields"
 import { ArrowRight, Loader2 } from "lucide-react"
+import { PrivacyLink } from "@/components/privacy-link"
 
 type Subject = (typeof SUBJECTS)[number]
 type GradeBand = (typeof GRADE_BANDS)[number]
@@ -144,6 +145,9 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
           {CONSENT_TEXT}
         </Label>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Plačiau: <PrivacyLink />
+      </p>
 
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">

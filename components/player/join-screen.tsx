@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Gamepad2 } from "lucide-react"
 import { QRScanner } from "@/components/player/qr-scanner"
 import Image from "next/image"
+import { PrivacyLink } from "@/components/privacy-link"
 
 /**
  * Participant entry: type the activity code or scan the QR code.
@@ -86,7 +87,7 @@ export function JoinScreen() {
         </Card>
 
         <p className="text-xs text-muted-foreground mt-6">
-          STEAM LT Klaipėda &middot; Klaipėdos universitetas
+          STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
         </p>
       </div>
     </div>
