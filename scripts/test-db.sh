@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Apply every migration to an empty Postgres 16 and run the security checks.
+# Apply every migration to an empty Postgres and run the security checks.
+# Production runs Postgres 17, so CI uses 17 too (CLS-012).
 #
 # Uses DATABASE_URL when set (CI service container). Otherwise starts a
-# throwaway local cluster with the Postgres binaries on this machine.
+# throwaway local cluster with the newest Postgres binaries on this machine,
+# or the ones in PGBIN (for example PGBIN=/usr/lib/postgresql/17/bin).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,12 +39,25 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
   echo "migrate $(basename "$f")"
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$f" >/dev/null
 done
+# The read-only fingerprint compares production with the files
+# (docs/migration-history.md). It runs before the security checks, which add
+# their own helper functions. On Postgres 17 the migrated schema must match
+# supabase/tests/schema-fingerprint.expected; a migration that changes the
+# schema updates that file in the same PR. Postgres 16 has no MAINTAIN
+# privilege, so table grants differ there and the comparison is skipped.
+FINGERPRINT="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql")"
+SERVER_VERSION="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c 'show server_version_num')"
+if (( SERVER_VERSION >= 170000 )); then
+  if ! diff <(echo "$FINGERPRINT") "$ROOT/supabase/tests/schema-fingerprint.expected"; then
+    echo "schema fingerprint differs from supabase/tests/schema-fingerprint.expected" >&2
+    exit 1
+  fi
+  echo "schema fingerprint matches"
+else
+  echo "schema fingerprint not compared: Postgres $SERVER_VERSION, expected values are for 17"
+fi
 psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$ROOT/supabase/tests/security.sql" >/dev/null
 echo "security checks passed"
-# The read-only fingerprint used to compare production with the files
-# (docs/migration-history.md) must keep running on the migrated schema.
-psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$ROOT/supabase/tests/schema-fingerprint.sql" >/dev/null
-echo "schema fingerprint ran"
 
 if [[ "${TEST_ROLLBACK:-1}" == "1" ]]; then
   # Every rollback must apply cleanly newest first (later migrations may

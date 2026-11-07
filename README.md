@@ -55,7 +55,7 @@ npm run dev
 - `npm run lint`: ESLint
 - `npx tsc --noEmit`: tipų patikra
 - `npm test`: vienetų testai (Vitest)
-- `npm run test:db`: migracijos, saugumo patikros ir grąžinimas tuščioje Postgres (be Docker)
+- `npm run test:db`: migracijos, schemos atspaudas, saugumo patikros ir grąžinimas tuščioje Postgres (be Docker). Produkcija ir CI naudoja Postgres 17; vietoje kitos versijos nurodyti `PGBIN=/usr/lib/postgresql/17/bin`
 - `npm run test:e2e`: produkcijos smoke testai (Playwright, tik skaitymas). CI juos paleidžia po kiekvieno produkcijos diegimo ir kasdien.
 
 ## Diegimas

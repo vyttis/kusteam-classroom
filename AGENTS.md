@@ -24,7 +24,7 @@ Ekosistemos dokumentai yra `vyttis/kusteam-ai-lab` repozitorijoje (čia nekopiju
 ## Duomenų bazė
 
 - Migracijos `supabase/migrations/`, kiekvienai grąžinimas `supabase/rollback/`. Įrašytų migracijų netaisyti, pridėti naują.
-- `npm run test:db`: visos migracijos tuščioje Postgres, saugumo patikros (`supabase/tests/security.sql`), grąžinimas ir pakartotinis taikymas. Tas pats CI `Database` darbe.
+- `npm run test:db`: visos migracijos tuščioje Postgres 17 (kaip produkcijoje), schemos atspaudas (`supabase/tests/schema-fingerprint.expected`), saugumo patikros (`supabase/tests/security.sql`), grąžinimas ir pakartotinis taikymas. Tas pats CI `Database` darbe.
 - Produkcijoje migracijos taikomos rankiniu būdu per Supabase SQL Editor, tik su Vyčio patvirtinimu, atsargine kopija ar išsaugota būsena, nevykstant veikloms. Įrašas `docs/migration-history.md`. Supabase GitHub integracija produkcijai migracijų netaiko.
 
 ## Kalba ir dizainas
