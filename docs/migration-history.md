@@ -32,7 +32,7 @@ Produkcijos schema palyginta su tuščia Postgres, kurioje pritaikyti visi 35 fa
 - Failuose (`00002`) vaidmuo neįrašomas (lieka stulpelio numatytasis `teacher`). Vardas imamas iš `full_name` arba lieka tuščia eilutė.
 - Nuo `20261106130000` naujos paskyros gauna `pending`, o `get_my_role()` neaktyviai paskyrai grąžina `teacher`. Todėl automatinis `super_admin` neveikia, kol paskyros nepatvirtina administratorius.
 
-Kurią versiją palikti, sprendžia Vytis (BACKLOG CLS-011). Istorijos sutvarkymui tai netrukdo: visi failai produkcijoje pritaikyti, funkcija pakeista vėliau.
+Kurią versiją palikti, sprendžia Vytis. Pasiūlymas ir testai: skyrius „CLS-011“ žemiau. Istorijos sutvarkymui tai netrukdo: visi failai produkcijoje pritaikyti, funkcija pakeista vėliau.
 
 Išvada: produkcijos schema atitinka visas 35 migracijas, bet CLI to nežino. Todėl:
 
@@ -162,6 +162,86 @@ Naują migraciją galima taikyti dviem būdais, abu tik su Vyčio patvirtinimu:
 - `db push --dry-run --remote`, tada `db push --remote`.
 
 Kol istorija nesutvarkyta, taikyti tik rankiniu būdu.
+
+## CLS-011: `handle_new_user()` be vaidmens pagal el. paštą (pasiūlymas, laukia sprendimo)
+
+Produkcijos funkcija kol kas nekeičiama. Pasiūlymas yra `supabase/proposals/cls-011-handle-new-user/`: `up.sql`, `down.sql`, `test.sql`. Supabase CLI šio katalogo nemato, į produkciją jis nepatenka.
+
+### Skirtumas
+
+| | Produkcija (pakeista ranka) | Failai (`00002`) | Pasiūlymas |
+| --- | --- | --- | --- |
+| Vaidmuo | `super_admin` vienam Vyčio asmeniniam Gmail adresui, kitiems `teacher` | neįrašomas, stulpelio numatytasis `teacher` | neįrašomas, numatytasis `teacher` |
+| Būsena | stulpelio numatytoji `pending` | `pending` | `pending` |
+| Vardas | `full_name`, tada `name`, kitaip NULL | `full_name`, kitaip tuščia eilutė | `full_name`, tada `name`, kitaip tuščia eilutė |
+| `search_path`, SECURITY DEFINER, teisės | prisegtas, taip, nekeistos | tas pats | tas pats, `search_path` nurodytas pačiame apibrėžime |
+
+### Kodėl atsisakyti el. pašto taisyklės
+
+- Vaidmuo suteikiamas aplenkiant administravimo skydelį. `admin_audit_log` apie tai neįrašo nieko.
+- Laukiančią paskyrą patvirtinus (`/admin/prasymai` arba paskyros būsenos keitimas), ji tampa aktyvi jau su `super_admin`. Tvirtinantis administratorius vaidmens nesuteikia ir gali to nepastebėti.
+- Teisė priklauso nuo vieno išorinio el. pašto adreso. Asmeninis adresas įrašytas į DB funkciją, o repozitorijoje jo nėra, todėl funkcija ir failai išsiskiria.
+- Esami profiliai nesikeičia: taisyklė veikia tik kuriant naują `auth.users` įrašą.
+
+### Aiškus teisių suteikimo procesas (jau veikia programoje)
+
+1. Žmogus prisijungia arba pateikia paskyros prašymą. Profilis gauna `teacher` ir `pending`.
+2. `super_admin` patvirtina prašymą (`access_request.approve`) arba pakviečia (`account.invite`, `account.activate`). Abu įrašomi į `admin_audit_log`.
+3. Vaidmenį keičia tik `super_admin` per `/admin/users` (`PATCH /api/admin/users`). Savo vaidmens keisti negalima. Kiekvienas pakeitimas įrašomas kaip `profile.role_change` su ankstesniu ir nauju vaidmeniu.
+4. Avarinis būdas, tik jei neliktų nė vieno aktyvaus `super_admin`. Savininkas SQL Editor vienoje transakcijoje pakeičia vaidmenį ir įrašo, kas padaryta:
+
+```sql
+begin;
+update public.profiles set role = 'super_admin', status = 'active' where id = '<profilio id>';
+insert into public.admin_audit_log (actor_id, action, target_type, target_id, details)
+values ('<profilio id>', 'profile.role_change', 'profile', '<profilio id>', '{"to": "super_admin", "via": "sql-editor"}');
+commit;
+```
+
+### Ką daro pasiūlymas
+
+- `up.sql` pirmiausia išsaugo dabartinį funkcijos apibrėžimą į `backup_cls011.handle_new_user`. Jei kopija jau yra, `up.sql` nepavyksta ir nieko nekeičia. Tada funkcija perrašoma pagal lentelę viršuje.
+- `down.sql` grąžina išsaugotą apibrėžimą. Produkcijoje tai būtų ranka pakeista versija, tiksliai tokia, kokia buvo. El. pašto adresas į repozitoriją nepatenka.
+- `test.sql` tikrina: SECURITY DEFINER ir prisegtą `search_path`; funkcijoje nėra el. pašto adresų ir administratoriaus vaidmenų; naujas vartotojas su savininko tipo adresu gauna `teacher` ir `pending`; `full_name` pirmenybę prieš `name`; be vardų lieka tuščia eilutė.
+
+### Patikrinta lokaliai (Postgres 17.6)
+
+| Patikra | Rezultatas |
+| --- | --- |
+| `test:db`: migracijos, `up.sql`, `test.sql`, `down.sql` | praeina; po `down.sql` funkcija tokia pati kaip prieš `up.sql` |
+| `test.sql` produkcijos kopijoje prieš `up.sql` | krenta: „handle_new_user must not grant roles by email address“ |
+| `test.sql` dabartinėje failų versijoje | krenta: nėra `name` atsarginio varianto |
+| `up.sql`, `test.sql`, `down.sql` produkcijos kopijoje | praeina; `down.sql` grąžina tiksliai tą patį apibrėžimą (md5 sutampa), teisės nepakitę |
+| Pakartotinis `up.sql` | nepavyksta (`backup_cls011.handle_new_user` jau yra), funkcija nekeičiama |
+| Atspaudas po `up.sql` | failų replay ir produkcijos kopija sutampa: `function` 26 `9d3d3d665d481c8ed0139cf81b8bd8f1`, `grant.function` nepakitęs |
+
+Produkcijos kopija čia reiškia failų replay su ranka pakeista funkcija, kurioje vietoj tikro adreso įrašytas netikras.
+
+### Prieš sprendimą: produkcijos patikra (tik skaitymas)
+
+Užklausa neįrašo adreso, ji paima jį iš pačios funkcijos:
+
+```sql
+with f as (
+  select substring(prosrc from $re$NEW.email = '([^']+)'$re$) as e
+  from pg_proc where proname = 'handle_new_user' and pronamespace = 'public'::regnamespace
+)
+select
+  (select count(*) from public.profiles where role = 'super_admin' and status = 'active') as active_super_admins,
+  (select string_agg(p.role || '/' || p.status, ',') from public.profiles p, f where lower(p.email) = lower(f.e)) as email_profile,
+  (select count(*) from auth.users u, f where lower(u.email) = lower(f.e)) as email_auth_users,
+  (select count(*) from public.admin_audit_log where action = 'profile.role_change') as role_changes_logged;
+```
+
+Laukiama: `active_super_admins` bent 1. Jei adreso paskyra jau yra, taisyklė jai nebeturi įtakos, o pasiūlymas jos vaidmens nekeičia.
+
+### Taikymo planas, kai Vytis patvirtins
+
+1. PR: `up.sql` → `supabase/migrations/<laikas>_handle_new_user_without_email_role.sql`, `down.sql` → `supabase/rollback/<tas pats>.sql`, `test.sql` → `supabase/tests/`, paleidžiamas `test:db`. `schema-fingerprint.expected` eilutė `function` → `9d3d3d665d481c8ed0139cf81b8bd8f1`. Proposal etapas iš `test-db.sh` pašalinamas.
+2. Prieš taikymą (tik skaitymas): aukščiau esanti užklausa, 0 vykstančių veiklų.
+3. Taikymas produkcijoje: SQL Editor, visas failas, arba `db push --remote` po CLS-005. Jei per SQL Editor ir CLS-005 jau atliktas: `migration repair --status applied --remote <laikas>`.
+4. Po taikymo: atspaudas `function` 26 `9d3d3d665d481c8ed0139cf81b8bd8f1`, kitos sritys nepakitusios; `select count(*) from backup_cls011.handle_new_user` lygu 1.
+5. Grąžinimas: rollback failas (tas pats kaip `down.sql`).
 
 ## Schemos atspaudas
 
