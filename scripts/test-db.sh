@@ -34,6 +34,9 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   DATABASE_URL="postgresql://postgres@/postgres?host=$PGTMP&port=$PORT"
 fi
 
+# Byte order, as in the Supabase CLI, whatever the machine locale is.
+export LC_COLLATE=C
+
 psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$ROOT/supabase/tests/bootstrap.sql"
 for f in "$ROOT"/supabase/migrations/*.sql; do
   echo "migrate $(basename "$f")"

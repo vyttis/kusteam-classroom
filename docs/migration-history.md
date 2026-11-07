@@ -8,7 +8,7 @@ Migracijos produkcijoje taikomos rankiniu būdu per Supabase SQL Editor. CLI ist
 select count(*) from supabase_migrations.schema_migrations;  -- 0
 ```
 
-Produkcija veikia Postgres 17.6. Repozitorijoje 35 migracijų failai ir 34 skirtingos versijos, nes `00007` kartojasi.
+Produkcija veikia Postgres 17.6. Repozitorijoje 35 migracijų failai. Iki 2026-11-07 buvo 34 skirtingos versijos, nes `00007` kartojosi; dabar 35 (žr. žemiau).
 
 Produkcijos schema palyginta su tuščia Postgres, kurioje pritaikyti visi 35 failai. Palyginimo užklausa: `supabase/tests/schema-fingerprint.sql` (žr. „Schemos atspaudas“).
 
@@ -40,39 +40,68 @@ Išvada: produkcijos schema atitinka visas 35 migracijas, bet CLI to nežino. To
 - **Niekada nenaudoti `db push --include-all`.** Jis iš naujo vykdytų jau pritaikytus failus.
 - Naujos migracijos taikomos rankiniu būdu, kaip iki šiol (`BEGIN; … COMMIT;` per SQL Editor).
 
-## Dubliuota versija `00007`
+## Dubliuota versija `00007` (sutvarkyta repozitorijoje)
+
+Iki 2026-11-07 du failai turėjo tą pačią versiją:
 
 | Failas | Ką daro | Priklausomybės |
 | --- | --- | --- |
-| `00007_bcrypt_answer_hash.sql` | įjungia `pgcrypto`, perrašo `check_answer` | `00018` naudoja `gen_salt()` ir `crypt()` iš `pgcrypto`. `00025` prisega `search_path` visoms tuo metu esamoms funkcijoms |
+| `00007_bcrypt_answer_hash.sql`, dabar `000071_bcrypt_answer_hash.sql` | įjungia `pgcrypto`, perrašo `check_answer` | `00018` naudoja `gen_salt()` ir `crypt()` iš `pgcrypto`. `00025` prisega `search_path` visoms tuo metu esamoms funkcijoms |
 | `00007_di_verification_columns.sql` | prideda `generated_by_di` ir `verification_*` stulpelius | turi būti prieš `00018` (CHECK ant `verification_confidence`) |
 
-Supabase CLI versiją laiko `schema_migrations` pirminiu raktu ir versijas lygina kaip tekstą. Patikrinta su CLI 3.0.0 vietinėje DB kopijoje (tuščia istorija, pilna schema):
+Supabase CLI versiją laiko `schema_migrations` pirminiu raktu ir versijas lygina kaip tekstą. Su dviem `00007` failais CLI 3.0.0 vietinėje kopijoje elgėsi taip:
 
-- `migration repair --status applied` įrašo 34 eilutes, ne 35.
-- `migration list` vieną `00007` palieka be atitikmens.
-- `db push --dry-run` sustoja: „Found local migration files to be inserted before the last migration on remote database“ ir siūlo `--include-all`.
+- `migration repair --status applied` įrašė 34 eilutes, ne 35.
+- `migration list` vieną `00007` paliko be atitikmens.
+- `db push --dry-run` sustojo: „Found local migration files to be inserted before the last migration on remote database“ ir pasiūlė `--include-all`.
 
-Ankstesnis planas pervadinti `00007_bcrypt_answer_hash.sql` į `00026` netinka. Patikrinta lokaliai: tuščioje DB `00018` lūžta (`function gen_salt(unknown, integer) does not exist`), o `check_answer` netenka `search_path`, nes `CREATE OR REPLACE` po `00025` jį nuima.
+Pervadinti į `00026` netiko: tuščioje DB `00018` lūžta (`function gen_salt(unknown, integer) does not exist`), o `check_answer` netenka `search_path`, nes `CREATE OR REPLACE` po `00025` jį nuima.
 
-Tinka vardas `000071_bcrypt_answer_hash.sql`. Pagal failo vardą (`test:db`) ir pagal CLI versijų tvarką failas lieka tarp `00006` ir `00008`. Patikrinta lokaliai abiem tvarkomis: visų sričių atspaudai sutampa su dabartiniais, `check_answer` išlaiko `search_path`. Failo turinys nekeičiamas.
+Failas pervadintas į `000071_bcrypt_answer_hash.sql`, turinys nepakeistas. Pagal failo vardą ir pagal CLI versijų tvarką jis lieka tarp `00006` ir `00008`. `test:db` su Postgres 17 duoda tą patį schemos atspaudą kaip prieš pervadinimą, `check_answer` išlaiko `search_path`. `test:db` dabar rikiuoja failus baitų tvarka (`LC_COLLATE=C`), kaip CLI. `tests/migration-versions.test.ts` neleidžia pasikartojančių versijų.
 
-`tests/migration-versions.test.ts` neleidžia atsirasti naujoms pasikartojančioms versijoms.
+Produkcijos tai nekeičia: istorija tuščia, o failo turinys jau pritaikytas.
 
-## Sutvarkymo procedūra (laukia Vyčio patvirtinimo)
+## Sutvarkymo procedūra
 
-Į produkcijos `supabase_migrations.schema_migrations` rašoma tik su atskiru Vyčio patvirtinimu. Schema ir duomenys nekeičiami, įrašoma tik istorija. Visa eiga išbandyta su CLI 3.0.0 vietinėje produkcijos schemos kopijoje: 35 eilutės, `migration list` be skirtumų, `db push --dry-run` „Remote database is up to date“, schema nepasikeitė, grąžinimas istoriją ištuštino.
+Repozitorijos dalis atlikta (žr. žemiau, 1 žingsnis). Į produkcijos `supabase_migrations.schema_migrations` rašoma tik su atskiru Vyčio patvirtinimu, ir rašo pats Vytis. Claude Code produkcijoje vykdo tik skaitymo patikras.
 
-### 1. Pakeitimai repozitorijoje (PR, produkcijos nekeičia)
+### Ką rašymas keičia ir ko nekeičia
 
-```bash
-git mv supabase/migrations/00007_bcrypt_answer_hash.sql \
-       supabase/migrations/000071_bcrypt_answer_hash.sql
-```
+- Keičia: į `supabase_migrations.schema_migrations` įrašomos 35 eilutės (versija, vardas, failo sakiniai). Lentelė jau yra ir dabar tuščia.
+- Nekeičia: `public`, `auth`, `storage` schemų, duomenų, teisių, funkcijų. Jokia migracija nevykdoma.
+- Grąžinimas: lentelė vėl ištuštinama (žr. „Grąžinimas“). Kadangi prieš rašymą ji tuščia, tai tiksli ankstesnė būsena.
 
-- `tests/migration-versions.test.ts`: `KNOWN_DUPLICATES` palikti tuščią.
-- `supabase/config.toml`: `[inbucket]` pakeisti į `[local_smtp]`. Be to CLI 3.0.0 nepasileidžia („[inbucket] in supabase/config.toml is no longer supported“).
-- CI: `npm test` ir `Database` (`test:db`) žali.
+### Repetuota 2026-11-07
+
+Vietinė Postgres 17.6 su produkcijos schemos kopija (visų failų replay ir `handle_new_user()` produkcijos versija su netikru el. pašto adresu), tuščia istorija, šios repozitorijos `supabase/config.toml`, CLI 3.0.0 su `--remote=<vietinės DB adresas>`:
+
+| Žingsnis | Rezultatas |
+| --- | --- |
+| `migration list` | 35 vietinės eilutės, nuotolinių 0 |
+| `migration repair --status applied` (be versijų) | 35 eilutės, 35 skirtingos versijos |
+| `migration list` | visos 35 sutampa |
+| `db push --dry-run` | „Remote database is up to date.“ |
+| Schemos atspaudas | toks pat kaip prieš rašymą |
+| `migration repair --status reverted` (be versijų) | 0 eilučių |
+| Tas pats su 35 aiškiai nurodytomis versijomis | tas pats rezultatas |
+
+Nerepetuota, nes reikia Vyčio prisijungimo: `supabase login`, `supabase link` ir `--remote` be adreso, nukreiptas į tikrą projektą.
+
+### CLI 3.0.0 pagalba (patikrinta 2026-11-07)
+
+- `npm view supabase dist-tags`: `latest` 3.0.0. Procedūroje versija prisegta: `npx supabase@3.0.0`.
+- `migration list`, `migration repair`, `db push`: „Local by default. Pass --remote for the linked project, or --remote=<ref|branch|url>.“ Be `--remote` komanda dirba su vietine DB.
+- `migration repair [<version...>]`, `--status applied|reverted`, `--password`. Be versijų keičia visą istoriją.
+- `db push --dry-run`: tik parodo, ką taikytų. `--include-all` nenaudoti.
+- `link [<ref-or-branch>]`: „Remote only“.
+
+Prieš vykdymą dar kartą paleisti `npx supabase@3.0.0 migration repair --help` ir palyginti su šiuo sąrašu. Jei skiriasi, sustoti.
+
+### 1. Repozitorija (atlikta, produkcijos nekeičia)
+
+- `00007_bcrypt_answer_hash.sql` → `000071_bcrypt_answer_hash.sql`.
+- `supabase/config.toml`: `[inbucket]` → `[local_smtp]`. Su senu vardu CLI 3.0.0 nepasileidžia („[inbucket] in supabase/config.toml is no longer supported“).
+- `tests/migration-versions.test.ts`: jokių pasikartojančių versijų.
 
 ### 2. Patikra prieš rašymą (tik skaitymas, SQL Editor)
 
@@ -81,19 +110,21 @@ select count(*) from supabase_migrations.schema_migrations;               -- 0
 select count(*) from public.games where status in ('active', 'paused');  -- 0
 ```
 
-Paleisti `supabase/tests/schema-fingerprint.sql`. Rezultatas turi sutapti su lentele „Schemos atspaudas“. Jei nesutampa, sustoti.
+Paleisti `supabase/tests/schema-fingerprint.sql`. Produkcijos rezultatas turi sutapti su lentele „Schemos atspaudas“. Jei nesutampa, sustoti.
 
-### 3. Įrašyti istoriją (vykdo Vytis, reikia DB slaptažodžio)
+### 3. Įrašyti istoriją (vykdo Vytis savo kompiuteryje)
 
-CLI 3.0.0 pagal nutylėjimą dirba su vietine DB. Produkcijai būtinas `--remote`.
+Repozitorijos šaknyje, `main` šakoje. `link` paprašys DB slaptažodžio arba jį galima nurodyti `--password`.
 
 ```bash
+npx supabase@3.0.0 login
 npx supabase@3.0.0 link --project-ref menmndjyfeuwfweubwnl
+npx supabase@3.0.0 migration repair --help        # palyginti su skyriumi „CLI 3.0.0 pagalba“
 npx supabase@3.0.0 migration list --remote        # Remote stulpelis tuščias, 35 Local eilutės
 npx supabase@3.0.0 migration repair --status applied --remote
 ```
 
-Be versijų `repair` viena transakcija įrašo visus 35 vietinius failus (versiją, vardą ir sakinius). CLI paprašys patvirtinti. Versijas galima nurodyti ir aiškiai:
+CLI parodys planą („Replace the migration history table with 35 local migrations“) ir paprašys patvirtinti. Jei skaičius ne 35, atsisakyti. Versijas galima nurodyti ir aiškiai:
 
 ```bash
 npx supabase@3.0.0 migration repair --status applied --remote \
@@ -111,7 +142,7 @@ npx supabase@3.0.0 migration list --remote          # Local ir Remote sutampa vi
 npx supabase@3.0.0 db push --dry-run --remote       # „Remote database is up to date.“
 ```
 
-SQL Editor: `select count(*) from supabase_migrations.schema_migrations;` turi grąžinti 35. Atspaudas nepasikeitęs.
+SQL Editor: `select count(*) from supabase_migrations.schema_migrations;` turi grąžinti 35. Schemos atspaudas nepasikeitęs. Claude Code gali patikrinti tik skaitydamas.
 
 ### Grąžinimas
 
@@ -121,12 +152,16 @@ Prieš rašymą lentelė tuščia, todėl grąžinimas ją vėl ištuština. Sch
 npx supabase@3.0.0 migration repair --status reverted --remote   # be versijų išvalo visą istoriją
 ```
 
+Arba SQL Editor: `delete from supabase_migrations.schema_migrations;`.
+
 ### Po sutvarkymo
 
 Naują migraciją galima taikyti dviem būdais, abu tik su Vyčio patvirtinimu:
 
 - kaip iki šiol per SQL Editor, o tada `migration repair --status applied --remote <versija>`;
 - `db push --dry-run --remote`, tada `db push --remote`.
+
+Kol istorija nesutvarkyta, taikyti tik rankiniu būdu.
 
 ## Schemos atspaudas
 
