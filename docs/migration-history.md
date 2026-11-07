@@ -23,7 +23,7 @@ Produkcijos schema palyginta su tuščia Postgres, kurioje pritaikyti visi 35 fa
 | Realtime lentelės | 5 | sutampa |
 | Stulpelių teisės | 50 | sutampa |
 | Funkcijų vykdymo teisės | 53 | sutampa |
-| Lentelių teisės | 42 | sutampa. Skiriasi tik Postgres 17 teisė `MAINTAIN`, kurios vietinis Postgres 16 neturi |
+| Lentelių teisės | 42 | sutampa. Lyginant su Postgres 16 skyrėsi tik Postgres 17 teisė `MAINTAIN`; su Postgres 17 (CLS-012) sutampa visiškai |
 | Funkcijos | 26 | 25 sutampa, `handle_new_user()` skiriasi |
 
 `handle_new_user()` produkcijoje pakeista ranka, ne migracija:
@@ -148,13 +148,13 @@ Produkcija 2026-11-07:
 | table | 18 | `4456d03e6c5fa3e0ee1b8a1835df268d` |
 | trigger | 11 | `6b0e207b15b5ecf28ecd7e75c9c4dbb6` |
 
-Vietinė Postgres 16 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`) ir `grant.table` (`8d13ac3ebb8e5923124bbfe1b8bdaaaa`, dėl `MAINTAIN`).
+Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
 
 ## 2026-11-06: atsakymų, rolių ir statistikos spragos
 
 Failas `supabase/migrations/20261106120000_close_answer_and_role_gaps.sql`
 (pavadintas pagal CLI konvenciją). Grąžinimas: `supabase/rollback/20261106120000_close_answer_and_role_gaps.sql`.
-Abu failai tikrinami `npm run test:db` (visos migracijos tuščioje Postgres 16,
+Abu failai tikrinami `npm run test:db` (visos migracijos tuščioje Postgres,
 saugumo patikros, grąžinimas ir pakartotinis pritaikymas) ir CI darbe „Database".
 
 Taikymas produkcijoje: SQL Editor, visas failas (jame yra `BEGIN; … COMMIT;`).

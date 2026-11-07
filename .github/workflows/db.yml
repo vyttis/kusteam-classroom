@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17  # production runs Postgres 17 (CLS-012)
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
