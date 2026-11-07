@@ -62,6 +62,24 @@ fi
 psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$ROOT/supabase/tests/security.sql" >/dev/null
 echo "security checks passed"
 
+# CLS-011 proposal (docs/migration-history.md) is not a migration yet: apply
+# it on the migrated schema, run its test, roll it back and check that the
+# previous definition of handle_new_user() is back.
+PROPOSAL="$ROOT/supabase/proposals/cls-011-handle-new-user"
+if [[ -d "$PROPOSAL" ]]; then
+  FN_DEF="select md5(pg_get_functiondef('public.handle_new_user()'::regprocedure))"
+  BEFORE="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "$FN_DEF")"
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/up.sql" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/test.sql" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/down.sql" >/dev/null
+  if [[ "$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "$FN_DEF")" != "$BEFORE" ]]; then
+    echo "CLS-011 down.sql did not restore handle_new_user()" >&2
+    exit 1
+  fi
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -c "DROP SCHEMA backup_cls011 CASCADE" >/dev/null
+  echo "CLS-011 proposal: apply, test and rollback passed"
+fi
+
 if [[ "${TEST_ROLLBACK:-1}" == "1" ]]; then
   # Every rollback must apply cleanly newest first (later migrations may
   # depend on earlier ones), and the migrations must apply again on top.
