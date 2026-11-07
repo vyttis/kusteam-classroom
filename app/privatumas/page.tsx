@@ -5,7 +5,7 @@ import { SteamLogo } from "@/components/steam-logo"
 import { PRIVACY_NOTICE_STATUS, PRIVACY_NOTICE_UPDATED } from "@/lib/privacy"
 
 export const metadata: Metadata = {
-  title: "Privatumo pranešimas | KU STEAM pamokos",
+  title: "Privatumo pranešimas",
   description: "Kokius duomenis tvarko KU STEAM CLASSROOM, kam ir kiek laiko.",
   alternates: { canonical: "/privatumas" },
 }
