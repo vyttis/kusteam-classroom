@@ -1,6 +1,6 @@
 # Duomenų saugojimo politikos projektas (CLS-014)
 
-**Būsena: projektas.** Terminus pasiūlė Vytis Radvila 2026-11-08, po konsultacijos su KU duomenų apsaugos pareigūnu (jis vidaus sprendimus paliko KU STEAM centrui). Tai dar ne patvirtinta ir ne įgyvendinta politika. Produkcijoje niekas netrinama.
+**Būsena: patvirtinta vidaus taisyklė** (Vytis Radvila, 2026-11-08, po konsultacijos su KU duomenų apsaugos pareigūnu). Įgyvendinta PR #116 esamame naktiniame cron (`lib/retention.ts`, `docs/scheduled-jobs.md`). Produkcijoje trinama tik nustačius `RETENTION_MODE=delete`; iki tol darbas tik skaičiuoja.
 
 **v1.0 sąlyga.** CLASSROOM v1.0 priimamas tik turint patvirtintą ir įgyvendinamą planą: kiekvienai kategorijai terminas, atsakingas asmuo ir trynimo būdas. Privatumo pranešimas (`/privatumas`) turi sakyti tai, kas iš tikrųjų daroma.
 

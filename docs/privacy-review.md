@@ -124,14 +124,16 @@ union all select 'admin_audit_log', count(*), min(created_at)::date from public.
 
 Atsarginių kopijų saugojimo trukmę rodo Supabase → Database → Backups (nepatikrinta).
 
-## Laukia savininko patvirtinimo
+## Sprendimai ir kas liko
 
-1. **Teisinis pagrindas:** ar tvirtini BDAR 6 straipsnio 1 dalies e punktą (viešojo intereso užduotis) visiems tikslams. Alternatyva: b punktas vedėjų paskyroms ir e punktas dalyviams bei statistikai. Rekomenduoju e punktą.
-2. **Perdavimas už EEE:** sakinys „Jei teikėjas duomenis tvarko už Europos ekonominės erdvės ribų, taikomos BDAR numatytos apsaugos priemonės“ teisingas tik tada, kai su Supabase, Vercel, Resend ir Anthropic galioja jų duomenų tvarkymo sąlygos (DPA). Patvirtink, kad KU paskyros šias sąlygas priėmusios, arba sakinį išimsime.
-3. **Atsarginių kopijų trukmė:** pažiūrėk Supabase → Database → Backups. Jei nori, įrašysime skaičių vietoje „ribotą laiką“.
-4. **Žymimasis langelis:** palikti „Susipažinau su privatumo pranešimu“ (dabartinis pasiūlymas) ar visai atsisakyti langelio ir palikti tik sakinį su nuoroda. Pastarasis paprastesnis vartotojui, bet reikia mažo API pakeitimo.
-5. **Saugojimo terminai:** pranešime įrašyti tavo siūlomi terminai. Jie tampa teisingi tik patvirtinus politiką ir įgyvendinus mechanizmus (`docs/data-retention.md`).
-6. **Skelbimo sąlygos:** pranešimą skelbti tik kai (a) patvirtintas tekstas, (b) pritaikyta CLS-015 migracija, (c) įgyvendintas importuotų dokumentų trynimas (CLS-017). Kiti automatiniai trynimai (CLS-018) turi veikti iki pirmo termino pabaigos, ne vėliau kaip 2027 m. vasario pradžioje (pirmas prašymas išspręstas 2026-11-06, plius 90 dienų).
+Vytis 2026-11-08 priėmė: trumpą pranešimą kaip galutinę kryptį, BDAR 6 straipsnio 1 dalies e punktą kaip teisinį pagrindą, langelį „Susipažinau su privatumo pranešimu“ ir saugojimo terminus kaip vidaus taisyklę.
+
+Iki paskelbimo turi atitikti realų veikimą:
+
+1. Bibliotekos sakinys: pritaikyta CLS-015 migracija (PR #115).
+2. Saugojimo terminai: kodas produkcijoje (PR #116), bet trinama tik nustačius `RETENTION_MODE=delete`.
+3. Sakinys apie perdavimą už EEE: patvirtinta, kad su Supabase, Vercel, Resend ir Anthropic galioja jų duomenų tvarkymo sąlygos; kitaip sakinys išimamas.
+4. Atsarginių kopijų trukmė: nebūtina pranešime, bet patikrinama Supabase → Database → Backups.
 
 ## Kaip paskelbti
 
