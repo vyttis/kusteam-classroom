@@ -1,5 +1,15 @@
 import { z } from "zod"
 
+// The legal basis is KU's public-interest education task, not consent
+// (docs/privacy-review.md), so the box confirms the notice was read. The
+// API field keeps its name `consent`; consent_at records when.
+export const PRIVACY_ACK_TEXT = "Susipažinau su privatumo pranešimu."
+export const PRIVACY_ACK_REQUIRED = "Pažymėkite, kad susipažinote su privatumo pranešimu."
+export const REQUEST_PRIVACY_NOTE =
+  "Prašymo duomenis Klaipėdos universitetas naudoja tik vedėjo paskyrai suteikti."
+export const PROFILE_PRIVACY_NOTE =
+  "Profilio duomenis Klaipėdos universitetas naudoja vedėjo paskyrai, veikloms ir apibendrintai statistikai."
+
 /** Subjects a facilitator teaches, for statistics. Shown as chips. */
 export const SUBJECTS = [
   "Pradinis ugdymas",
@@ -48,7 +58,7 @@ export const accessRequestSchema = z
     first_name: name("vardą"),
     last_name: name("pavardę"),
     email: z.string().trim().toLowerCase().email("Neteisingas el. pašto adresas").max(200),
-    consent: z.literal(true, { message: "Reikia sutikimo tvarkyti duomenis" }),
+    consent: z.literal(true, { message: PRIVACY_ACK_REQUIRED }),
     // Exactly one way in: the team's session (finish screen), the activity
     // QR token, or a request link token.
     game_code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{6}$/).optional(),
@@ -65,9 +75,7 @@ export const onboardingSchema = z
     last_name: name("pavardę"),
     subjects: z.array(z.enum(SUBJECTS)).min(1, "Pasirinkite bent vieną dalyką").max(SUBJECTS.length),
     grades: z.array(z.enum(GRADE_BANDS)).min(1, "Pasirinkite bent vieną klasių grupę").max(GRADE_BANDS.length),
-    consent: z.literal(true, { message: "Reikia sutikimo tvarkyti duomenis" }),
+    consent: z.literal(true, { message: PRIVACY_ACK_REQUIRED }),
   })
   .merge(schoolChoiceSchema)
 
-export const CONSENT_TEXT =
-  "Sutinku, kad KU STEAM centras tvarkytų mano vardą, pavardę, el. paštą, mokyklą, dalykus ir klases veiklų organizavimo ir statistikos tikslais."
