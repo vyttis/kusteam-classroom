@@ -1,23 +1,49 @@
-# Privatumo pranešimo projektas (CLS-013)
+# Privatumo pranešimas: pagrindimas (CLS-013)
 
-Puslapis `app/privatumas/page.tsx` (`/privatumas`). Kol `lib/privacy.ts` būsena `draft`, puslapyje rodoma „Projektas“ ir atviri klausimai. Produkcijoje skelbiama tik Vyčiui Radvilai patvirtinus turinį.
+Viešas puslapis `app/privatumas/page.tsx` (`/privatumas`) yra trumpas ir be techninių detalių. Šis dokumentas yra vidinis: iš kur kiekvienas teiginys, kodėl pasirinktas teisinis pagrindas ir ko puslapyje sąmoningai neteigiame. Kol `lib/privacy.ts` būsena `draft`, puslapyje rodoma „Projektas“. Produkcijoje skelbiama tik Vyčiui Radvilai patvirtinus.
 
-Faktai patikrinti 2026-11-07, patikslinti 2026-11-08 po Vyčio nepriklausomos peržiūros. Žemiau nurodyta, iš kur paimtas kiekvienas teiginys. Ko patikrinti nepavyko, puslapyje pateikta kaip klausimas, o ne kaip faktas.
+KU duomenų apsaugos pareigūnas (konsultacija 2026-11-08, perdavė Vytis): pranešimai trumpi ir suprantami, laikomasi gerosios praktikos, vartotojai neapkraunami. Praktinį parengimą ir vidaus sprendimus jis paliko KU STEAM centrui. Todėl ankstesni klausimai DAP nebėra išorinis blokatorius; sprendimus priima Vytis (žr. „Laukia savininko patvirtinimo“).
 
-Susiję dokumentai:
+Susiję: `docs/data-retention.md` (saugojimo politikos projektas, CLS-014), `docs/library-access.md` (biblioteka, CLS-015).
 
-- `docs/data-retention.md`: saugojimas ir ištrynimas pagal duomenų kategorijas (CLS-014).
-- `docs/library-access.md`: patvirtintos bibliotekos prieinamumas per Supabase Data API (CLS-015).
+## Sluoksniai
+
+| Vieta | Ką mato žmogus |
+| --- | --- |
+| Paskyros prašymo forma | Vienas sakinys: duomenis KU naudoja tik paskyrai suteikti, prašymas saugomas 90 dienų po sprendimo; nuoroda; žymimasis langelis „Susipažinau su privatumo pranešimu.“ |
+| Profilio forma (pirmas prisijungimas) | Vienas sakinys: profilio duomenys naudojami paskyrai, veikloms ir apibendrintai statistikai; nuoroda; tas pats langelis |
+| Prisijungimo forma | Nuoroda į pranešimą |
+| Dalyvio įėjimas (kodas, QR) | Nuoroda į pranešimą |
+| Komandos vardo laukas | „Sugalvokite komandos vardą be tikrų vardų ir pavardžių. Paskyros nereikia.“ ir nuoroda |
+| `/privatumas` | Visas pranešimas, apie 320 žodžių: kas tvarko, ką renka, kodėl ir kokiu pagrindu, kas mato ir kam perduodama, kiek saugoma, teisės, kur kreiptis, slapukai |
+
+## Teisinis pagrindas
+
+**Siūloma:** viešojo intereso užduotis, BDAR 6 straipsnio 1 dalies e punktas, visiems platformos tvarkymo tikslams (paskyra, veiklos, rezultatai, DI pagalba, saugumas, statistika, pranešimai el. paštu).
+
+Kodėl:
+
+- KU yra valstybinis universitetas. Platforma yra nemokama KU STEAM centro švietimo paslauga mokytojams ir jų mokiniams, ne komercinė sutartis.
+- Mokslo ir studijų įstatymas (Nr. XI-242) leidžia aukštajai mokyklai pasirinkti mokslo žinių sklaidos kryptis ir formas bei teikti kitas švietimo paslaugas (8 straipsnio 2 dalis) ir įpareigoja sudaryti sąlygas mokytis visą gyvenimą (10 ir 11 straipsniai). Tikrinta pagal 2025-01-01 suvestinės redakcijos kopiją; e-seimas.lrs.lt šiai sesijai nepasiekiamas.
+- Sutikimas (a punktas) netinka: vedėjas negali gauti paskyros neduodamas duomenų, todėl sutikimas nebūtų laisvas, o jo atšaukimas reikštų paskyros panaikinimą. Žymimasis langelis todėl pakeistas į „Susipažinau su privatumo pranešimu“.
+- Teisėtas interesas (f punktas) valdžios institucijoms, vykdančioms savo užduotis, netaikomas.
+- Sutartis (b punktas) galima vedėjų paskyroms, bet netinka dalyviams ir statistikai; vienas pagrindas paprastesnis.
+
+Pasekmės pranešime: teisė nesutikti (21 straipsnis) nurodyta; teisė į duomenų perkeliamumą netaikoma, todėl neminima.
+
+Ko nepatikrinau: KU statuto ir STEAM centro nuostatų, kurie konkrečiai įvardytų šią veiklą. Todėl tai sprendimo klausimas Vyčiui (žr. žemiau).
 
 ## Patikrinti faktai
 
-| Teiginys puslapyje | Šaltinis |
+Faktai patikrinti kode, schemoje ir paslaugų nustatymuose 2026-11-07 ir 2026-11-08.
+
+| Teiginys | Šaltinis |
 | --- | --- |
 | Valdytojas VšĮ „Klaipėdos universitetas“, kodas 211951150 | KU „Asmens duomenų saugumo pažeidimų reagavimo tvarkos aprašas“ (rektoriaus 2021-12-15 įsakymas Nr. 1-044), 2.1 p., ku.lt |
 | Duomenų apsaugos pareigūnas Marius Kadelskas, dpo@ku.lt | Oficiali KU privatumo politika https://www.ku.lt/privatumo-politika; Vytis Radvila patvirtino 2026-11-08. Claude Code šio puslapio automatiškai perskaityti negali (ku.lt neleidžia automatinio skaitymo) |
 | Kontaktas steam@ku.lt | Platformos laiškų atsakymo adresas (`lib/email/send.ts`), puslapiai `/laukia`, prisijungimo forma |
 | Vedėjų duomenys | `profiles` stulpeliai (schema po visų migracijų), profilio forma, `lib/access/profile-fields.ts` |
-| Sutikimo tekstas | `CONSENT_TEXT` (`lib/access/profile-fields.ts`), rodomas prašymo ir profilio formose; data `profiles.consent_at` |
+| Formose pažymima „Susipažinau su privatumo pranešimu“ | `PRIVACY_ACK_TEXT` (`lib/access/profile-fields.ts`); API laukas lieka `consent`, laikas `profiles.consent_at` ir `access_requests.consent_at`. Tai patvirtinimas, kad pranešimas parodytas, ne teisinis pagrindas |
 | Paskyros prašymo duomenys | `access_requests` stulpeliai |
 | Dalyvių duomenys | `teams`, `submissions`, `hint_reveals`, `achievements`, `reflections`; paskyrų nėra |
 | DI naudojimo įrašas be turinio | `ai_usage`: naudotojas, funkcija, modelis, žetonai, kaina, laikas |
@@ -31,11 +57,11 @@ Susiję dokumentai:
 | Ištrynimas kaskadomis | Veiklos trynimas (`app/api/games/[gameId]`), komandos šalinimas; `on delete cascade` migracijose `00001`, `00004`, `00011`, `00012`, `00024` |
 | Ištrynus paskyrą: veiklos ir planai trinami, kita lieka | `profiles.id` → `auth.users` `on delete cascade`; `games.teacher_id`, `lesson_plans.teacher_id` `on delete cascade`; `library_items.published_by`, `access_requests.user_id`, `ai_usage.user_id`, `admin_audit_log.actor_id` `on delete set null` |
 | Paskyros platformoje ištrinti negalima | UI ir API turi tik blokavimą (`app/api/admin/users/[id]/status`); `auth.admin.deleteUser` kode nenaudojamas |
-| Paveikslėliai ir dokumentai neištrinami | Kode nėra nė vieno `storage.remove` kvietimo |
+| Paveikslėliai ir dokumentai dabar neištrinami | Kode nėra nė vieno `storage.remove` kvietimo. Pranešimo terminas dokumentams (7 dienos) reikalauja CLS-017 (`docs/data-retention.md`) |
 | Naktinis užbaigimas be trynimo | `app/api/cron/finish-stale-activities` keičia tik būseną |
-| Kasdienės atsarginės kopijos | Supabase → Database → Backups: kasdienės fizinės kopijos. Saugojimo trukmė pagal Supabase planą nepatikrinta |
+| Atsarginės kopijos daromos kasdien, saugomos ribotą laiką | Supabase → Database → Backups: kasdienės fizinės kopijos. Tikslios trukmės (pagal planą) Claude Code patikrinti negali: Supabase prieiga šiai sesijai CLASSROOM projekto nerodo. Puslapyje skaičius nenurodytas |
 | Paveikslėliai pagal nuorodą | Saugykla `challenge-images` vieša (`00003_challenge_media.sql`) |
-| Patvirtinti bibliotekos įrašai pasiekiami be prisijungimo | `docs/library-access.md`; Vytis 2026-11-08 produkcijoje patvirtino, kad `read_approved_library` taikoma rolei `public`. Pasirinktas B variantas: migracija atskirame PR (CLS-015), netaikyta. Pritaikius sakinį pakeisti (puslapyje pažymėta klausimu) |
+| Patvirtintus šablonus mato kiti prisijungę vedėjai | Teisinga tik pritaikius CLS-015 migraciją (PR #115). Iki tol per Data API jie pasiekiami ir be prisijungimo (`docs/library-access.md`). Todėl pranešimas skelbiamas tik po CLS-015 taikymo |
 | Dalyvio naršyklėje saugomas žetonas | `lib/game/session.ts`: `ctf_session_<kodas>` (tikrinama 24 val. riba), `ctf_start_<kodas>`, `ctf_reflection_<kodas>` |
 | Analitikos ir reklamos slapukų nėra | Priklausomybėse nėra analitikos ar reklamos paketų |
 
@@ -58,7 +84,9 @@ Ko neteigiame:
 - Resend, Anthropic ir Google duomenų tvarkymo vietos.
 - Vercel tinklo taško, kuriame priimama užklausa, vietos.
 - Kur paslaugų teikėjai saugo savo žurnalus ir kiek laiko.
-- Ar duomenys perduodami už EEE ribų. Ankstesnė frazė „bendrovės registruotos JAV“ išimta: šiame darbe ji nepatikrinta ir pati savaime neatsako, ar vyksta perdavimas.
+- Kad duomenys perduodami ar neperduodami už EEE ribų. Puslapyje yra tik sąlyginis sakinys apie apsaugos priemones, ir jis laukia Vyčio patvirtinimo apie teikėjų DPA (žr. 2 punktą žemiau).
+- Vercel funkcijų regiono: jis teisingas, bet vartotojui nieko nepaaiškina, o tinklo taško vietos nežinome.
+- Jokių lentelių, HMAC, RLS ar kitų techninių pavadinimų: jie lieka šiame dokumente.
 
 ## Produkcijos patikra (2026-11-08)
 
@@ -96,21 +124,17 @@ union all select 'admin_audit_log', count(*), min(created_at)::date from public.
 
 Atsarginių kopijų saugojimo trukmę rodo Supabase → Database → Backups (nepatikrinta).
 
-## Klausimai KU duomenų apsaugos pareigūnui
+## Laukia savininko patvirtinimo
 
-1. Teisinis pagrindas. Formose dabar prašoma sutikimo. Ar tinka sutikimas, ar KU naudoja kitą pagrindą (pvz., viešąjį interesą ar teisėtą interesą)? Jei sutikimas, kaip jis atšaukiamas.
-2. Saugojimo terminai kiekvienai `docs/data-retention.md` kategorijai (sprendimas S13: terminai derinami su DAP, Claude Code jų nenustato).
-3. Duomenų tvarkytojai ir perdavimai:
-   - ar su Supabase, Vercel, Anthropic, Resend ir Google sudarytos ar priimtos duomenų tvarkymo sutartys (DPA) ir kas jas sudaro KU vardu;
-   - kur duomenis tvarko Resend, Anthropic ir Google, kur paslaugų teikėjai saugo žurnalus;
-   - ar duomenys perduodami už EEE ribų ir kokiu pagrindu (pvz., sprendimas dėl tinkamumo ar standartinės sutarčių sąlygos).
-4. Kas priima duomenų subjektų prašymus: STEAM centras (steam@ku.lt) ar duomenų apsaugos pareigūnas.
-5. Ar reikia atskiros informacijos tėvams, kai dalyviai yra nepilnamečiai (dalyviai be paskyrų, bet laisvame tekste gali įrašyti vardus).
-6. Ar pranešime reikia nurodyti, kad paslaugų teikėjų žurnaluose gali būti IP adresas, ir kokiu tikslumu.
+1. **Teisinis pagrindas:** ar tvirtini BDAR 6 straipsnio 1 dalies e punktą (viešojo intereso užduotis) visiems tikslams. Alternatyva: b punktas vedėjų paskyroms ir e punktas dalyviams bei statistikai. Rekomenduoju e punktą.
+2. **Perdavimas už EEE:** sakinys „Jei teikėjas duomenis tvarko už Europos ekonominės erdvės ribų, taikomos BDAR numatytos apsaugos priemonės“ teisingas tik tada, kai su Supabase, Vercel, Resend ir Anthropic galioja jų duomenų tvarkymo sąlygos (DPA). Patvirtink, kad KU paskyros šias sąlygas priėmusios, arba sakinį išimsime.
+3. **Atsarginių kopijų trukmė:** pažiūrėk Supabase → Database → Backups. Jei nori, įrašysime skaičių vietoje „ribotą laiką“.
+4. **Žymimasis langelis:** palikti „Susipažinau su privatumo pranešimu“ (dabartinis pasiūlymas) ar visai atsisakyti langelio ir palikti tik sakinį su nuoroda. Pastarasis paprastesnis vartotojui, bet reikia mažo API pakeitimo.
+5. **Saugojimo terminai:** pranešime įrašyti tavo siūlomi terminai. Jie tampa teisingi tik patvirtinus politiką ir įgyvendinus mechanizmus (`docs/data-retention.md`).
+6. **Skelbimo sąlygos:** pranešimą skelbti tik kai (a) patvirtintas tekstas, (b) pritaikyta CLS-015 migracija, (c) įgyvendintas importuotų dokumentų trynimas (CLS-017). Kiti automatiniai trynimai (CLS-018) turi veikti iki pirmo termino pabaigos, ne vėliau kaip 2027 m. vasario pradžioje (pirmas prašymas išspręstas 2026-11-06, plius 90 dienų).
 
 ## Kaip paskelbti
 
-1. Vytis patvirtina turinį ir atsiunčia DAP pareigūno atsakymus.
-2. Claude Code pakeičia kiekvieną `<Question>` patvirtintu tekstu, `lib/privacy.ts` būseną pakeičia į `approved`, atnaujina datą.
-3. `tests/privacy-notice.test.ts` neleidžia `approved` būsenos su likusiais klausimais.
-4. CI, Vercel peržiūra, sujungimas, produkcijos patikra.
+1. Vytis patvirtina tekstą ir 1–6 punktus.
+2. Claude Code pataiso tekstą pagal sprendimus, `lib/privacy.ts` būseną pakeičia į `approved`, atnaujina datą.
+3. CI, Vercel peržiūra, sujungimas, produkcijos patikra telefone.

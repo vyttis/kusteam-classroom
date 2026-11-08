@@ -1,52 +1,117 @@
-# Duomenų saugojimas ir ištrynimas (CLS-014)
+# Duomenų saugojimo politikos projektas (CLS-014)
 
-**Suderinimo dokumentas.** Sprendimas S13 (Vytis Radvila, 2026-11-08): saugojimo terminai derinami su KU duomenų apsaugos pareigūnu (DAP). Claude Code jų nenustato. Kol terminai nesuderinti, šis dokumentas yra pagrindas pokalbiui su DAP, ne patvirtintas planas.
+**Būsena: projektas.** Terminus pasiūlė Vytis Radvila 2026-11-08, po konsultacijos su KU duomenų apsaugos pareigūnu (jis vidaus sprendimus paliko KU STEAM centrui). Tai dar ne patvirtinta ir ne įgyvendinta politika. Produkcijoje niekas netrinama.
 
-Suvestinė privatumo pranešimui (CLS-013). Faktai patikrinti kode ir migracijose 2026-11-08.
+**v1.0 sąlyga.** CLASSROOM v1.0 priimamas tik turint patvirtintą ir įgyvendinamą planą: kiekvienai kategorijai terminas, atsakingas asmuo ir trynimo būdas. Privatumo pranešimas (`/privatumas`) turi sakyti tai, kas iš tikrųjų daroma.
 
-**v1.0 sąlyga.** CLASSROOM v1.0 priimamas tik turint patvirtintą ir įgyvendinamą saugojimo planą: kiekvienai kategorijai patvirtintas terminas, atsakingas asmuo ir būdas, kuriuo duomenys ištrinami. Būdas gali būti rankinė procedūra. Automatinis trynimas gali būti vėlesnės versijos funkcija, bet privatumo pranešimas turi aprašyti tai, kas iš tikrųjų daroma.
+## Terminai ir ar jų galima laikytis
 
-## Kategorijos
+Faktai patikrinti kode ir migracijose 2026-11-08.
 
-„Dabar“ reiškia, kaip yra šiandien. „Siūlomas procesas“ yra pasiūlymas, kurį tvirtina Vytis; terminas jame paliktas DAP.
+| Kategorija | Siūlomas terminas | Nuo kada skaičiuojama | Ar dabar laikomasi | Ko trūksta | Darbas, svarba |
+| --- | --- | --- | --- | --- | --- |
+| Paskyrų prašymai | 90 dienų po sprendimo | Sprendimo laikas (`reviewed_at`, būsena patvirtinta ar atmesta) | Ne: trynimo nėra | Naktinis trynimas | CLS-018, v1.0. Pirmas terminas baigiasi 2027-02-04 (prašymas išspręstas 2026-11-06) |
+| Veiklų dalyvių rezultatai | 6 mėnesiai po užsiėmimo | Veiklos pabaiga (`games.finished_at`, nustatoma automatiškai) | Ne: rezultatai lieka, kol vedėjas ištrina veiklą | Naktinis komandų trynimas (kartu atsakymai, užuominos, ženkleliai, refleksijos). Veikla ir užduotys lieka vedėjui | CLS-018, v1.0. Pirmas terminas: 6 mėn. po piloto |
+| Vedėjų paskyros | Kol reikalingos; peržiūra po 24 mėn. neaktyvumo | Paskutinis prisijungimas (rodomas Administravimas → Vartotojai) | Taip, rankiniu būdu: sąrašas rodo paskutinį prisijungimą | Tik procedūra, kodo nereikia | Procedūra žemiau. v1.0: aprašyta. Pirmas taikymas ne anksčiau kaip 2028 m. |
+| DI sąnaudų įrašai | 12 mėnesių, jei nėra ilgesnių KU prievolių | Įrašo laikas | Ne | Naktinis trynimas | CLS-018, v1.0. Produkcijoje įrašų dar nėra |
+| Administravimo žurnalas | 12 mėnesių, jei nėra ilgesnių KU prievolių | Įrašo laikas | Ne | Naktinis trynimas | CLS-018, v1.0. Pirmas terminas 2027-11-06 |
+| Importuoti dokumentai | Po apdorojimo, ne vėliau kaip per 7 dienas | Įkėlimo laikas | Ne: failai niekada netrinami | Trynimas po apdorojimo ir naktinis valymas | CLS-017, iki PILOT READY, nes pranešimas tai žada. Produkcijoje failų dabar nėra |
+| Atsarginės kopijos | Pagal faktiškai patikrintą paslaugos planą | Supabase | Taip, automatiškai keičiamos | Vytis patikrina trukmę Supabase → Database → Backups | Vyčio veiksmas, iki PILOT READY |
 
-| Nr. | Duomenys | Kur | Dabar saugoma | Esamas ištrynimo būdas | Siūlomas procesas | Klausimas DAP |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | Vedėjų paskyros ir profiliai | Supabase `auth.users`, `profiles` | Kol ištrinama | Platformoje paskyrą galima tik užblokuoti. Ištrinti galima tik Supabase skydelyje (Authentication → Users). Kartu ištrinamos veiklos su dalyvių duomenimis ir pamokų planai | Ištrinti vedėjo prašymu ir periodiškai peržiūrėti neaktyvias paskyras. Atlieka super administratorius, užrašo, kas ir kada ištrinta (skydelio veiksmas į `admin_audit_log` nepatenka) | Terminas neaktyviai paskyrai. Ar ištrinant paskyrą trinti ir veiklų rezultatus |
-| 2 | Paskyrų prašymai, taip pat atmesti | `access_requests` (vardas, pavardė, el. paštas, mokykla, šaltinis, sprendimas) | Neribotai. Ištrynus paskyrą prašymas lieka | Nėra | Periodinis rankinis trynimas pagal terminą (paruošta SQL užklausa, Vyčio patvirtinimas) | Terminai patvirtintiems ir atmestiems prašymams |
-| 3 | Prašymo nuorodos | `request_links` (žyma, kas sukūrė, galiojimas) | Neribotai, atšauktos lieka | Atšaukimas platformoje, trynimo nėra | Kartu su 2 kategorija | Ar žyma laikoma asmens duomenimis, jei joje įrašytas vardas |
-| 4 | Veiklos, užduotys, skelbimai | `games`, `challenges`, `announcements` | Kol vedėjas ištrina. Naktinis darbas veiklas tik užbaigia | Vedėjas ištrina veiklą (kaskada) | Vedėjams rekomenduoti trinti nebereikalingas veiklas; periodinė senų baigtų veiklų peržiūra | Terminas baigtoms veikloms |
-| 5 | Dalyvių duomenys | `teams`, `submissions`, `hint_reveals`, `achievements`, `reflections` | Kaip veikla | Kaskada su veikla; vedėjas gali pašalinti komandą | Kartu su 4 kategorija | Terminas. Ar refleksijas ar statistiką galima laikyti ilgiau be komandų pavadinimų |
-| 6 | Pamokų planai | `lesson_plans` | Kol vedėjas ištrina | Vedėjas ištrina; kaskada ištrynus paskyrą | Kartu su 1 kategorija | Ar reikia atskiro termino |
-| 7 | Bibliotekos įrašai | `library_items` | Neribotai. Ištrynus autorių įrašas lieka be autoriaus | Super administratorius ištrina platformoje | Turinio peržiūra kartu su 1 kategorija | Ar įrašas gali likti ištrynus autoriaus paskyrą |
-| 8 | Užduočių paveikslėliai | Supabase saugykla `challenge-images` (vieša) | Neribotai. Lieka ištrynus užduotį, veiklą ar paskyrą | Nėra (kode nėra `storage.remove`), tik Supabase skydelis | Vienkartinis nebenaudojamų failų valymas pagal patvirtintą sąrašą; vėliau trynimas kartu su užduotimi | Terminas. Ar paveikslėliuose gali būti žmonių atvaizdai |
-| 9 | Vedėjų įkelti dokumentai | Supabase saugykla `documents`, `imports/<vedėjas>/...` | Neribotai, ir po importo | Nėra | Periodinis rankinis trynimas; vėliau trynimas iškart po importo | Ar dokumentą reikia laikyti po importo; jei taip, kiek |
-| 10 | DI naudojimo įrašai | `ai_usage` (naudotojas, funkcija, modelis, žetonai, kaina, laikas, be užklausų turinio) | Neribotai. Ištrynus paskyrą įrašas lieka be naudotojo | Nėra | Periodiškai pasilikti tik mėnesio sumas ir ištrinti eilutes | Terminas, atsižvelgiant į išlaidų apskaitą |
-| 11 | Administratorių veiksmų žurnalas | `admin_audit_log` (veiksmas, kas, kada; `details` yra el. pašto adresai) | Neribotai. Ištrynus paskyrą įrašas lieka, el. paštas detalėse lieka | Nėra | Periodinis rankinis trynimas pagal terminą | Terminas |
-| 12 | Vedėjų prisijungimo įvykiai | Supabase Auth (`auth.audit_log_entries`, gali būti IP adresas) | Produkcijoje 0 įrašų (2026-11-08). Supabase žurnalai už DB ribų nepatikrinti | Supabase nustatymai | Patikrinti; jei įrašai kaupiami, įtraukti į planą | Terminas. Ar šis žurnalas reikalingas |
-| 13 | Bandymų ribojimo identifikatoriai | Serverio egzemplioriaus atmintis (HMAC iš IP adreso) | Kol veikia serverio egzempliorius | Išnyksta su egzemplioriumi | Nieko nekeisti | Ar pakanka aprašymo pranešime |
-| 14 | Dalyvio naršyklė | `localStorage`: komandos žetonas, pradžios laikas, refleksijos būsena | Žetonas laikomas negaliojančiu po 24 val.; likusius išvalo „Išeiti“ arba naršyklė | „Išeiti“ dalyvio ekrane, naršyklės duomenų valymas | Nieko nekeisti | Ar pakanka aprašymo pranešime |
-| 15 | Atsarginės kopijos | Supabase | Kasdien; trukmė pagal Supabase planą, nepatikrinta | Automatiškai pagal planą | Patikrinti planą ir įrašyti trukmę į planą bei pranešimą | Ar trukmė tinka |
-| 16 | Išsiųsti laiškai | Resend žurnalai | Nepatikrinta | Resend nustatymai | Patikrinti Resend paskyroje | Terminas, jei reikia |
-| 17 | Paslaugų teikėjų techniniai žurnalai | Vercel, Supabase | Pagal teikėjų planus, nepatikrinta | Automatiškai pagal teikėją | Patikrinti ir įrašyti į planą | Ar reikia nurodyti pranešime |
+Kitos kategorijos, kurių šis sprendimas neapima:
+
+- **Užduočių paveikslėliai:** saugomi, kol yra užduotis, bet dabar lieka ir ištrynus užduotį. Nenaudojamų failų valymas POST-V1. Produkcijoje 1 failas.
+- **Prašymo nuorodos:** siūlau trinti kartu su prašymais, 90 dienų po galiojimo pabaigos ar atšaukimo (tame pačiame CLS-018 darbe).
+- **Dalyvio naršyklė:** komandos žetonas galioja 24 valandas. Kodo nereikia.
+- **Bandymų ribojimo identifikatoriai:** tik serverio atmintyje. Kodo nereikia.
+- **Paslaugų teikėjų žurnalai:** pagal teikėjų nustatymus. Supabase Auth žurnalas duomenų bazėje produkcijoje tuščias (2026-11-08).
+
+## Minimalūs pakeitimai
+
+Naujos infrastruktūros nereikia. Migracijų nereikia: visi laiko laukai jau yra. Abu darbai naudoja esamą naktinį Vercel cron (`/api/cron/finish-stale-activities`, 02:00 UTC) ir tą patį `CRON_SECRET`.
+
+**CLS-017. Importuoti dokumentai (P1, iki PILOT READY).**
+
+- `app/api/import/process`: po sėkmingo apdorojimo ištrinti failą iš saugyklos. Nepavykus failas lieka, kad vedėjas galėtų bandyti dar kartą.
+- Naktinis darbas: per Storage API ištrinti `documents/imports/**` failus, senesnius nei 7 dienos.
+- Patikra: testas su imituota saugykla parenka tik senesnius nei 7 dienos failus; peržiūros diegime įkėlus ir apdorojus dokumentą jo saugykloje nebėra.
+
+**CLS-018. Naktinis saugojimo valymas (P2, V1-BLOCKER, iki 2027-02-04).**
+
+- Vienas modulis, kviečiamas iš to paties naktinio darbo, su tuo pačiu laiko biudžetu.
+- Taisyklės:
+  - prašymai po sprendimo senesni nei 90 dienų;
+  - nebegaliojančios nuorodos senesnės nei 90 dienų;
+  - komandos veiklose, pasibaigusiose prieš daugiau nei 6 mėnesius;
+  - DI ir žurnalo įrašai senesni nei 12 mėnesių.
+- Režimas `RETENTION_MODE`: numatytasis `report` tik suskaičiuoja, `delete` trina. Pirmi paleidimai tik skaičiuoja; Vytis įjungia trynimą peržiūrėjęs skaičius.
+- Kiekvienas paleidimas įrašo į administravimo žurnalą tik skaičius, be asmens duomenų.
+- Patikra:
+  - testai: ribinės datos;
+  - `test:db`: senesni įrašai trinami, naujesni lieka;
+  - ištrynus komandas, veikla ir užduotys lieka;
+  - po produkcijos įjungimo ataskaitos užklausa (žemiau) rodo 0.
+
+**Nebūtina, Vyčio sprendimas.** Jei KU STEAM centrui ataskaitoms reikia ilgalaikių dalyvių skaičių, prieš trinant rezultatus galima išsaugoti tik skaičius veiklos eilutėje. Tam reikėtų mažos migracijos. Jei tokių ataskaitų nereikia, nedarome.
+
+## Ištrynimo procedūra
+
+**Periodinis valymas (kol nėra CLS-018, ir po jo patikrai).** Ataskaita, tik SELECT:
+
+```sql
+select 'access_requests' as k, count(*) from public.access_requests
+  where status in ('approved', 'rejected') and reviewed_at < now() - interval '90 days'
+union all select 'access_requests_undecided', count(*) from public.access_requests
+  where status = 'pending' and created_at < now() - interval '90 days'
+union all select 'teams', count(*) from public.teams t join public.games g on g.id = t.game_id
+  where g.status = 'finished' and g.finished_at < now() - interval '6 months'
+union all select 'ai_usage', count(*) from public.ai_usage where created_at < now() - interval '12 months'
+union all select 'admin_audit_log', count(*) from public.admin_audit_log where created_at < now() - interval '12 months'
+union all select 'documents', count(*) from storage.objects
+  where bucket_id = 'documents' and created_at < now() - interval '7 days';
+```
+
+Užklausa patikrinta vietinėje Postgres 17 kopijoje. Jei kurioje nors eilutėje skaičius didesnis nei 0, trynimą vykdo CLS-018 darbas `delete` režimu, Vyčiui patvirtinus. Rankinis trynimas SQL Editor tik išimtiniu atveju, viena transakcija, ištrintų eilučių skaičius turi sutapti su ataskaita. Dokumentų failus trinti tik per Storage API ar skydelį, ne SQL.
+
+**Neaktyvios paskyros (kas pusmetį).**
+
+1. Super administratorius Vartotojų sąraše randa paskyras, kurios neprisijungė 24 mėnesius.
+2. Parašo vedėjui. Jei vedėjas paskyros nebenori arba neatsako per 30 dienų, paskyrą užblokuoja.
+3. Ištrina Supabase → Authentication → Users. Kartu ištrinamos vedėjo veiklos su dalyvių rezultatais ir pamokų planai. Patvirtinti bibliotekos šablonai lieka be autoriaus.
+4. Užrašo datą ir skaičių (be el. pašto adresų).
+
+**Žmogaus prašymas ištrinti duomenis (steam@ku.lt arba dpo@ku.lt).**
+
+1. Atsakyti per vieną mėnesį.
+2. Vedėjui: kaip 3 žingsnis aukščiau. Jei prašo, ištrinti ir jo bibliotekos šablonus (Administravimas → Moderavimas → „Pašalinti“).
+3. Dalyviui: komandą pagal veiklos kodą ir komandos pavadinimą pašalina veiklos vedėjas (veiklos puslapyje).
+4. Užrašyti, kas ir kada įvykdyta.
+
+## Patikrinimo kriterijai
+
+- CLS-017: po apdorojimo failo saugykloje nėra; naktinis darbas ištrina tik senesnius nei 7 dienos failus.
+- CLS-018: `report` režimo skaičiai sutampa su ataskaitos užklausa; po `delete` ataskaita rodo 0; naujesni įrašai lieka; veikla ir užduotys lieka; administravimo žurnale yra paleidimo įrašas su skaičiais.
+- Procedūros: pirmas neaktyvių paskyrų peržiūros įrašas; prašymų įvykdymo įrašai.
+- Pranešimas: kiekvienas jame nurodytas terminas turi įgyvendintą mechanizmą arba aprašytą procedūrą.
 
 ## Produkcijos apimtis (2026-11-08)
 
-Vyčio SELECT patikra (`docs/privacy-review.md`): `access_requests` 1 įrašas (nuo 2026-11-06), `ai_usage` 0, `admin_audit_log` 3 (nuo 2026-11-06), `auth.audit_log_entries` 0, `storage.objects` 1 failas `challenge-images` (nuo 2026-03-02). Apimtis maža, todėl pirmas rankinis vykdymas paprastas, bet terminai reikalingi prieš v1.0.
+Vyčio SELECT patikra (`docs/privacy-review.md`):
 
-## Siūloma rankinė procedūra v1.0
+| Kas | Kiekis |
+| --- | --- |
+| Paskyrų prašymai | 1 (nuo 2026-11-06) |
+| DI įrašai | 0 |
+| Administravimo žurnalas | 3 (nuo 2026-11-06) |
+| Auth žurnalas | 0 |
+| Saugyklos failai | 1, `challenge-images`, nuo 2026-03-02 |
 
-Kol nėra automatinio trynimo:
+Apimtis maža, todėl pirmas valymas bus paprastas.
 
-1. Kiekvienai kategorijai Vytis patvirtina terminą ir atsakingą asmenį pagal DAP atsakymą.
-2. Claude Code repozitorijoje paruošia peržiūros užklausas (tik SELECT) ir trynimo užklausas kiekvienai kategorijai, su testu vietinėje Postgres 17.
-3. Nustatytu periodiškumu (pvz., semestro pabaigoje) super administratorius paleidžia peržiūrą, Vytis patvirtina, tada vykdomas trynimas SQL Editor arba Supabase skydelyje.
-4. Kiekvienas vykdymas užrašomas: data, kategorija, kiek įrašų ištrinta, kas vykdė.
-5. Privatumo pranešime aprašomi patvirtinti terminai ir tai, kad trynimas atliekamas periodiškai.
+## Laukia Vyčio sprendimo
 
-Automatinis trynimas (pvz., naktinis darbas) yra atskira užduotis po plano patvirtinimo.
-
-## Ko šis dokumentas nesprendžia
-
-- Konkrečių terminų.
-- Teisinio pagrindo (`docs/privacy-review.md`, 1 klausimas).
+1. Patvirtinti terminus (lentelė viršuje) ir kad KU neturi ilgesnių prievolių DI ir administravimo įrašams.
+2. Nepriimti sprendimo prašymai: siūlau tą patį 90 dienų terminą nuo pateikimo.
+3. Ar reikia ilgalaikių dalyvių skaičių ataskaitoms (nebūtina migracija).
+4. Atsarginių kopijų trukmė pagal Supabase planą.
+5. Leisti CLS-017 ir CLS-018 darbus. CLS-017 reikia iki PILOT READY.

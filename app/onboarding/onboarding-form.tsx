@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SchoolPicker, type SchoolValue } from "@/components/access/school-picker"
 import { ChipGroup } from "@/components/access/chip-group"
-import { CONSENT_TEXT, GRADE_BANDS, SUBJECTS } from "@/lib/access/profile-fields"
+import { GRADE_BANDS, PRIVACY_ACK_TEXT, PROFILE_PRIVACY_NOTE, SUBJECTS } from "@/lib/access/profile-fields"
 import { ArrowRight, Loader2 } from "lucide-react"
 import { PrivacyLink } from "@/components/privacy-link"
 
@@ -139,15 +139,15 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
         invalid={tried && grades.length === 0}
       />
 
+      <p className="text-xs text-muted-foreground">
+        {PROFILE_PRIVACY_NOTE} Plačiau: <PrivacyLink />
+      </p>
       <div className="flex items-start gap-3">
         <Checkbox id="ob-consent" checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5" />
         <Label htmlFor="ob-consent" className="text-xs font-normal leading-relaxed text-muted-foreground">
-          {CONSENT_TEXT}
+          {PRIVACY_ACK_TEXT}
         </Label>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Plačiau: <PrivacyLink />
-      </p>
 
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">

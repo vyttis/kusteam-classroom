@@ -23,12 +23,28 @@ describe("privacy notice (CLS-013)", () => {
     expect(page).toContain("dpo@ku.lt")
   })
 
+  it("is short and plain: contacts and legal basis, no technical terms", () => {
+    expect(page).toContain("steam@ku.lt")
+    expect(page.replace(/\s+/g, " ")).toContain("6 straipsnio 1 dalies e punktas")
+    for (const term of ["HMAC", "RLS", "access_requests", "ai_usage", "admin_audit_log", "auth.audit_log"]) {
+      expect(page, term).not.toContain(term)
+    }
+  })
+
+  it("does not present the form checkbox as consent (the basis is a public task)", () => {
+    const fields = read("lib/access/profile-fields.ts")
+    expect(fields).not.toMatch(/Sutinku/)
+    expect(fields).toContain("Susipažinau su privatumo pranešimu")
+    expect(page).not.toMatch(/sutikim/i)
+  })
+
   it("is linked from the participant, login and consent screens", () => {
     for (const file of [
       "components/player/join-screen.tsx",
       "app/auth/login/login-form.tsx",
       "components/access/access-request-form.tsx",
       "app/onboarding/onboarding-form.tsx",
+      "app/play/[gameCode]/page.tsx",
     ]) {
       expect(read(file), file).toContain("<PrivacyLink />")
     }
@@ -40,6 +56,10 @@ describe("privacy notice (CLS-013)", () => {
     } else {
       expect(page).toMatch(/Projektas/)
     }
+  })
+
+  it("tells participants they need no account and no real names", () => {
+    expect(read("app/play/[gameCode]/page.tsx")).toContain("be tikrų vardų ir pavardžių. Paskyros nereikia.")
   })
 
   it("stays public: the proxy does not treat it as a facilitator route", () => {

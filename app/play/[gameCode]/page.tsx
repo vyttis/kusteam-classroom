@@ -11,6 +11,7 @@ import type { PlayerSession } from "@/types/game"
 import { getPlayerSession, savePlayerSession } from "@/lib/game/session"
 import Link from "next/link"
 import Image from "next/image"
+import { PrivacyLink } from "@/components/privacy-link"
 
 type GameState =
   | { status: "loading" }
@@ -324,7 +325,7 @@ export default function JoinGamePage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Sugalvokite kūrybingą komandos vardą
+                  Sugalvokite komandos vardą be tikrų vardų ir pavardžių. Paskyros nereikia.
                 </p>
               </div>
 
@@ -347,7 +348,7 @@ export default function JoinGamePage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          STEAM LT Klaipėda &middot; Klaipėdos universitetas
+          STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
         </p>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SchoolPicker, type SchoolValue } from "@/components/access/school-picker"
-import { CONSENT_TEXT } from "@/lib/access/profile-fields"
+import { PRIVACY_ACK_REQUIRED, PRIVACY_ACK_TEXT, REQUEST_PRIVACY_NOTE } from "@/lib/access/profile-fields"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { PrivacyLink } from "@/components/privacy-link"
 
@@ -45,7 +45,7 @@ export function AccessRequestForm({ door, compact }: AccessRequestFormProps) {
       return
     }
     if (!consent) {
-      setError("Pažymėkite sutikimą, kad galėtume peržiūrėti prašymą.")
+      setError(PRIVACY_ACK_REQUIRED)
       return
     }
     setSending(true)
@@ -155,6 +155,9 @@ export function AccessRequestForm({ door, compact }: AccessRequestFormProps) {
         <Label htmlFor="ar-school">Mokykla</Label>
         <SchoolPicker id="ar-school" value={school} onChange={setSchool} />
       </div>
+      <p className="text-xs text-muted-foreground">
+        {REQUEST_PRIVACY_NOTE} Plačiau: <PrivacyLink />
+      </p>
       <div className="flex items-start gap-3">
         <Checkbox
           id="ar-consent"
@@ -163,12 +166,9 @@ export function AccessRequestForm({ door, compact }: AccessRequestFormProps) {
           className="mt-0.5"
         />
         <Label htmlFor="ar-consent" className="text-xs font-normal leading-relaxed text-muted-foreground">
-          {CONSENT_TEXT}
+          {PRIVACY_ACK_TEXT}
         </Label>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Plačiau: <PrivacyLink />
-      </p>
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
           {error}
