@@ -145,7 +145,13 @@ export async function computeDetailedStats(
     const solved = new Set(
       teamSubs.filter((s) => s.is_correct).map((s) => s.challenge_id)
     ).size
-    const hintsUsed = teamSubs.reduce((sum, s) => sum + (s.hints_used || 0), 0)
+    // Each answer records the hints opened on that task so far, so the same
+    // hint shows up again on every retry: count the most per task, not the sum.
+    const hintsByTask = new Map<string, number>()
+    for (const s of teamSubs) {
+      hintsByTask.set(s.challenge_id, Math.max(hintsByTask.get(s.challenge_id) ?? 0, s.hints_used || 0))
+    }
+    const hintsUsed = [...hintsByTask.values()].reduce((sum, n) => sum + n, 0)
     const lastActivity =
       teamSubs.length > 0 ? teamSubs[teamSubs.length - 1].attempted_at : null
 

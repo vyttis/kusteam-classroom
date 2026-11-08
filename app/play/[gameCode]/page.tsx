@@ -285,7 +285,13 @@ export default function JoinGamePage() {
 
       <div className="rise-in w-full max-w-sm relative z-10">
         <div className="flex justify-center mb-6">
-          <Image src="/illustrations/adventure-start.svg" alt="" width={192} height={192} />
+          <Image
+            src="/illustrations/adventure-start.svg"
+            alt=""
+            width={192}
+            height={192}
+            className="h-28 w-28 sm:h-48 sm:w-48"
+          />
         </div>
 
         <Card className="border-0 shadow-2xl shadow-primary/10 bg-white/90 backdrop-blur-xl">
@@ -299,8 +305,10 @@ export default function JoinGamePage() {
             <CardTitle className="text-xl font-bold text-steam-dark">
               {gameState.title}
             </CardTitle>
+            {/* Three lines at most: a long description pushed the team name
+                field below the fold on a phone. */}
             {gameState.description && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-3" title={gameState.description}>
                 {gameState.description}
               </p>
             )}
