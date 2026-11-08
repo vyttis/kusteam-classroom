@@ -643,11 +643,13 @@ vedėjo realaus laiko atnaujinimai (reikia bandomosios veiklos).
 
 Failas `supabase/migrations/20261108120000_library_active_facilitators_only.sql`,
 grąžinimas `supabase/rollback/20261108120000_library_active_facilitators_only.sql`.
-Sprendimas S12 = B (Vytis Radvila, 2026-11-08). Analizė:
-`docs/library-access.md`.
+Sprendimas S12 = B (Vytis Radvila, 2026-11-08), kryptis ir techninė
+peržiūra patvirtintos. Analizė: `docs/library-access.md`.
 
-**Būsena: PR nesujungtas, produkcijoje netaikyta.** Taikyti tik atskiru
-Vyčio leidimu, pagal planą tame pačiame lange kaip CLS-011.
+**Būsena: PR nesujungtas, produkcijoje netaikyta.** Taikymas dar
+neautorizuotas; taikyti tik atskiru Vyčio leidimu. Privatumo pranešimas
+(CLS-013) sako, kad šablonus mato tik prisijungę vedėjai, todėl siūloma
+taikyti iki pranešimo paskelbimo.
 
 Problema: `anon` turėjo visas teises į `library_items` (numatytoji Supabase
 teisė), o `read_approved_library` galiojo rolei `public`. Su viešu `anon`
@@ -704,8 +706,26 @@ Iš išorės su viešu `anon` raktu
 „Mano pateikimai“, moderavimas ir administravimo skaičius veikia
 (`docs/REGISTRATION-TEST.md`, E dalis), `E2E smoke (production)` žalias.
 
-Grąžinimas: rollback failas SQL Editor. Po jo `anon_select` `true`,
-`read_roles` `{public}`, `active_only` `0`, atspaudas kaip prieš taikymą.
+Avarinis grąžinimas: rollback failas SQL Editor. Po jo `anon_select`
+`true`, `read_roles` `{public}`, `active_only` `0`, atspaudas kaip prieš
+taikymą. **Dėmesio: avarinis grąžinimas vėl atveria anksčiau buvusį
+anoniminį skaitymą.** Bet kas su viešu `anon` raktu per Data API vėl mato
+visus patvirtintus įrašus su užuominomis, o `pending` ir `blocked` paskyros
+vėl mato patvirtintus įrašus. Naudoti tik jei migracija sugadina biblioteką
+aktyviems vedėjams, ir iš karto planuoti pataisymą bei pakartotinį taikymą.
+
+Dalinis grąžinimas, jei problema tik aktyvios paskyros patikroje (pvz.,
+aktyvus vedėjas staiga nemato bibliotekos): pašalinti tik ribojančią
+politiką. `anon` lieka uždarytas, skaityti gali visi prisijungę, kaip prieš
+migraciją, tik ne neprisijungę.
+
+```sql
+DROP POLICY IF EXISTS "Only active accounts read" ON public.library_items;
+```
+
+Po jo `anon_select` `false`, `read_roles` `{authenticated}`, `active_only`
+`0` (patikrinta lokaliai). Grąžinti į pilną migraciją: vėl pritaikyti
+migracijos failą (jis pakartotinai taikomas be klaidų).
 
 ## Konvencija toliau
 

@@ -1,6 +1,8 @@
 # Patvirtintos bibliotekos prieinamumas (CLS-015)
 
-**Sprendimas S12 = B** (Vytis Radvila, 2026-11-08): patvirtinta biblioteka skirta tik aktyviems prisijungusiems vedėjams. CLS-015 yra V1-BLOCKER. Migracija `supabase/migrations/20261108120000_library_active_facilitators_only.sql` paruošta atskirame PR; produkcijoje netaikyta (`docs/migration-history.md`, „CLS-015“).
+**Sprendimas S12 = B** (Vytis Radvila, 2026-11-08): patvirtinta biblioteka skirta tik aktyviems prisijungusiems vedėjams. CLS-015 yra V1-BLOCKER. Migracija `supabase/migrations/20261108120000_library_active_facilitators_only.sql` paruošta atskirame PR (#115). Kryptis ir techninė peržiūra patvirtintos, taikymas produkcijoje dar neautorizuotas (`docs/migration-history.md`, „CLS-015“).
+
+**Avarinis grąžinimas vėl atveria anoniminį skaitymą**, kuris buvo iki migracijos. Jį naudoti tik jei migracija sugadina biblioteką aktyviems vedėjams. Jei kliūva tik aktyvios paskyros patikra, yra dalinis grąžinimas, kuris `anon` palieka uždarytą (`docs/migration-history.md`).
 
 Politikos ir teisės patikrintos migracijose ir vietinėje Postgres 17 kopijoje po visų migracijų (2026-11-08). Šios kopijos schemos atspaudas, įskaitant teises ir RLS politikas, sutampa su produkcija, išskyrus `handle_new_user` (CLS-012). Vytis 2026-11-08 produkcijoje patvirtino, kad `read_approved_library` taikoma rolei `public`.
 
@@ -51,7 +53,7 @@ Patvirtinti šablonai lieka prieinami be prisijungimo.
 
 ## Sprendimas
 
-Pasirinkta B. CLASSROOM v1.0 skirtas patvirtintiems vedėjams. Biblioteka nėra suplanuota kaip vieša, o užuominų viešumas pedagogiškai kenkia. Migraciją siūloma taikyti tame pačiame produkcijos lange kaip CLS-011, kad būtų vienas atsarginės kopijos ir grąžinimo ciklas. Kol migracija netaikyta, privatumo pranešimo projektas teisingai sako, kad patvirtinti įrašai techniškai pasiekiami be prisijungimo; pritaikius šį sakinį reikia pakeisti (jis pažymėtas klausimu PR #112).
+Pasirinkta B. CLASSROOM v1.0 skirtas patvirtintiems vedėjams. Biblioteka nėra suplanuota kaip vieša, o užuominų viešumas pedagogiškai kenkia. Naujas privatumo pranešimas (PR #112) sako, kad patvirtintus šablonus mato tik prisijungę vedėjai. Todėl migraciją siūloma taikyti prieš skelbiant pranešimą, t. y. iki CLASSROOM PILOT READY. Jei tuo metu bus patvirtinta ir CLS-011, abi migracijas galima taikyti viename lange.
 
 ## Testavimo kriterijai (B)
 

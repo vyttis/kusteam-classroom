@@ -5,6 +5,14 @@
 -- shows the same policies and grants as the migration files): anon gets
 -- back the Supabase default grant (ALL), the read policy applies to public
 -- again and the restrictive SELECT policy is removed. Data is not changed.
+--
+-- WARNING: this emergency rollback reopens the anonymous read that the
+-- migration closes. After it, anyone with the public anon key can again
+-- read every approved library item through the Data API, and pending or
+-- blocked accounts can read them too. Use it only if the migration breaks
+-- the library for active facilitators, and plan the fix right away. If
+-- only the active-account check is the problem, use the partial rollback
+-- in docs/migration-history.md ("CLS-015"), which keeps anon closed.
 
 BEGIN;
 
