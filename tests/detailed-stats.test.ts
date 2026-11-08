@@ -113,6 +113,23 @@ describe("computeDetailedStats", () => {
     expect(t2.last_activity).toBe("2026-07-07T09:16:00Z")
   })
 
+  it("counts a hint once even when the team answered the task several times", async () => {
+    // Production 2026-11-08: one hint on a task, a wrong and then a right
+    // answer (both record hints_used 1) showed "2" to the facilitator.
+    const supabase = mockSupabase({
+      challenges,
+      teams: [teams[0]],
+      submissions: [
+        { challenge_id: CHALLENGE_A, is_correct: false, points_awarded: 0, team_id: TEAM_1, hints_used: 1, attempted_at: "2026-11-08T11:26:00Z" },
+        { challenge_id: CHALLENGE_A, is_correct: true, points_awarded: 80, team_id: TEAM_1, hints_used: 1, attempted_at: "2026-11-08T11:27:00Z" },
+        { challenge_id: CHALLENGE_B, is_correct: false, points_awarded: 0, team_id: TEAM_1, hints_used: 2, attempted_at: "2026-11-08T11:28:00Z" },
+        { challenge_id: CHALLENGE_B, is_correct: true, points_awarded: 110, team_id: TEAM_1, hints_used: 2, attempted_at: "2026-11-08T11:29:00Z" },
+      ],
+    })
+    const stats = await computeDetailedStats(supabase, "game-1")
+    expect(stats.team_stats[0].hints_used).toBe(3)
+  })
+
   it("returns empty stats for a game with no challenges", async () => {
     const supabase = mockSupabase({ challenges: [], teams })
     const stats = await computeDetailedStats(supabase, "game-1")

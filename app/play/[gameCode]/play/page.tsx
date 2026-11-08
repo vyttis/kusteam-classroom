@@ -814,7 +814,10 @@ export default function PlayPage() {
     challenges: challenges.map((c) => ({ id: c.id, title: c.title })),
     showLeaderboard,
     showReflection: !reflectionDone,
-    onReflectionDone: () => setReflectionDone(true),
+    // The form shows its own "Refleksija išsaugota" (or nothing after
+    // "Praleisti"); hiding it here unmounted that confirmation at once. A
+    // reload still hides it (reflectionDone is read from storage).
+    onReflectionDone: () => {},
     allowAccessRequests,
   }
 
