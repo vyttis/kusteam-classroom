@@ -117,8 +117,11 @@ export default async function GameDetailPage(
     ? await computeDetailedStats(supabase, game.id).catch(() => null)
     : null
 
+  // The team count is read once on the server. During a live session the
+  // control centre shows the live count, so a tile here would stay at the
+  // number from page load: show it only for a finished session.
   const statsCards = (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className={isFinished ? "grid grid-cols-2 sm:grid-cols-4 gap-3" : "grid grid-cols-3 gap-3"}>
       <Card className="border-border/50 bg-white">
         <CardContent className="p-4 text-center">
           <Puzzle className="h-5 w-5 mx-auto mb-1 text-primary-ink" />
@@ -128,13 +131,15 @@ export default async function GameDetailPage(
           <p className="text-xs text-muted-foreground">Užduotys</p>
         </CardContent>
       </Card>
-      <Card className="border-border/50 bg-white">
-        <CardContent className="p-4 text-center">
-          <Users className="h-5 w-5 mx-auto mb-1 text-secondary-ink" />
-          <p className="text-2xl font-bold text-steam-dark">{teamCount}</p>
-          <p className="text-xs text-muted-foreground">Komandos</p>
-        </CardContent>
-      </Card>
+      {isFinished && (
+        <Card className="border-border/50 bg-white">
+          <CardContent className="p-4 text-center">
+            <Users className="h-5 w-5 mx-auto mb-1 text-secondary-ink" />
+            <p className="text-2xl font-bold text-steam-dark">{teamCount}</p>
+            <p className="text-xs text-muted-foreground">Komandos</p>
+          </CardContent>
+        </Card>
+      )}
       <Card className="border-border/50 bg-white">
         <CardContent className="p-4 text-center">
           <Trophy className="h-5 w-5 mx-auto mb-1 text-highlight-ink" />

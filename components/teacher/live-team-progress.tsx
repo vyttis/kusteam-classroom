@@ -157,7 +157,9 @@ export function LiveTeamProgress({ gameId, paused = false, resumedAt: serverResu
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      {/* At most two columns: this area is a third of the page width at
+          most, and three cards cut team names to a few letters. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {teams.map((team, index) => {
           const lastSub = lastSubmissions.get(team.id)
           const stuck = isStuck(team)
@@ -172,7 +174,7 @@ export function LiveTeamProgress({ gameId, paused = false, resumedAt: serverResu
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm text-steam-dark truncate">
+                    <p className="font-semibold text-sm text-steam-dark leading-snug line-clamp-2 break-words" title={team.name}>
                       {index === 0 && teams.length > 1 && (
                         <Trophy className="inline h-3.5 w-3.5 text-highlight-ink mr-1 -mt-0.5" />
                       )}
