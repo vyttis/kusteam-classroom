@@ -13,7 +13,9 @@ export const metadata: Metadata = {
 // Short, layered notice (KU DPO advice, 2026-11-08): this page is the full
 // layer; the registration forms and the participant join page carry one
 // sentence and a link. Sources, legal basis reasoning and technical detail:
-// docs/privacy-review.md. Retention terms: docs/data-retention.md.
+// docs/privacy-review.md. "Kiek saugome" states what happens today: the
+// terms in docs/data-retention.md go on this page only once the nightly job
+// runs with RETENTION_MODE=delete in production.
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -84,22 +86,25 @@ export default function PrivacyPage() {
             bibliotekos šablonus mato kiti prisijungę vedėjai. Užduočių paveikslėliai pasiekiami pagal nuorodą.
           </p>
           <p>
-            Platformai veikti KU naudoja paslaugų teikėjus: Supabase (duomenų bazė ir prisijungimas, duomenys
-            laikomi ES), Vercel (svetainė), Resend (el. laiškai) ir Anthropic (DI pagalba vedėjams). Anthropic
-            gauna tik vedėjų rengiamą užduočių ir pamokų turinį, ne dalyvių atsakymus. Jei vedėjas jungiasi per
-            Google, prisijungimą atlieka Google. Jei teikėjas duomenis tvarko už Europos ekonominės erdvės ribų,
-            taikomos BDAR numatytos apsaugos priemonės. Duomenų neparduodame ir reklamai nenaudojame.
+            Platforma veikia naudodama šių paslaugų teikėjų paslaugas: Supabase (duomenų bazė ir prisijungimas,
+            duomenys laikomi ES), Vercel (svetainė), Resend (el. laiškai) ir Anthropic (DI pagalba vedėjams).
+            Anthropic gauna tik vedėjų rengiamą užduočių ir pamokų turinį, ne dalyvių atsakymus. Jei vedėjas
+            jungiasi per Google, prisijungimą atlieka Google. Šių teikėjų duomenų tvarkymo sąlygose perdavimams už
+            Europos ekonominės erdvės ribų numatytos ES standartinės sutarčių sąlygos. Duomenų neparduodame ir
+            reklamai nenaudojame.
           </p>
         </Section>
 
         <Section title="Kiek saugome">
+          <p>Duomenis saugome tol, kol jų reikia aukščiau nurodytiems tikslams.</p>
           <ul className="list-disc space-y-1 pl-5">
-            <li>Paskyrų prašymus: 90 dienų po sprendimo.</li>
-            <li>Dalyvių rezultatus: 6 mėnesius po užsiėmimo. Vedėjas gali juos ištrinti ir anksčiau.</li>
-            <li>Vedėjų paskyras: kol jos reikalingos. Nenaudojamas 24 mėnesius paskyras peržiūrime.</li>
-            <li>DI naudojimo ir administravimo įrašus: 12 mėnesių.</li>
-            <li>Importuotus dokumentus: ištriname po apdorojimo, ne vėliau kaip per 7 dienas.</li>
-            <li>Atsargines kopijas: daromos kasdien ir saugomos ribotą laiką pagal paslaugos planą.</li>
+            <li>
+              Vedėjas savo veiklą gali ištrinti bet kada. Kartu ištrinami tos veiklos komandų pavadinimai, atsakymai,
+              taškai ir refleksijos.
+            </li>
+            <li>Kitų duomenų, taip pat paskyros, ištrynimo galite paprašyti el. paštu (žr. „Jūsų teisės“).</li>
+            <li>Automatinio senų duomenų trynimo pagal terminą šiuo metu nėra.</li>
+            <li>Duomenų bazės atsargines kopijas paslaugos teikėjas daro kasdien ir saugo ribotą laiką.</li>
           </ul>
         </Section>
 
@@ -113,8 +118,9 @@ export default function PrivacyPage() {
 
         <Section title="Slapukai">
           <p>
-            Naudojame tik būtinus vedėjo prisijungimo slapukus. Dalyvio įrenginyje iki 24 valandų saugomas komandos
-            žetonas, kad perkrovus puslapį būtų galima tęsti. Analitikos ir reklamos slapukų nėra.
+            Naudojame tik būtinus vedėjo prisijungimo slapukus. Dalyvio naršyklėje išsaugomas komandos žetonas, kad
+            perkrovus puslapį būtų galima tęsti. Po 24 valandų jis nebenaudojamas ir ištrinamas, kai veiklos puslapis
+            vėl atidaromas. Analitikos ir reklamos slapukų nėra.
           </p>
         </Section>
 

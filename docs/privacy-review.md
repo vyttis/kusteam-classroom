@@ -84,7 +84,7 @@ Ko neteigiame:
 - Resend, Anthropic ir Google duomenų tvarkymo vietos.
 - Vercel tinklo taško, kuriame priimama užklausa, vietos.
 - Kur paslaugų teikėjai saugo savo žurnalus ir kiek laiko.
-- Kad duomenys perduodami ar neperduodami už EEE ribų. Puslapyje yra tik sąlyginis sakinys apie apsaugos priemones, ir jis laukia Vyčio patvirtinimo apie teikėjų DPA (žr. 2 punktą žemiau).
+- Kad duomenys perduodami ar neperduodami už EEE ribų. Puslapyje tik nurodyta, kad teikėjų DPA perdavimams numato ES standartines sutarčių sąlygas (žr. 3 punktą žemiau).
 - Vercel funkcijų regiono: jis teisingas, bet vartotojui nieko nepaaiškina, o tinklo taško vietos nežinome.
 - Jokių lentelių, HMAC, RLS ar kitų techninių pavadinimų: jie lieka šiame dokumente.
 
@@ -135,8 +135,12 @@ Iki paskelbimo turi atitikti realų veikimą:
 3. Sakinys apie perdavimą už EEE: patikrinta 2026-11-08 viešose sąlygose. Visų keturių teikėjų DPA galioja priėmus pagrindines sąlygas, atskiro pasirašymo nereikia, perdavimams už EEE taikomos ES standartinės sutarčių sąlygos: Vercel (paslaugų sąlygų 11.1 p. DPA įtraukia nuoroda, https://vercel.com/legal/dpa), Supabase (DPA yra paslaugų sąlygų dalis, https://supabase.com/legal/dpa), Resend (DPA privalomas priėmus sąlygas, taip pat ES ir JAV duomenų privatumo sistema, https://resend.com/legal/dpa), Anthropic (DPA automatiškai įtrauktas į komercines sąlygas, https://privacy.claude.com/en/articles/7996862). Sakinys teisingas. DPO klausimas: paskyros pas teikėjus yra Vyčio Radvilos paskyros, ne KU vardu sudarytos sutartys.
 4. Atsarginių kopijų trukmė: nebūtina pranešime, bet patikrinama Supabase → Database → Backups.
 
-## Kaip paskelbti
+## Paskelbta 2026-11-08
 
-1. Vytis patvirtina tekstą ir 1–6 punktus.
-2. Claude Code pataiso tekstą pagal sprendimus, `lib/privacy.ts` būseną pakeičia į `approved`, atnaujina datą.
-3. CI, Vercel peržiūra, sujungimas, produkcijos patikra telefone.
+Vytis 2026-11-08 nurodė paskelbti, jei nėra esminių neatitikimų, ir nežadėti automatinio trynimo, kol jis neįjungtas. Pakeitimai prieš paskelbimą:
+
+- „Kiek saugome“ aprašo dabartinį veikimą: veiklos trynimas su komandų duomenimis, trynimas pagal prašymą, automatinio trynimo pagal terminą nėra, kasdienės atsarginės kopijos. Terminai iš `docs/data-retention.md` į puslapį ir prašymo formos sakinį grąžinami tik tada, kai naktinis darbas produkcijoje veikia su `RETENTION_MODE=delete`.
+- Perdavimų sakinys sako tik tai, kas patikrinta 3 punkte: teikėjų DPA numato ES standartines sutarčių sąlygas. Puslapis neteigia, kad sutartis su teikėjais sudarė KU.
+- Slapukų sakinys: žetonas po 24 val. nebenaudojamas ir ištrinamas, kai puslapis vėl atidaromas (`lib/game/session.ts`), o ne ištrinamas savaime.
+
+Lieka KU sprendimui, pranešimo teisingumo nekeičia: paskyros pas teikėjus yra Vyčio Radvilos, ne KU vardu sudarytos sutartys.

@@ -4,7 +4,7 @@
  * after Vytis Radvila approves the content; tests/privacy-notice.test.ts then
  * refuses any open question left in the page.
  */
-export const PRIVACY_NOTICE_STATUS: "draft" | "approved" = "draft"
+export const PRIVACY_NOTICE_STATUS: "draft" | "approved" = "approved"
 
 /** Date shown on the page; update with every content change. */
 export const PRIVACY_NOTICE_UPDATED = "2026 m. lapkričio 8 d."

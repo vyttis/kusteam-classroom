@@ -6,7 +6,7 @@ import { z } from "zod"
 export const PRIVACY_ACK_TEXT = "Susipažinau su privatumo pranešimu."
 export const PRIVACY_ACK_REQUIRED = "Pažymėkite, kad susipažinote su privatumo pranešimu."
 export const REQUEST_PRIVACY_NOTE =
-  "Prašymo duomenis Klaipėdos universitetas naudoja tik vedėjo paskyrai suteikti ir saugo 90 dienų po sprendimo."
+  "Prašymo duomenis Klaipėdos universitetas naudoja tik vedėjo paskyrai suteikti."
 export const PROFILE_PRIVACY_NOTE =
   "Profilio duomenis Klaipėdos universitetas naudoja vedėjo paskyrai, veikloms ir apibendrintai statistikai."
 
