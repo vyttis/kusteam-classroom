@@ -104,7 +104,8 @@ export async function POST(_request: Request, props: { params: Promise<{ itemId:
 
       let { error: challengeError } = await supabase
         .from("challenges")
-        .insert(await buildChallenges(true))
+        // Missing keys take the column default, not NULL (see duplicate).
+        .insert(await buildChallenges(true), { defaultToNull: false })
 
       // needs_answer column may not exist on unmigrated DBs — retry without it
       if (
@@ -113,7 +114,7 @@ export async function POST(_request: Request, props: { params: Promise<{ itemId:
       ) {
         ;({ error: challengeError } = await supabase
           .from("challenges")
-          .insert(await buildChallenges(false)))
+          .insert(await buildChallenges(false), { defaultToNull: false }))
       }
 
       if (challengeError) {
