@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { STALE_MIN_AGE_MS, isStaleActivity, latest } from "@/lib/game/stale"
+import { retentionMode, runRetention, type RetentionSummary } from "@/lib/retention"
 
 export const maxDuration = 60
 
@@ -31,6 +32,9 @@ function authorized(request: Request, secret: string): boolean {
  * lesson, see lib/game/stale.ts for the rule. Same effect as the admin
  * "Baigti" (results stay, the database keeps the pause time), written to
  * the admin audit log as game_auto_finish without an actor.
+ *
+ * Then data retention (lib/retention.ts, CLS-017 and CLS-018) in the time
+ * that is left: counts only, unless RETENTION_MODE=delete.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -89,8 +93,19 @@ export async function GET(request: Request) {
 
   const summary = { checked, finished, failed, incomplete: stopped !== null, stopped }
   console.log(JSON.stringify({ event: "auto_finish_done", ...summary }))
+
+  let retention: RetentionSummary | { failed: string[] }
+  try {
+    retention = await runRetention(admin, { now: new Date(now), mode: retentionMode(), overBudget })
+  } catch (e) {
+    console.error(JSON.stringify({ event: "retention_error", message: e instanceof Error ? e.message : "unknown" }))
+    retention = { failed: ["error"] }
+  }
+  console.log(JSON.stringify({ event: "retention_done", ...retention }))
+
   // A read failure means activities were skipped: report it as a failed run.
-  return NextResponse.json(summary, { status: stopped === "list_failed" ? 500 : 200 })
+  const runFailed = stopped === "list_failed" || retention.failed.length > 0
+  return NextResponse.json({ ...summary, retention }, { status: runFailed ? 500 : 200 })
 }
 
 async function finishIfStale(
