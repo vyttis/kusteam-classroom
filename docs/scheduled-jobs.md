@@ -31,3 +31,28 @@ Rezultatas matomas Vercel žurnale: įvykis `auto_finish_done` su `checked`,
 (`stopped: "time_budget"`), likusios veiklos laukia kitos nakties. Jei
 nepavyko perskaityti sąrašo (`stopped: "list_failed"`), atsakymas 500 ir
 Vercel pažymi paleidimą kaip nepavykusį.
+
+## Duomenų saugojimo valymas (CLS-017, CLS-018)
+
+Tas pats naktinis darbas, po veiklų užbaigimo, pagal patvirtintus terminus
+(Vytis Radvila, 2026-11-08; kodas `lib/retention.ts`):
+
+- paskyrų prašymai: 90 dienų po sprendimo;
+- dalyvių rezultatai (komandos su atsakymais, užuominomis, ženkleliais,
+  refleksijomis): 6 mėnesiai po veiklos pabaigos; veikla ir užduotys lieka;
+- DI naudojimo ir administravimo žurnalo įrašai: 12 mėnesių;
+- importuoti dokumentai: ištrinami po sėkmingo apdorojimo, likę senesni nei
+  7 dienos ištrinami naktį.
+
+Režimas `RETENTION_MODE`:
+
+- nenustatytas (numatytasis): darbas tik suskaičiuoja, kas būtų ištrinta,
+  ir įrašo į Vercel žurnalą įvykį `retention_done`. Niekas netrinama;
+- `delete`: trina ir į `admin_audit_log` įrašo `retention_run` tik su
+  skaičiais. Tas pats kintamasis įjungia dokumento trynimą po importo.
+
+Įjungimas: Vercel → ctf-builder → Settings → Environment Variables,
+`RETENTION_MODE` = `delete`, aplinka Production, tada Redeploy. Prieš tai
+peržiūrėti kelių naktų `retention_done` skaičius. Išjungti: ištrinti
+kintamąjį ir perdiegti. Jei valymo žingsnis nepavyksta, atsakymas 500 ir
+`retention.failed` rodo, kuris.
