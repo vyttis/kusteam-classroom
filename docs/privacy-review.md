@@ -131,8 +131,8 @@ Vytis 2026-11-08 priėmė: trumpą pranešimą kaip galutinę kryptį, BDAR 6 st
 Iki paskelbimo turi atitikti realų veikimą:
 
 1. Bibliotekos sakinys: pritaikyta CLS-015 migracija (PR #115). Atlikta 2026-11-08.
-2. Saugojimo terminai: kodas produkcijoje (PR #116), bet trinama tik nustačius `RETENTION_MODE=delete`.
-3. Sakinys apie perdavimą už EEE: patvirtinta, kad su Supabase, Vercel, Resend ir Anthropic galioja jų duomenų tvarkymo sąlygos; kitaip sakinys išimamas.
+2. Saugojimo terminai: kodas produkcijoje (PR #116), bet trinama tik nustačius `RETENTION_MODE=delete`. 2026-11-08 naktinis darbas paleistas `report` režimu: klaidų nėra, vykdymas pilnas, trintinas tik 1 įrašas (1 komanda su 5 atsakymais iš 2026-03-03 veiklos „Lietuvos prezidentai (kopija)“). Kol Vytis nepatvirtina jo ištrynimo, `delete` neįjungtas, todėl teiginiai apie 6 mėn. ir importuotų dokumentų trynimą dar nevykdomi.
+3. Sakinys apie perdavimą už EEE: patikrinta 2026-11-08 viešose sąlygose. Visų keturių teikėjų DPA galioja priėmus pagrindines sąlygas, atskiro pasirašymo nereikia, perdavimams už EEE taikomos ES standartinės sutarčių sąlygos: Vercel (paslaugų sąlygų 11.1 p. DPA įtraukia nuoroda, https://vercel.com/legal/dpa), Supabase (DPA yra paslaugų sąlygų dalis, https://supabase.com/legal/dpa), Resend (DPA privalomas priėmus sąlygas, taip pat ES ir JAV duomenų privatumo sistema, https://resend.com/legal/dpa), Anthropic (DPA automatiškai įtrauktas į komercines sąlygas, https://privacy.claude.com/en/articles/7996862). Sakinys teisingas. DPO klausimas: paskyros pas teikėjus yra Vyčio Radvilos paskyros, ne KU vardu sudarytos sutartys.
 4. Atsarginių kopijų trukmė: nebūtina pranešime, bet patikrinama Supabase → Database → Backups.
 
 ## Kaip paskelbti
