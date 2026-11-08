@@ -95,6 +95,11 @@ Supabase Auth → URL Configuration: Site URL `https://pamokos.kusteam.app`, Red
 - `lib/auth/roles.ts`: RBAC `teacher` / `admin` / `super_admin`
 - `supabase/migrations/`: DB schema (`00001`…`00025`, žr. `docs/migration-history.md`)
 
+## Patikros produkcijoje
+
+- `docs/REGISTRATION-TEST.md`: paskyros prašymas, patvirtinimas, kvietimas, administratoriaus rolė, bibliotekos moderavimas (CLS-004).
+- `docs/PILOT.md`: pilotas klasėje su 5–10 tikrų įrenginių (CLS-002).
+
 ## Saugumas
 
 - RLS visose lentelėse, anon INSERT izoliuotas (00018).

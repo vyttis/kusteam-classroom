@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { removeImportDocument, retentionMode } from "@/lib/retention"
 import { checkAiAllowance, enterAiContext } from "@/lib/ai/usage"
 import { NextResponse } from "next/server"
 import { IMPORT_TEXT_LIMIT } from "@/lib/upload-limits"
@@ -133,6 +135,9 @@ Sugeneruok ${parsed.data.count} užduotis pagal šį dokumentą. Užduotys turi 
         return { ...suggestion, verification }
       })
     )
+
+    // CLS-017: the document is not needed after a successful import.
+    await removeImportDocument(parsed.data.storage_path, retentionMode(), createAdminClient)
 
     return NextResponse.json({ suggestions: enriched, truncated })
   } catch (error) {

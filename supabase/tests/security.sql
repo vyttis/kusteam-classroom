@@ -743,3 +743,78 @@ BEGIN
     NULL;
   END;
 END $$;
+
+-- CLS-015: the approved library is for active, signed-in facilitators only
+-- (20261108120000). Anon has no privilege; pending and blocked accounts see
+-- nothing; an active teacher sees approved items and their own; admins and
+-- super admins see everything. scripts/test-data-api.sh repeats this through
+-- the Data API.
+RESET ROLE;
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-0000-0000-0000000001a1', 'cls015-author@example.lt'),
+  ('00000000-0000-0000-0000-0000000001a2', 'cls015-teacher@example.lt'),
+  ('00000000-0000-0000-0000-0000000001a3', 'cls015-pending@example.lt'),
+  ('00000000-0000-0000-0000-0000000001a4', 'cls015-blocked@example.lt'),
+  ('00000000-0000-0000-0000-0000000001a5', 'cls015-admin@example.lt'),
+  ('00000000-0000-0000-0000-0000000001a6', 'cls015-super@example.lt');
+UPDATE public.profiles SET status = 'active', role = 'teacher'
+  WHERE id IN ('00000000-0000-0000-0000-0000000001a1', '00000000-0000-0000-0000-0000000001a2');
+UPDATE public.profiles SET status = 'pending', role = 'teacher' WHERE id = '00000000-0000-0000-0000-0000000001a3';
+UPDATE public.profiles SET status = 'blocked', role = 'teacher' WHERE id = '00000000-0000-0000-0000-0000000001a4';
+UPDATE public.profiles SET status = 'active', role = 'admin' WHERE id = '00000000-0000-0000-0000-0000000001a5';
+UPDATE public.profiles SET status = 'active', role = 'super_admin' WHERE id = '00000000-0000-0000-0000-0000000001a6';
+INSERT INTO public.library_items (title, published_by, status) VALUES
+  ('CLS015 approved', '00000000-0000-0000-0000-0000000001a1', 'approved'),
+  ('CLS015 pending', '00000000-0000-0000-0000-0000000001a1', 'pending_review'),
+  ('CLS015 rejected', '00000000-0000-0000-0000-0000000001a1', 'rejected');
+
+DO $$
+BEGIN
+  IF has_table_privilege('anon', 'public.library_items', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
+    RAISE EXCEPTION 'anon must have no privilege on library_items';
+  END IF;
+END $$;
+
+SET ROLE anon;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'anon', false);
+SELECT public.t_denied('SELECT 1 FROM public.library_items');
+SELECT public.t_denied($q$SELECT 1 FROM public.library_items WHERE status = 'approved'$q$);
+SELECT public.t_denied($q$INSERT INTO public.library_items (title, status) VALUES ('anon', 'pending_review')$q$);
+SELECT public.t_denied('UPDATE public.library_items SET clone_count = clone_count + 1');
+SELECT public.t_denied('DELETE FROM public.library_items');
+
+RESET ROLE;
+CREATE FUNCTION public.t_cls015(who uuid, expected int) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', who::text, false);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', false);
+  PERFORM public.t_rows($q$SELECT 1 FROM public.library_items WHERE title LIKE 'CLS015 %'$q$, expected);
+END $$;
+GRANT EXECUTE ON FUNCTION public.t_cls015(uuid, int) TO authenticated;
+
+SET ROLE authenticated;
+-- Active teacher, not the author: approved only.
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a2', 1);
+SELECT public.t_rows($q$SELECT 1 FROM public.library_items WHERE title = 'CLS015 approved'$q$, 1);
+-- Author: approved and own pending and rejected.
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a1', 3);
+-- Pending and blocked accounts: nothing, not even approved items.
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a3', 0);
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a4', 0);
+-- Admin and super admin: everything.
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a5', 3);
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a6', 3);
+-- A signed-in session without a profile row sees nothing.
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001ff', 0);
+
+-- A blocked author loses the own items too; unblocking restores them.
+RESET ROLE;
+UPDATE public.profiles SET status = 'blocked' WHERE id = '00000000-0000-0000-0000-0000000001a1';
+SET ROLE authenticated;
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a1', 0);
+RESET ROLE;
+UPDATE public.profiles SET status = 'active' WHERE id = '00000000-0000-0000-0000-0000000001a1';
+SET ROLE authenticated;
+SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a1', 3);
+RESET ROLE;
