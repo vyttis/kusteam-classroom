@@ -11,9 +11,11 @@ export const metadata: Metadata = {
 }
 
 // Facts below were checked against the code, the database schema and the
-// service settings on 2026-11-07 (docs/privacy-review.md). Anything that
-// could not be verified is an open question for the KU data protection
-// officer and is shown with <Question> until Vytis Radvila approves the text.
+// service settings on 2026-11-07 and 2026-11-08 (docs/privacy-review.md).
+// Anything that could not be verified is an open question for the KU data
+// protection officer and is shown with <Question> until Vytis Radvila
+// approves the text. Storage and deletion per data category:
+// docs/data-retention.md.
 
 function Question({ children }: { children: ReactNode }) {
   return (
@@ -60,8 +62,15 @@ export default function PrivacyPage() {
             .
           </p>
           <p>
-            Duomenų apsaugos pareigūnas:
-            <Question>kontaktas pagal oficialią KU privatumo politiką.</Question>
+            Duomenų apsaugos pareigūnas: Marius Kadelskas,{" "}
+            <a className="underline" href="mailto:dpo@ku.lt">
+              dpo@ku.lt
+            </a>
+            .
+            <Question>
+              kontaktas paimtas iš KU privatumo politikos (www.ku.lt/privatumo-politika). Prieš paskelbiant
+              patvirtinti, kad jis galioja.
+            </Question>
           </p>
         </Section>
 
@@ -109,8 +118,14 @@ export default function PrivacyPage() {
           </p>
           <h3 className="font-semibold text-steam-dark">Techniniai duomenys</h3>
           <p>
-            IP adresas naudojamas tik bandymų ribojimui: serverio atmintyje laikomas užšifruotas jo raktas, į
-            duomenų bazę jis neįrašomas. Paslaugų teikėjai (žr. žemiau) veda savo techninius žurnalus.
+            IP adresą platforma naudoja tik tam, kad apribotų per dažnus bandymus prisijungti prie veiklos, grįžti
+            į komandą ar pateikti paskyros prašymą. Serveris iš adreso apskaičiuoja identifikatorių ir laiko jį tik
+            savo darbinėje atmintyje. Nei adresas, nei identifikatorius į platformos duomenų bazę neįrašomi.
+            Paslaugų teikėjai (žr. žemiau) savo techniniuose žurnaluose gali įrašyti IP adresą.
+            <Question>
+              ar ir kiek laiko IP adresą saugo paslaugų teikėjų žurnalai, taip pat vedėjų prisijungimo įvykių
+              žurnalas.
+            </Question>
           </p>
         </Section>
 
@@ -129,18 +144,19 @@ export default function PrivacyPage() {
 
         <Section title="Paslaugų teikėjai">
           <ul className="list-disc space-y-1 pl-5">
-            <li>Supabase: duomenų bazė, prisijungimas ir failai. Duomenų centras Frankfurte (ES).</li>
-            <li>Vercel: svetainės talpinimas. Serverio funkcijos vykdomos Frankfurte (ES).</li>
+            <li>Supabase: duomenų bazė, prisijungimas ir failai. Projekto regionas: Frankfurtas (ES).</li>
+            <li>Vercel: svetainės talpinimas. Serverio funkcijų regionas: Frankfurtas (ES).</li>
             <li>
               Anthropic: DI pagalba vedėjui. Siunčiamas tik vedėjo užduočių, pamokų planų ir įkeltų dokumentų
               tekstas. Dalyvių atsakymai DI paslaugai nesiunčiami.
             </li>
-            <li>Resend: el. laiškai (prisijungimo kodas, kvietimas, pranešimai), ES regionas.</li>
+            <li>Resend: el. laiškai (prisijungimo kodas, kvietimas, pranešimai).</li>
             <li>Google: tik jei vedėjas pasirenka prisijungti per Google.</li>
           </ul>
           <Question>
-            duomenų tvarkymo sutartys su šiais teikėjais ir duomenų perdavimas už Europos ekonominės erdvės ribų
-            (bendrovės registruotos JAV).
+            kur duomenis tvarko Anthropic, Resend ir Google, kuriame tinklo taške Vercel priima užklausas ir kur
+            teikėjai saugo savo žurnalus; duomenų tvarkymo sutartys su teikėjais; ar duomenys perduodami už
+            Europos ekonominės erdvės ribų ir kokiu pagrindu.
           </Question>
         </Section>
 
@@ -148,18 +164,25 @@ export default function PrivacyPage() {
           <ul className="list-disc space-y-1 pl-5">
             <li>
               Vedėjas gali ištrinti savo veiklą. Kartu ištrinamos jos komandos, atsakymai, refleksijos, pasiekimai
-              ir skelbimai. Vedėjas gali pašalinti ir atskirą komandą.
+              ir skelbimai. Vedėjas gali pašalinti ir atskirą komandą. Užduočių paveikslėliai lieka saugykloje.
             </li>
             <li>Nebaigtos veiklos naktį automatiškai užbaigiamos, bet neištrinamos.</li>
             <li>
-              Paskyros, paskyrų prašymai, DI naudojimo įrašai, administratorių veiksmų žurnalas ir įkelti dokumentai
-              automatiškai neištrinami.
+              Paskyros, paskyrų prašymai, DI naudojimo įrašai, administratorių veiksmų žurnalas, užduočių
+              paveikslėliai ir įkelti dokumentai automatiškai neištrinami.
+            </li>
+            <li>
+              Vedėjas savo paskyros pats ištrinti negali, tai gali padaryti tik KU STEAM centro administratorius.
+              Kartu ištrinamos vedėjo veiklos ir pamokų planai. Patvirtinti bibliotekos įrašai lieka be autoriaus.
+              Paskyros prašymas, DI naudojimo įrašai ir administratorių veiksmų žurnalo įrašai lieka; prašyme ir
+              žurnale lieka el. pašto adresas.
             </li>
             <li>Duomenų bazės atsarginės kopijos daromos kasdien.</li>
           </ul>
           <Question>
             saugojimo terminai: vedėjų paskyroms, paskyrų prašymams (taip pat atmestiems), veiklų rezultatams,
-            DI naudojimo įrašams, administratorių veiksmų žurnalui, įkeltiems dokumentams ir atsarginėms kopijoms.
+            DI naudojimo įrašams, administratorių veiksmų žurnalui, užduočių paveikslėliams, įkeltiems
+            dokumentams, atsarginėms kopijoms ir paslaugų teikėjų žurnalams.
           </Question>
         </Section>
 

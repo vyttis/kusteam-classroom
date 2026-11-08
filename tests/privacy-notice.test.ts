@@ -15,6 +15,14 @@ describe("privacy notice (CLS-013)", () => {
     }
   })
 
+  it("makes no claims that were not verified (docs/privacy-review.md)", () => {
+    // The rate-limit key is an HMAC of the address, not encryption.
+    expect(page).not.toMatch(/šifruot/i)
+    // Resend's region was not checked in the Resend account.
+    expect(page).not.toMatch(/Resend[^<]*ES regionas/)
+    expect(page).toContain("dpo@ku.lt")
+  })
+
   it("is linked from the participant, login and consent screens", () => {
     for (const file of [
       "components/player/join-screen.tsx",

@@ -7,4 +7,4 @@
 export const PRIVACY_NOTICE_STATUS: "draft" | "approved" = "draft"
 
 /** Date shown on the page; update with every content change. */
-export const PRIVACY_NOTICE_UPDATED = "2026 m. lapkričio 7 d."
+export const PRIVACY_NOTICE_UPDATED = "2026 m. lapkričio 8 d."
