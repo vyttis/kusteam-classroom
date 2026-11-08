@@ -3,9 +3,9 @@ name: Database
 on:
   push:
     branches: [main]
-    paths: ["supabase/**", "scripts/test-db.sh", ".github/workflows/db.yml"]
+    paths: ["supabase/**", "scripts/test-db.sh", "scripts/test-data-api.sh", ".github/workflows/db.yml"]
   pull_request:
-    paths: ["supabase/**", "scripts/test-db.sh", ".github/workflows/db.yml"]
+    paths: ["supabase/**", "scripts/test-db.sh", "scripts/test-data-api.sh", ".github/workflows/db.yml"]
 
 jobs:
   migrations:
@@ -25,3 +25,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: bash scripts/test-db.sh
+      - name: Library access through the Data API (PostgREST)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          PGRST_DB_URI: postgres://authenticator:pgrst-test@localhost:5432/postgres
+        run: bash scripts/test-data-api.sh

@@ -18,11 +18,20 @@ CREATE TABLE auth.users (
   raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
--- Tests set these settings instead of a JWT.
-CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
-  $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
-  $$ SELECT nullif(current_setting('request.jwt.claim.role', true), '') $$;
+-- As in Supabase: SQL tests set request.jwt.claim.*, PostgREST (the Data
+-- API test, scripts/test-data-api.sh) sets request.jwt.claims from the JWT.
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid
+$$;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
+  )::text
+$$;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon, authenticated, service_role;
 
 CREATE SCHEMA storage;

@@ -639,6 +639,74 @@ rezultatų lentelė ir būsena per serverį veikia, Vercel klaidų nėra.
 Produkcijoje nepatikrinta: naujas prisijungimas prie vykstančios veiklos ir
 vedėjo realaus laiko atnaujinimai (reikia bandomosios veiklos).
 
+## 2026-11-08: biblioteka tik aktyviems vedėjams (CLS-015, laukia peržiūros)
+
+Failas `supabase/migrations/20261108120000_library_active_facilitators_only.sql`,
+grąžinimas `supabase/rollback/20261108120000_library_active_facilitators_only.sql`.
+Sprendimas S12 = B (Vytis Radvila, 2026-11-08). Analizė:
+`docs/library-access.md`.
+
+**Būsena: PR nesujungtas, produkcijoje netaikyta.** Taikyti tik atskiru
+Vyčio leidimu, pagal planą tame pačiame lange kaip CLS-011.
+
+Problema: `anon` turėjo visas teises į `library_items` (numatytoji Supabase
+teisė), o `read_approved_library` galiojo rolei `public`. Su viešu `anon`
+raktu per Data API buvo skaitomi visi patvirtinti įrašai su užuominomis,
+`published_by` ir `review_notes`. Užblokuotos ir `pending` paskyros su
+galiojančia sesija taip pat matė patvirtintus įrašus. Vytis 2026-11-08
+produkcijoje patvirtino, kad politika taikoma rolei `public`.
+
+Pakeitimas: `REVOKE ALL ... FROM anon`; `read_approved_library` taikoma tik
+`authenticated` su ta pačia taisykle; nauja ribojanti SELECT politika
+„Only active accounts read“ (`is_active_account()`). Duomenys nekeičiami.
+Programos kodas nesikeičia: biblioteką ji skaito tik vedėjo sesija.
+
+Patikrinta lokaliai (Postgres 17.6, `npm run test:db`): atspaudas po
+migracijos `grant.table 41 3a9a703d936e8239b365b1ec7e0f6297`, `policy 58
+2a8f82ee66475757bb54b47bb765216e`, kitos sritys nepakito. Grąžinimas
+atkuria ankstesnius `grant.table 42 0d0aa2b35c41cf90611319b7668164bb` ir
+`policy 57 a7a2bd206c5f2f9c6ee93fb69d6bc475`, pakartotinis taikymas vėl duoda
+naujus. `security.sql` tikrina `anon`, aktyvų mokytoją, autorių, `pending`,
+`blocked`, administratorių, super administratorių ir sesiją be profilio; be
+migracijos šie testai krenta. CI `scripts/test-data-api.sh` tą patį tikrina
+tikromis HTTP užklausomis per PostgREST (Data API serveris).
+
+Prieš taikymą (tik skaitymas), išsaugoti rezultatą palyginimui:
+
+```sql
+select 'rel' k, relacl::text v from pg_class where oid = 'public.library_items'::regclass
+union all
+select 'pol:' || policyname, roles::text || ' ' || cmd || ' ' || permissive || ' ' || coalesce(qual, '')
+  from pg_policies where schemaname = 'public' and tablename = 'library_items'
+order by 1;
+```
+
+Taikymas: SQL Editor, visas failas (viena transakcija), kai nevyksta
+veiklos. Tą pačią dieną sujungti PR, kad repozitorija atitiktų produkciją.
+Jei CLS-005 jau atliktas: `migration repair --status applied --remote 20261108120000`.
+
+Patikra po taikymo:
+
+```sql
+select
+  has_table_privilege('anon', 'public.library_items', 'SELECT') as anon_select,
+  (select roles::text from pg_policies where schemaname = 'public'
+     and tablename = 'library_items' and policyname = 'read_approved_library') as read_roles,
+  (select count(*) from pg_policies where schemaname = 'public' and tablename = 'library_items'
+     and policyname = 'Only active accounts read' and permissive = 'RESTRICTIVE') as active_only;
+```
+
+Laukiama: `false`, `{authenticated}`, `1`; atspaudas `grant.table 41
+3a9a703d936e8239b365b1ec7e0f6297`, `policy 58 2a8f82ee66475757bb54b47bb765216e`.
+Iš išorės su viešu `anon` raktu
+`GET https://menmndjyfeuwfweubwnl.supabase.co/rest/v1/library_items?select=id`
+(antraštė `apikey`) grąžina 401. Vedėjo biblioteka, „Naudoti šabloną“,
+„Mano pateikimai“, moderavimas ir administravimo skaičius veikia
+(`docs/REGISTRATION-TEST.md`, E dalis), `E2E smoke (production)` žalias.
+
+Grąžinimas: rollback failas SQL Editor. Po jo `anon_select` `true`,
+`read_roles` `{public}`, `active_only` `0`, atspaudas kaip prieš taikymą.
+
 ## Konvencija toliau
 
 Naujas migracijas kurti tik per CLI, kad versijos būtų unikalios ir
