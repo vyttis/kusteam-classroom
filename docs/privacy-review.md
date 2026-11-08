@@ -61,7 +61,7 @@ Faktai patikrinti kode, schemoje ir paslaugų nustatymuose 2026-11-07 ir 2026-11
 | Naktinis užbaigimas be trynimo | `app/api/cron/finish-stale-activities` keičia tik būseną |
 | Atsarginės kopijos daromos kasdien, saugomos ribotą laiką | Supabase → Database → Backups: kasdienės fizinės kopijos. Tikslios trukmės (pagal planą) Claude Code patikrinti negali: Supabase prieiga šiai sesijai CLASSROOM projekto nerodo. Puslapyje skaičius nenurodytas |
 | Paveikslėliai pagal nuorodą | Saugykla `challenge-images` vieša (`00003_challenge_media.sql`) |
-| Patvirtintus šablonus mato kiti prisijungę vedėjai | Teisinga tik pritaikius CLS-015 migraciją (PR #115). Iki tol per Data API jie pasiekiami ir be prisijungimo (`docs/library-access.md`). Todėl pranešimas skelbiamas tik po CLS-015 taikymo |
+| Patvirtintus šablonus mato kiti prisijungę vedėjai | Teisinga: CLS-015 migracija pritaikyta produkcijoje 2026-11-08 (PR #115). `anon` per Data API gauna 401, `pending` ir `blocked` paskyros įrašų nemato (`docs/migration-history.md`) |
 | Dalyvio naršyklėje saugomas žetonas | `lib/game/session.ts`: `ctf_session_<kodas>` (tikrinama 24 val. riba), `ctf_start_<kodas>`, `ctf_reflection_<kodas>` |
 | Analitikos ir reklamos slapukų nėra | Priklausomybėse nėra analitikos ar reklamos paketų |
 
@@ -130,7 +130,7 @@ Vytis 2026-11-08 priėmė: trumpą pranešimą kaip galutinę kryptį, BDAR 6 st
 
 Iki paskelbimo turi atitikti realų veikimą:
 
-1. Bibliotekos sakinys: pritaikyta CLS-015 migracija (PR #115).
+1. Bibliotekos sakinys: pritaikyta CLS-015 migracija (PR #115). Atlikta 2026-11-08.
 2. Saugojimo terminai: kodas produkcijoje (PR #116), bet trinama tik nustačius `RETENTION_MODE=delete`.
 3. Sakinys apie perdavimą už EEE: patvirtinta, kad su Supabase, Vercel, Resend ir Anthropic galioja jų duomenų tvarkymo sąlygos; kitaip sakinys išimamas.
 4. Atsarginių kopijų trukmė: nebūtina pranešime, bet patikrinama Supabase → Database → Backups.
