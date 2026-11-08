@@ -1,6 +1,8 @@
 # Duomenų saugojimas ir ištrynimas (CLS-014)
 
-Suvestinė privatumo pranešimui (CLS-013) ir KU duomenų apsaugos pareigūnui (DAP). Faktai patikrinti kode ir migracijose 2026-11-08. Saugojimo terminų čia nenustatome: juos tvirtina Vytis Radvila pagal DAP atsakymą.
+**Suderinimo dokumentas.** Sprendimas S13 (Vytis Radvila, 2026-11-08): saugojimo terminai derinami su KU duomenų apsaugos pareigūnu (DAP). Claude Code jų nenustato. Kol terminai nesuderinti, šis dokumentas yra pagrindas pokalbiui su DAP, ne patvirtintas planas.
+
+Suvestinė privatumo pranešimui (CLS-013). Faktai patikrinti kode ir migracijose 2026-11-08.
 
 **v1.0 sąlyga.** CLASSROOM v1.0 priimamas tik turint patvirtintą ir įgyvendinamą saugojimo planą: kiekvienai kategorijai patvirtintas terminas, atsakingas asmuo ir būdas, kuriuo duomenys ištrinami. Būdas gali būti rankinė procedūra. Automatinis trynimas gali būti vėlesnės versijos funkcija, bet privatumo pranešimas turi aprašyti tai, kas iš tikrųjų daroma.
 
@@ -21,12 +23,16 @@ Suvestinė privatumo pranešimui (CLS-013) ir KU duomenų apsaugos pareigūnui (
 | 9 | Vedėjų įkelti dokumentai | Supabase saugykla `documents`, `imports/<vedėjas>/...` | Neribotai, ir po importo | Nėra | Periodinis rankinis trynimas; vėliau trynimas iškart po importo | Ar dokumentą reikia laikyti po importo; jei taip, kiek |
 | 10 | DI naudojimo įrašai | `ai_usage` (naudotojas, funkcija, modelis, žetonai, kaina, laikas, be užklausų turinio) | Neribotai. Ištrynus paskyrą įrašas lieka be naudotojo | Nėra | Periodiškai pasilikti tik mėnesio sumas ir ištrinti eilutes | Terminas, atsižvelgiant į išlaidų apskaitą |
 | 11 | Administratorių veiksmų žurnalas | `admin_audit_log` (veiksmas, kas, kada; `details` yra el. pašto adresai) | Neribotai. Ištrynus paskyrą įrašas lieka, el. paštas detalėse lieka | Nėra | Periodinis rankinis trynimas pagal terminą | Terminas |
-| 12 | Vedėjų prisijungimo įvykiai | Supabase Auth (`auth.audit_log_entries`, gali būti IP adresas) | Nepatikrinta produkcijoje (`docs/privacy-review.md`) | Supabase nustatymai | Patikrinti; jei įrašai kaupiami, įtraukti į planą | Terminas. Ar šis žurnalas reikalingas |
+| 12 | Vedėjų prisijungimo įvykiai | Supabase Auth (`auth.audit_log_entries`, gali būti IP adresas) | Produkcijoje 0 įrašų (2026-11-08). Supabase žurnalai už DB ribų nepatikrinti | Supabase nustatymai | Patikrinti; jei įrašai kaupiami, įtraukti į planą | Terminas. Ar šis žurnalas reikalingas |
 | 13 | Bandymų ribojimo identifikatoriai | Serverio egzemplioriaus atmintis (HMAC iš IP adreso) | Kol veikia serverio egzempliorius | Išnyksta su egzemplioriumi | Nieko nekeisti | Ar pakanka aprašymo pranešime |
 | 14 | Dalyvio naršyklė | `localStorage`: komandos žetonas, pradžios laikas, refleksijos būsena | Žetonas laikomas negaliojančiu po 24 val.; likusius išvalo „Išeiti“ arba naršyklė | „Išeiti“ dalyvio ekrane, naršyklės duomenų valymas | Nieko nekeisti | Ar pakanka aprašymo pranešime |
 | 15 | Atsarginės kopijos | Supabase | Kasdien; trukmė pagal Supabase planą, nepatikrinta | Automatiškai pagal planą | Patikrinti planą ir įrašyti trukmę į planą bei pranešimą | Ar trukmė tinka |
 | 16 | Išsiųsti laiškai | Resend žurnalai | Nepatikrinta | Resend nustatymai | Patikrinti Resend paskyroje | Terminas, jei reikia |
 | 17 | Paslaugų teikėjų techniniai žurnalai | Vercel, Supabase | Pagal teikėjų planus, nepatikrinta | Automatiškai pagal teikėją | Patikrinti ir įrašyti į planą | Ar reikia nurodyti pranešime |
+
+## Produkcijos apimtis (2026-11-08)
+
+Vyčio SELECT patikra (`docs/privacy-review.md`): `access_requests` 1 įrašas (nuo 2026-11-06), `ai_usage` 0, `admin_audit_log` 3 (nuo 2026-11-06), `auth.audit_log_entries` 0, `storage.objects` 1 failas `challenge-images` (nuo 2026-03-02). Apimtis maža, todėl pirmas rankinis vykdymas paprastas, bet terminai reikalingi prieš v1.0.
 
 ## Siūloma rankinė procedūra v1.0
 
@@ -43,5 +49,4 @@ Automatinis trynimas (pvz., naktinis darbas) yra atskira užduotis po plano patv
 ## Ko šis dokumentas nesprendžia
 
 - Konkrečių terminų.
-- Teisinio pagrindo (`docs/privacy-review.md`, 2 klausimas).
-- Produkcijos duomenų kiekio: užklausos `docs/privacy-review.md`, jos nevykdytos.
+- Teisinio pagrindo (`docs/privacy-review.md`, 1 klausimas).

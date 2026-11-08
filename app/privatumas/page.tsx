@@ -67,10 +67,6 @@ export default function PrivacyPage() {
               dpo@ku.lt
             </a>
             .
-            <Question>
-              kontaktas paimtas iš KU privatumo politikos (www.ku.lt/privatumo-politika). Prieš paskelbiant
-              patvirtinti, kad jis galioja.
-            </Question>
           </p>
         </Section>
 
@@ -123,8 +119,8 @@ export default function PrivacyPage() {
             savo darbinėje atmintyje. Nei adresas, nei identifikatorius į platformos duomenų bazę neįrašomi.
             Paslaugų teikėjai (žr. žemiau) savo techniniuose žurnaluose gali įrašyti IP adresą.
             <Question>
-              ar ir kiek laiko IP adresą saugo paslaugų teikėjų žurnalai, taip pat vedėjų prisijungimo įvykių
-              žurnalas.
+              ar ir kiek laiko IP adresą saugo paslaugų teikėjų (Vercel, Supabase, Resend) techniniai ir
+              prisijungimo žurnalai.
             </Question>
           </p>
         </Section>
@@ -137,6 +133,10 @@ export default function PrivacyPage() {
             <li>
               Patvirtinti bibliotekos įrašai (užduotys be atsakymų ir be komandų rezultatų) nėra slapti: juos mato
               kiti vedėjai, o techniškai jie pasiekiami ir be prisijungimo.
+              <Question>
+                pritaikius CLS-015 migraciją (sprendimas S12 = B), šį punktą pakeisti: patvirtinti bibliotekos
+                įrašai matomi tik prisijungusiems aktyviems vedėjams.
+              </Question>
             </li>
             <li>Užduočių paveikslėliai pasiekiami kiekvienam, kas turi jų nuorodą.</li>
           </ul>

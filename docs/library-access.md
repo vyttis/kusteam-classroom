@@ -1,8 +1,10 @@
 # Patvirtintos bibliotekos prieinamumas (CLS-015)
 
-Analizė be DB pakeitimų. Politikos ir teisės patikrintos migracijose ir vietinėje Postgres 17 kopijoje po visų migracijų (2026-11-08). Šios kopijos schemos atspaudas, įskaitant teises ir RLS politikas, sutampa su produkcija, išskyrus `handle_new_user` (CLS-012). Produkcijoje užklausų nevykdyta.
+**Sprendimas S12 = B** (Vytis Radvila, 2026-11-08): patvirtinta biblioteka skirta tik aktyviems prisijungusiems vedėjams. CLS-015 yra V1-BLOCKER. Migracija `supabase/migrations/20261108120000_library_active_facilitators_only.sql` paruošta atskirame PR; produkcijoje netaikyta (`docs/migration-history.md`, „CLS-015“).
 
-## Dabartinė būsena
+Politikos ir teisės patikrintos migracijose ir vietinėje Postgres 17 kopijoje po visų migracijų (2026-11-08). Šios kopijos schemos atspaudas, įskaitant teises ir RLS politikas, sutampa su produkcija, išskyrus `handle_new_user` (CLS-012). Vytis 2026-11-08 produkcijoje patvirtino, kad `read_approved_library` taikoma rolei `public`.
+
+## Būsena iki migracijos
 
 **Teisės ir RLS (`library_items`):**
 
@@ -47,28 +49,28 @@ Patvirtinti šablonai lieka prieinami be prisijungimo.
   - pridėti ribojančią SELECT politiką „Only active accounts read“ su `is_active_account()`.
 - Vėliau prireikus viešos vitrinos ją galima daryti sąmoningai, per atskirą rodinį su atrinktais stulpeliais.
 
-## Rekomendacija
+## Sprendimas
 
-B. CLASSROOM v1.0 skirtas patvirtintiems vedėjams. Biblioteka nėra suplanuota kaip vieša, o užuominų viešumas pedagogiškai kenkia. Migraciją siūlau taikyti tame pačiame produkcijos lange kaip CLS-011 (Sprint 008), kad būtų vienas atsarginės kopijos ir grąžinimo ciklas. Iki tada privatumo pranešimas teisingai sako, kad patvirtinti įrašai techniškai pasiekiami be prisijungimo. Pasirinkus B ir pritaikius migraciją, šį sakinį reikia pakeisti.
+Pasirinkta B. CLASSROOM v1.0 skirtas patvirtintiems vedėjams. Biblioteka nėra suplanuota kaip vieša, o užuominų viešumas pedagogiškai kenkia. Migraciją siūloma taikyti tame pačiame produkcijos lange kaip CLS-011, kad būtų vienas atsarginės kopijos ir grąžinimo ciklas. Kol migracija netaikyta, privatumo pranešimo projektas teisingai sako, kad patvirtinti įrašai techniškai pasiekiami be prisijungimo; pritaikius šį sakinį reikia pakeisti (jis pažymėtas klausimu PR #112).
 
 ## Testavimo kriterijai (B)
 
-Automatiniai (`npm run test:db`, `supabase/tests/security.sql`):
+Automatiniai, įgyvendinti migracijos PR (1–5 `supabase/tests/security.sql` per `npm run test:db`, 6 `scripts/test-data-api.sh` CI):
 
-1. `anon`: SELECT iš `library_items` grąžina teisių klaidą (42501).
-2. Aktyvus vedėjas mato patvirtintus įrašus ir savo `pending_review` bei `rejected`, bet ne kitų nepatvirtintus.
-3. Užblokuotas ir `pending` vedėjas nemato nieko, įskaitant patvirtintus.
+1. `anon`: SELECT, INSERT, UPDATE ir DELETE į `library_items` grąžina teisių klaidą (42501).
+2. Aktyvus vedėjas mato patvirtintus įrašus, autorius ir savo `pending_review` bei `rejected`, bet ne kitų nepatvirtintus.
+3. Užblokuota ir `pending` paskyra, taip pat sesija be profilio, nemato nieko, įskaitant patvirtintus. Užblokuotas autorius nemato ir savo įrašų.
 4. Administratorius ir super administratorius mato visus įrašus.
-5. Schemos atspaudas atnaujintas tame pačiame PR, grąžinimas atkuria dabartinę politiką ir `anon` teisę, pakartotinis taikymas pavyksta.
+5. Schemos atspaudas atnaujintas tame pačiame PR, grąžinimas atkuria ankstesnę politiką ir `anon` teisę, pakartotinis taikymas pavyksta.
+6. Per Data API (PostgREST): `anon` skaitymas, įrašymas ir trynimas grąžina 401; suklastotas JWT 401; aktyvus vedėjas, autorius, `pending`, `blocked`, administratorius ir super administratorius gauna tuos pačius rezultatus kaip 2–4.
 
 Rankiniai po produkcijos taikymo:
 
-6. `GET /rest/v1/library_items?select=id` su `anon` raktu grąžina klaidą, ne sąrašą.
-7. Vedėjo biblioteka, šablono peržiūra, „Naudoti šabloną“, „Mano pateikimai“, moderavimas ir administravimo skaičius veikia (CLS-004 scenarijaus E dalis).
-8. `E2E smoke (production)` žalias.
+7. `GET /rest/v1/library_items?select=id` su produkcijos `anon` raktu grąžina 401, ne sąrašą.
+8. Vedėjo biblioteka, šablono peržiūra, „Naudoti šabloną“, „Mano pateikimai“, moderavimas ir administravimo skaičius veikia (CLS-004 scenarijaus E dalis).
+9. `E2E smoke (production)` žalias.
 
-## Reikalingas Vyčio sprendimas
+## Kas dar laukia Vyčio
 
-1. Pasirinkti A arba B.
-2. Jei B: leisti paruošti migraciją su grąžinimu ir testais (repozitorijoje, be produkcijos), o taikyti produkcijoje tik atskiru patvirtinimu pagal `docs/migration-history.md` tvarką.
-3. Jei A: patvirtinti, kurie stulpeliai vieši, ir kad pateikimo lange vedėjas bus informuotas apie viešumą.
+1. Peržiūrėti migracijos PR (jis lieka nesujungtas).
+2. Atskiru leidimu taikyti migraciją produkcijoje pagal `docs/migration-history.md` ir tą pačią dieną sujungti PR.
