@@ -125,7 +125,7 @@ export default function PrivacyPage() {
         </Section>
 
         <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-          Atnaujinta {PRIVACY_NOTICE_UPDATED}.{" "}
+          Atnaujinta {PRIVACY_NOTICE_UPDATED}{" "}
           <Link href="/" className="underline">
             Grįžti į pradžią
           </Link>
