@@ -11,7 +11,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Settings, Rocket } from "lucide-react"
+import { ArrowLeft, Settings, QrCode } from "lucide-react"
 import Link from "next/link"
 
 interface BuilderHeaderProps {
@@ -108,13 +108,16 @@ export function BuilderHeader({
               challengeCount={challengeCount}
               tasksNeedingAnswer={tasksNeedingAnswer}
             />
+            {/* Shows the join QR and code only. It used to say "Paleisti" next
+                to "Pradėti veiklą", and facilitators took it for the start. */}
             <Button
               size="sm"
-              className="bg-accent-ink hover:bg-accent-ink/90 text-white gap-1.5 h-8"
+              variant="outline"
+              className="gap-1.5 h-8"
               onClick={() => setLaunchOpen(true)}
             >
-              <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
-              Paleisti
+              <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+              QR kodas
             </Button>
           </div>
         </div>
@@ -123,7 +126,7 @@ export function BuilderHeader({
       <Dialog open={launchOpen} onOpenChange={setLaunchOpen}>
         <DialogContent className="max-w-sm sm:max-w-md">
           <DialogTitle className="text-lg font-bold text-steam-dark text-center">
-            Paleisti veiklą
+            Prisijungimo QR kodas
           </DialogTitle>
           <QRDisplay gameCode={game.game_code} />
         </DialogContent>

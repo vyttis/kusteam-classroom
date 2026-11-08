@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MapsEmbed } from "@/components/shared/maps-embed"
 import { HintList } from "@/components/player/hint-list"
+import { OptionButton } from "@/components/player/option-button"
 
 interface ChallengeDetailModalProps {
   challenge: {
@@ -199,23 +200,15 @@ export function ChallengeDetailModal({
             {challenge.type === "multiple_choice" && challenge.options ? (
               <div className="space-y-2">
                 {challenge.options.map((option, i) => (
-                  <Button
+                  <OptionButton
                     key={i}
-                    type="button"
-                    variant={answer === option ? "default" : "outline"}
-                    className={`w-full justify-start items-start h-auto min-h-12 py-3 px-4 text-left whitespace-normal break-words ${
-                      answer === option
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : ""
-                    }`}
-                    onClick={() => setAnswer(option)}
+                    option={option}
+                    index={i}
+                    chosen={answer === option}
+                    wrong={feedback !== null && !feedback.is_correct}
                     disabled={loading}
-                  >
-                    <span className="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold mr-3 shrink-0 mt-0.5">
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    <span className="flex-1 leading-relaxed">{option}</span>
-                  </Button>
+                    onChoose={setAnswer}
+                  />
                 ))}
               </div>
             ) : (

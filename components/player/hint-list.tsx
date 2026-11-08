@@ -13,12 +13,15 @@ export function HintList({
   hints,
   penalty,
   points,
+  solved = false,
   onReveal,
 }: {
   hints: (string | null)[]
   penalty: number
   /** The task's points: hints never take more than half of them. */
   points: number
+  /** Answered correctly: opened hints stay, no offer of another one. */
+  solved?: boolean
   onReveal: (index: number) => Promise<boolean>
 }) {
   const [opening, setOpening] = useState(false)
@@ -53,14 +56,14 @@ export function HintList({
           ))}
         </div>
       )}
-      {nextIndex >= 0 && (
+      {nextIndex >= 0 && !solved && (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={reveal}
           disabled={opening}
-          className="gap-1.5 text-highlight-ink hover:bg-highlight/10 hover:text-highlight-ink"
+          className="h-11 gap-1.5 px-3 text-highlight-ink hover:bg-highlight/10 hover:text-highlight-ink"
         >
           {opening ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />

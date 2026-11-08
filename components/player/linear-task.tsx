@@ -1,6 +1,6 @@
 "use client"
 
-import type { FormEvent } from "react"
+import { useEffect, useRef, type FormEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { BookOpen, CheckCircle2, ChevronRight, Loader2, Send, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { AnswerInput } from "@/components/player/answer-input"
 import { TaskImage } from "@/components/player/task-image"
 import { HintList } from "@/components/player/hint-list"
+import { OptionButton } from "@/components/player/option-button"
 import { MapsEmbed } from "@/components/shared/maps-embed"
 import { pluralizeLt } from "@/lib/utils"
 import type { ChallengeType, SubmissionResult } from "@/types/game"
@@ -62,6 +63,17 @@ export function LinearTask({
   onRevealHint: (index: number) => Promise<boolean>
   onNext: () => void
 }) {
+  // On a phone the result sits below the answer button, out of sight: bring
+  // it into view, or a wrong answer looks like nothing happened.
+  const feedbackRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!feedback) return
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    feedbackRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" })
+  }, [feedback, explanation])
+
+  const wrong = feedback !== null && !feedback.is_correct
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -109,6 +121,7 @@ export function LinearTask({
               hints={challenge.hints ?? []}
               penalty={challenge.hint_penalty}
               points={challenge.points}
+              solved={feedback?.is_correct === true}
               onReveal={onRevealHint}
             />
 
@@ -117,20 +130,14 @@ export function LinearTask({
               {challenge.type === "multiple_choice" && challenge.options ? (
                 <div className="space-y-2">
                   {(challenge.options as string[]).map((option, i) => (
-                    <Button
+                    <OptionButton
                       key={i}
-                      type="button"
-                      variant={answer === option ? "default" : "outline"}
-                      className={`w-full justify-start items-start h-auto min-h-12 py-3 px-4 text-left whitespace-normal break-words ${
-                        answer === option ? "bg-primary text-primary-foreground" : ""
-                      }`}
-                      onClick={() => onAnswerChange(option)}
-                    >
-                      <span className="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold mr-3 shrink-0 mt-0.5">
-                        {String.fromCharCode(65 + i)}
-                      </span>
-                      <span className="flex-1 leading-relaxed">{option}</span>
-                    </Button>
+                      option={option}
+                      index={i}
+                      chosen={answer === option}
+                      wrong={wrong}
+                      onChoose={onAnswerChange}
+                    />
                   ))}
                 </div>
               ) : (
@@ -157,10 +164,11 @@ export function LinearTask({
             <AnimatePresence>
               {feedback && (
                 <motion.div
+                  ref={feedbackRef}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="mt-4 space-y-3"
+                  className="mt-4 space-y-3 scroll-mb-4"
                   role="alert"
                   aria-live="assertive"
                 >
