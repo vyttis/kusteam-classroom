@@ -639,17 +639,44 @@ rezultatų lentelė ir būsena per serverį veikia, Vercel klaidų nėra.
 Produkcijoje nepatikrinta: naujas prisijungimas prie vykstančios veiklos ir
 vedėjo realaus laiko atnaujinimai (reikia bandomosios veiklos).
 
-## 2026-11-08: biblioteka tik aktyviems vedėjams (CLS-015, laukia peržiūros)
+## 2026-11-08: biblioteka tik aktyviems vedėjams (CLS-015)
 
 Failas `supabase/migrations/20261108120000_library_active_facilitators_only.sql`,
 grąžinimas `supabase/rollback/20261108120000_library_active_facilitators_only.sql`.
 Sprendimas S12 = B (Vytis Radvila, 2026-11-08), kryptis ir techninė
 peržiūra patvirtintos. Analizė: `docs/library-access.md`.
 
-**Būsena: PR nesujungtas, produkcijoje netaikyta.** Taikymas dar
-neautorizuotas; taikyti tik atskiru Vyčio leidimu. Privatumo pranešimas
-(CLS-013) sako, kad šablonus mato tik prisijungę vedėjai, todėl siūloma
-taikyti iki pranešimo paskelbimo.
+**Pritaikyta produkcijoje 2026-11-08 apie 10:50 UTC** (Vyčio leidimas
+2026-11-08 12:45; SQL Editor, visas failas, SHA-256 sutapo su PR #115
+failu). Prieš taikymą:
+
+- Supabase Backups rodė kasdienes fizines kopijas (paskutinė 2026-11-07
+  23:41 UTC), kiekviena su „Restore“; atkūrimas nebandytas, nes jis keičia
+  produkciją.
+- 0 vykstančių veiklų, `library_items` 2 įrašai (abu patvirtinti), profiliai:
+  1 aktyvus mokytojas, 1 aktyvus super administratorius.
+- `schema_migrations` tuščia (CLS-005 neatliktas), todėl `migration repair`
+  nevykdytas.
+- Atspaudas visose 11 sričių sutapo su 2026-11-07 produkcijos būsena
+  (`grant.table 42 0d0aa2b3…`, `policy 57 a7a2bd20…`).
+
+Po taikymo:
+
+- `anon_select` `false`, `read_roles` `{authenticated}`, `active_only` `1`.
+- Atspaudas: `grant.table 41 3a9a703d936e8239b365b1ec7e0f6297`, `policy 58
+  2a8f82ee66475757bb54b47bb765216e`, kitos sritys nepakito (kaip laukta).
+- Rolių patikra viena transakcija, kuri visada atšaukiama (`RAISE` pabaigoje):
+  `anon` gauna `insufficient_privilege`, aktyvus mokytojas mato 2 iš 2
+  patvirtintų, tas pats profilis su `pending` mato 0, su `blocked` mato 0.
+  Po jos profilių būsenos nepakito.
+- Iš išorės viešu `anon` raktu `GET /rest/v1/library_items?select=id` ir
+  `POST` grąžina 401 (`42501 permission denied for table library_items`).
+- Prisijungusio administratoriaus biblioteka `pamokos.kusteam.app/library`
+  rodo abu šablonus.
+
+Produkcijoje nepatikrinta tikromis paskyromis: `pending` ir `blocked` sesijos
+(patikrinta tik rolių simuliacija ir CI), „Naudoti šabloną“ ir moderavimas
+(liks CLS-004 registracijos testui).
 
 Problema: `anon` turėjo visas teises į `library_items` (numatytoji Supabase
 teisė), o `read_approved_library` galiojo rolei `public`. Su viešu `anon`

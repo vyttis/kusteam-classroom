@@ -1,6 +1,6 @@
 # Patvirtintos bibliotekos prieinamumas (CLS-015)
 
-**Sprendimas S12 = B** (Vytis Radvila, 2026-11-08): patvirtinta biblioteka skirta tik aktyviems prisijungusiems vedėjams. CLS-015 yra V1-BLOCKER. Migracija `supabase/migrations/20261108120000_library_active_facilitators_only.sql` paruošta atskirame PR (#115). Kryptis ir techninė peržiūra patvirtintos, taikymas produkcijoje dar neautorizuotas (`docs/migration-history.md`, „CLS-015“).
+**Sprendimas S12 = B** (Vytis Radvila, 2026-11-08): patvirtinta biblioteka skirta tik aktyviems prisijungusiems vedėjams. CLS-015 yra V1-BLOCKER. Migracija `supabase/migrations/20261108120000_library_active_facilitators_only.sql` (PR #115) pritaikyta produkcijoje 2026-11-08 su Vyčio leidimu; patikros rezultatai `docs/migration-history.md`, „CLS-015“.
 
 **Avarinis grąžinimas vėl atveria anoniminį skaitymą**, kuris buvo iki migracijos. Jį naudoti tik jei migracija sugadina biblioteką aktyviems vedėjams. Jei kliūva tik aktyvios paskyros patikra, yra dalinis grąžinimas, kuris `anon` palieka uždarytą (`docs/migration-history.md`).
 
@@ -72,7 +72,6 @@ Rankiniai po produkcijos taikymo:
 8. Vedėjo biblioteka, šablono peržiūra, „Naudoti šabloną“, „Mano pateikimai“, moderavimas ir administravimo skaičius veikia (CLS-004 scenarijaus E dalis).
 9. `E2E smoke (production)` žalias.
 
-## Kas dar laukia Vyčio
+## Kas liko
 
-1. Peržiūrėti migracijos PR (jis lieka nesujungtas).
-2. Atskiru leidimu taikyti migraciją produkcijoje pagal `docs/migration-history.md` ir tą pačią dieną sujungti PR.
+Produkcijoje tikromis paskyromis dar nepatikrinta: `pending` ir `blocked` sesijos, „Naudoti šabloną“ ir moderavimas. Tai daroma per CLS-004 registracijos testą (E dalis).
