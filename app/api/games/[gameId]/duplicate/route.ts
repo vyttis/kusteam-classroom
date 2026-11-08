@@ -133,7 +133,11 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
 
       let { data: newChallenges, error: insertError } = await supabase
         .from("challenges")
-        .insert(challengePayloads)
+        // Rows differ in which keys they carry (accepted_answer_hashes only
+        // when a task has extra answers): without this PostgREST fills the
+        // missing ones with NULL instead of the column default, and the
+        // NOT NULL column rejects the whole copy (production, 2026-11-08).
+        .insert(challengePayloads, { defaultToNull: false })
         .select("id, order_index")
 
       // Tolerate an unmigrated DB (needs_answer column missing, 42703) the
@@ -146,7 +150,7 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
         })
         ;({ data: newChallenges, error: insertError } = await supabase
           .from("challenges")
-          .insert(legacyPayloads)
+          .insert(legacyPayloads, { defaultToNull: false })
           .select("id, order_index"))
       }
 

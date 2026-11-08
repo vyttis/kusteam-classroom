@@ -77,7 +77,12 @@ export function GameCard({ game, index, onUpdate }: GameCardProps) {
             {/* Header */}
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-steam-dark text-lg truncate group-hover:text-primary-ink transition-colors">
+                {/* Two lines, not one: "DEMO: Baltijos jūros t..." and the
+                    "TEST (Claude) ..." cards could not be told apart. */}
+                <h3
+                  className="font-semibold text-steam-dark text-lg leading-snug line-clamp-2 break-words group-hover:text-primary-ink transition-colors"
+                  title={game.title}
+                >
                   {game.title}
                 </h3>
                 {game.description && (
