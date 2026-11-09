@@ -75,6 +75,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   teacher: "Vedėjas",
   admin: "Administratorius",
   super_admin: "Super administratorius",
+  staff: "KU STEAM darbuotojas",
 }
 
 // The calendar day in Lithuania (YYYY-MM-DD), not in UTC.

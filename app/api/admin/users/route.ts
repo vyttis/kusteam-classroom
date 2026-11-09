@@ -29,6 +29,8 @@ export async function GET() {
   }
 }
 
+// 'staff' is never a target: only the KU STEAM TEAM sign-in (service role)
+// gives or removes it.
 const updateRoleSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(["teacher", "admin", "super_admin"]),
@@ -66,6 +68,14 @@ export async function PATCH(request: Request) {
     const { data: before } = await adminClient.from("profiles").select("role, email").eq("id", userId).maybeSingle()
     if (!before) {
       return NextResponse.json({ error: "Vartotojas nerastas" }, { status: 404 })
+    }
+    // A KU STEAM TEAM staff member's role belongs to TEAM (ADR-001). The
+    // admin may still block or unblock the profile (status route).
+    if (before.role === "staff") {
+      return NextResponse.json(
+        { error: "KU STEAM darbuotojo rolės čia keisti negalima. Ją valdo KU STEAM TEAM." },
+        { status: 409 }
+      )
     }
     const { error } = await adminClient
       .from("profiles")

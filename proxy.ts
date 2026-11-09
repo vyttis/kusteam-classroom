@@ -1,17 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { hostKind, legacyRedirect } from "@/lib/hosts"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { isTeamSsoEnabled, teamHomeUrl } from "@/lib/team-sso/config"
+import { TEAM_SSO_MESSAGES, messageKindFor, messagePath } from "@/lib/team-sso/messages"
+import { authCookieDeletions } from "@/lib/team-sso/auth-cookies"
+import { endedStaffSession, staffAccess, type StaffDecision } from "@/lib/team-sso/staff-gate"
 
 // In-memory account gate cache: user.id → { expiresAt }. Only the fully
 // open state (active and onboarded) is cached, for 30 s: it cuts ~30-50 ms
 // off every teacher navigation. Anything else is read fresh, so a user who
 // just finished onboarding or was just approved is not bounced back. A
-// block reaches cached instances within 30 s.
+// block reaches cached instances within 30 s. KU STEAM TEAM staff are never
+// cached: their access is checked on every request (staffGate below).
 type GateCacheEntry = { expiresAt: number }
 const GATE_TTL_MS = 30_000
 const gateCache = new Map<string, GateCacheEntry>()
 
-type AccountGate = { status: "pending" | "active" | "blocked"; onboarded: boolean }
+type AccountGate = { status: "pending" | "active" | "blocked"; onboarded: boolean; staff: boolean }
 
 async function accountGate(
   supabase: ReturnType<typeof createServerClient>,
@@ -19,14 +25,14 @@ async function accountGate(
 ): Promise<AccountGate> {
   const now = Date.now()
   const cached = gateCache.get(userId)
-  if (cached && cached.expiresAt > now) return { status: "active", onboarded: true }
+  if (cached && cached.expiresAt > now) return { status: "active", onboarded: true, staff: false }
 
   const first = await supabase
     .from("profiles")
-    .select("onboarding_completed, status")
+    .select("onboarding_completed, status, role")
     .eq("id", userId)
     .single()
-  let profile: { onboarding_completed: boolean; status: string } | null = first.data
+  let profile: { onboarding_completed: boolean; status: string; role?: string } | null = first.data
   if (first.error?.code === "42703") {
     // Database without the status column yet (before 20261106130000):
     // every existing account was active, so behave as before.
@@ -36,10 +42,109 @@ async function accountGate(
 
   const status = (profile?.status as AccountGate["status"]) ?? "pending"
   const onboarded = Boolean(profile?.onboarding_completed)
-  if (status === "active" && onboarded) {
+  const staff = profile?.role === "staff"
+  if (status === "active" && onboarded && !staff) {
     gateCache.set(userId, { expiresAt: now + GATE_TTL_MS })
   }
-  return { status, onboarded }
+  return { status, onboarded, staff }
+}
+
+/** Copies the auth cookies the Supabase client wrote (refresh, sign-out). */
+function withCookies<T extends NextResponse>(target: T, source: NextResponse): T {
+  source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie))
+  target.headers.set("Cache-Control", "no-store")
+  return target
+}
+
+/**
+ * A staff member's CLASSROOM access has ended: tell them why. The session
+ * cookies are cleared (what the Supabase client wrote, and explicitly, in
+ * case its sign-out could not). Pages go to the message page, APIs get 401.
+ * An expired session (8 h) on a page goes through TEAM again, silently if
+ * the TEAM session is alive.
+ */
+function staffEnded(
+  request: NextRequest,
+  reason: string,
+  sessionCookieNames: string[],
+  current: () => NextResponse,
+): NextResponse {
+  const url = request.nextUrl.clone()
+  url.search = ""
+  const kind = messageKindFor(reason)
+  let res: NextResponse
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    res = NextResponse.json({ error: TEAM_SSO_MESSAGES[kind].text }, { status: 401 })
+  } else if (reason === "expired" && request.method === "GET" && isTeamSsoEnabled()) {
+    url.pathname = "/auth/team/start"
+    url.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`)
+    res = NextResponse.redirect(url, 303)
+  } else {
+    res = NextResponse.redirect(staffMessageUrl(url, reason), 303)
+  }
+  withCookies(res, current())
+  for (const d of authCookieDeletions(sessionCookieNames)) res.cookies.set(d.name, d.value, d.options)
+  return res
+}
+
+/**
+ * KU STEAM TEAM staff (profile role 'staff', created only by the TEAM
+ * sign-in) on a facilitator page or API: checked on every request, never
+ * cached. Teachers and admins never get here. Returns the response to send
+ * instead of the page, or null to go on.
+ * - access ended (expired, a session not opened through TEAM, TEAM session
+ *   gone, CLASSROOM admin block): this CLASSROOM session is signed out
+ *   (scope local, TEAM stays signed in), then staffEnded(). A session TEAM
+ *   revoked (sign-out, block, grant removed) is already deleted on the
+ *   server and is caught before this, where getUser() finds no user.
+ * - the check failed: 503 for APIs, the "unavailable" message for pages.
+ * - allowed: onboarding and the waiting page are not for staff.
+ */
+async function staffGate(
+  supabase: ReturnType<typeof createServerClient>,
+  request: NextRequest,
+  userId: string,
+  gate: AccountGate,
+  sessionCookieNames: string[],
+  current: () => NextResponse,
+): Promise<NextResponse | null> {
+  const url = request.nextUrl.clone()
+  url.search = ""
+  const isApi = request.nextUrl.pathname.startsWith("/api/")
+  let decision: StaffDecision
+  try {
+    decision = await staffAccess(supabase, userId, gate.status, createAdminClient)
+  } catch {
+    decision = { kind: "unavailable" }
+  }
+
+  if (decision.kind === "unavailable") {
+    const text = TEAM_SSO_MESSAGES.nepasiekiamas.text
+    if (isApi) return withCookies(NextResponse.json({ error: text }, { status: 503 }), current())
+    return withCookies(NextResponse.redirect(staffMessageUrl(url, "temporarily_unavailable"), 303), current())
+  }
+
+  if (decision.kind === "end") {
+    // Ends this Supabase session only; TEAM's session (same project) stays.
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined)
+    return staffEnded(request, decision.reason, sessionCookieNames, current)
+  }
+
+  const path = request.nextUrl.pathname
+  if (/^\/api\/onboarding(\/|$)/.test(path)) {
+    return NextResponse.json({ error: "KU STEAM darbuotojo profilį tvarko KU STEAM TEAM." }, { status: 403 })
+  }
+  if (path === "/onboarding" || path === "/laukia") {
+    url.pathname = "/dashboard"
+    return NextResponse.redirect(url)
+  }
+  return null
+}
+
+/** The message page, or TEAM itself while the sign-in is turned off. */
+function staffMessageUrl(base: URL, reason: string): URL | string {
+  if (!isTeamSsoEnabled()) return teamHomeUrl()
+  return new URL(messagePath(messageKindFor(reason)), base.origin)
 }
 
 // Facilitator APIs need an active account. Participant and public APIs
@@ -109,6 +214,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
+  // KU STEAM TEAM sign-in (/auth/team/*) works signed in or not and handles
+  // the session itself: no refresh here, no login redirect, and its
+  // ?code= must not be taken for a Supabase OAuth code (safety net below).
+  if (url.pathname === "/auth/team" || url.pathname.startsWith("/auth/team/")) {
+    return NextResponse.next({ request })
+  }
+
+  // The cookies as the browser sent them, taken before the Supabase client
+  // below rewrites request.cookies (used only when a staff session has
+  // ended: to read why, and to clear it).
+  const sessionCookies = request.cookies.getAll()
+  const sessionCookieNames = sessionCookies.map((c) => c.name)
+
   // Create Supabase client for auth refresh (teacher routes only)
   let response = NextResponse.next({ request })
 
@@ -136,7 +254,20 @@ export async function proxy(request: NextRequest) {
   // Refresh auth token
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser()
+
+  // No user although a session cookie came with the request: Supabase no
+  // longer knows that session. Revoking a TEAM staff session deletes it
+  // (TEAM-006), so a staff member whose access was taken away is told why
+  // (message page, 401) instead of landing on the teacher sign-in. Anyone
+  // else (null) goes on as signed out. Facilitator pages and APIs only.
+  const endedStaff = async (): Promise<NextResponse | null> => {
+    // With the TEAM sign-in off nothing changes for anyone (no extra lookup).
+    if (user || !userError || !isTeamSsoEnabled()) return null
+    const reason = await endedStaffSession(sessionCookies, createAdminClient)
+    return reason ? staffEnded(request, reason, sessionCookieNames, () => response) : null
+  }
 
   // Safety net: if ?code= lands on the wrong page (e.g. due to www redirect),
   // forward it to /auth/callback so the code exchange still happens
@@ -161,6 +292,10 @@ export async function proxy(request: NextRequest) {
     }
 
     if (!user && !isAuthPage) {
+      if (!url.pathname.startsWith("/api/") || FACILITATOR_API.test(url.pathname)) {
+        const ended = await endedStaff()
+        if (ended) return ended
+      }
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
     }
@@ -172,6 +307,9 @@ export async function proxy(request: NextRequest) {
 
     if (user && !isAuthPage) {
       const gate = await accountGate(supabase, user.id)
+      if (gate.staff && (!url.pathname.startsWith("/api/") || FACILITATOR_API.test(url.pathname))) {
+        return (await staffGate(supabase, request, user.id, gate, sessionCookieNames, () => response)) ?? response
+      }
       if (FACILITATOR_API.test(url.pathname) && gate.status !== "active") {
         return NextResponse.json({ error: "Paskyra dar nepatvirtinta." }, { status: 403 })
       }
@@ -211,6 +349,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  if (!user && (isTeacherRoute || isOnboarding || url.pathname === "/laukia" || FACILITATOR_API.test(url.pathname))) {
+    const ended = await endedStaff()
+    if (ended) return ended
+  }
+
   // Facilitator routes require a session
   if (isTeacherRoute && !user) {
     url.pathname = kind === "pamokos" ? "/vedejui" : "/auth/login"
@@ -228,6 +371,7 @@ export async function proxy(request: NextRequest) {
   // finish onboarding first. Participant pages are never gated.
   if (user && (isTeacherRoute || isOnboarding || url.pathname === "/laukia")) {
     const gate = await accountGate(supabase, user.id)
+    if (gate.staff) return (await staffGate(supabase, request, user.id, gate, sessionCookieNames, () => response)) ?? response
     const target = gateRedirect(gate, url.pathname)
     if (target && target !== url.pathname) {
       url.pathname = target
@@ -240,6 +384,7 @@ export async function proxy(request: NextRequest) {
   }
   if (user && FACILITATOR_API.test(url.pathname)) {
     const gate = await accountGate(supabase, user.id)
+    if (gate.staff) return (await staffGate(supabase, request, user.id, gate, sessionCookieNames, () => response)) ?? response
     if (gate.status !== "active") {
       return NextResponse.json({ error: "Paskyra dar nepatvirtinta." }, { status: 403 })
     }

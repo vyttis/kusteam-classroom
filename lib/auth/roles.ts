@@ -1,6 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js"
 
-export type UserRole = "teacher" | "admin" | "super_admin"
+/**
+ * CLASSROOM roles. 'staff' is a KU STEAM TEAM staff member inside CLASSROOM:
+ * created only by the TEAM sign-in (TEAM-006), works with own activities
+ * like a teacher, never an admin, no registration or onboarding. Only the
+ * service role sets or removes it.
+ */
+export type UserRole = "teacher" | "admin" | "super_admin" | "staff"
 
 export interface UserProfile {
   id: string
@@ -103,6 +109,8 @@ export function getRoleLabel(role: UserRole): string {
       return "Administratorius"
     case "teacher":
       return "Vedėjas"
+    case "staff":
+      return "KU STEAM darbuotojas"
     default:
       return role
   }
@@ -116,6 +124,8 @@ export function getRoleBadgeColor(role: UserRole): string {
       return "bg-secondary/10 text-secondary-ink border-secondary/20"
     case "teacher":
       return "bg-primary/10 text-primary-ink border-primary/20"
+    case "staff":
+      return "bg-highlight/10 text-highlight-ink border-highlight/20"
     default:
       return "bg-muted text-muted-foreground"
   }

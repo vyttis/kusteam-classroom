@@ -83,9 +83,20 @@ export async function grantAccount(
   // Supabase Auth stores emails in lower case, and so do profiles.
   const { data: existing } = await admin
     .from("profiles")
-    .select("id, first_name, last_name, school")
+    .select("id, role, first_name, last_name, school")
     .eq("email", email)
     .maybeSingle()
+
+  // A KU STEAM TEAM staff member's CLASSROOM profile is managed by TEAM:
+  // an approval or invitation must not turn it into a teacher or an admin,
+  // nor re-activate one a CLASSROOM admin blocked.
+  if (existing?.role === "staff") {
+    return {
+      ok: false,
+      status: 409,
+      error: "Šis el. paštas priklauso KU STEAM darbuotojui. Jo prieigą valdo KU STEAM TEAM.",
+    }
+  }
 
   if (existing) {
     // Keep what the person already entered; fill only empty fields. The

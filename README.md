@@ -72,8 +72,25 @@ npm run dev
 | `NEXT_PUBLIC_SITE_URL` | Oficialus adresas metaduomenims (`https://pamokos.kusteam.app`) |
 | `NEXT_PUBLIC_PLAY_URL` | Dalyvių nuorodų ir QR kodų adresas (`https://pamokos.kusteam.app`) |
 | `CANONICAL_CLASSROOM_HOST` | Įjungia senų adresų nukreipimą |
+| `TEAM_SSO_ENABLED` | `1` įjungia prisijungimą per KU STEAM TEAM (žr. žemiau). Nenustatytas: `/auth/team/*` grąžina 404, viskas veikia kaip anksčiau |
+| `TEAM_SSO_URL` (arba `TEAM_APP_URL`) | TEAM adresas. Numatytasis `https://komanda.kusteam.app`; keičiamas tik testams (`http` leidžiamas tik `127.0.0.1` ar `localhost`) |
+| `TEAM_SSO_FLOW_SECRET` | Neprivalomas. Raktas, kuriuo užšifruojamas trumpalaikis prisijungimo slapukas. Nenustatytas: raktas išvedamas iš `SUPABASE_SERVICE_ROLE_KEY` (HMAC su paskirties eilute), todėl naujos paslapties nereikia |
 
 Supabase Auth → URL Configuration: Site URL `https://pamokos.kusteam.app`, Redirect URLs turi apimti `https://pamokos.kusteam.app/**` ir senus adresus, kol jie naudojami.
+
+## Prisijungimas per KU STEAM TEAM (TEAM-006)
+
+KU STEAM centro darbuotojai prisijungia tik prie KU STEAM TEAM (`komanda.kusteam.app`) ir iš ten atidaro CLASSROOM be antro prisijungimo. Sprendimas ir sutartis: `kusteam-ai-lab` `docs/ADR-001-TEAM-SSO.md`, `docs/TEAM-SSO-INTEGRATION-CONTRACT.md` (v1.2). DB dalis: `supabase/proposals/team-006-sso/`.
+
+- `GET /auth/team/start?next=/kelias`: naujas `state` ir PKCE `code_verifier` užšifruotame 10 min. slapuke (https: `__Host-kusteam_team_sso_flow`, `Secure; Path=/`, be `Domain`, HttpOnly; vietinis `http://127.0.0.1`: be priešdėlio), 303 į TEAM `/sso/authorize`. `next` priimamas tik kaip šios svetainės kelias, kitaip `/dashboard`.
+- `GET /auth/team/callback`: tikrina `state` (nepavykus, gerai suformuotas kodas „sudeginamas“: vieną kartą iškeičiamas su atsitiktiniu verifier, kad nebegaliotų), slapuką ištrina, kodą iškeičia per `team_sso_redeem_code` (service role), sukuria ar palieka profilį, serveryje sukuria naują CLASSROOM Supabase sesiją (`generateLink` + `verifyOtp`, vienkartinis žetonas serverio nepalieka), susieja ją su SSO sesija (`team_sso_link_client_session`) ir nukreipia į `next`.
+- `POST /auth/team/sign-out`: darbuotojo „Atsijungti“ baigia SSO sesiją (`team_sso_revoke`, kuris ištrina ir CLASSROOM Supabase sesiją) ir CLASSROOM slapukus (`scope: local`); TEAM lieka prisijungęs. Mokytojo atsijungimas lieka kaip buvo (`global`, ADR išimtis).
+- `/auth/team/pranesimas`: sutarties 7 skyriaus pranešimai su mygtuku į TEAM.
+- Profilis: naujam darbuotojui sukuriamas `role = 'staff'` (aktyvus, be registracijos ir onboarding). Esamas mokytojo ar administratoriaus profilis lieka nepakeistas. CLASSROOM administratoriaus užblokuotas `staff` profilis per TEAM neatblokuojamas.
+- `staff` CLASSROOM viduje: kaip vedėjas su savo veiklomis, niekada ne administratorius. Rolę keičia tik TEAM prisijungimas (service role); administratoriaus API ir paskyrų tvirtinimas `staff` profilio rolės nekeičia, bet administratorius gali jį užblokuoti.
+- `proxy.ts`: darbuotojo teisė tikrinama kiekvienoje vedėjo puslapio ir API užklausoje (`team_staff_access_ok()`, be 30 s talpyklos). Teisę praradus CLASSROOM sesija baigiama, puslapis rodo pranešimą, API grąžina 401. Po 8 val. puslapis tyliai pereina per TEAM iš naujo. TEAM atšauktos sesijos Supabase jau nebežino (`getUser()` naudotojo neranda): tada pagal slapuke likusį sesijos ID (service role) randama SSO sesija ir parodoma priežastis, o ne mokytojo prisijungimas. Mokytojų ir administratorių kelias nesikeičia; tik jų sesijai pasibaigus serveryje atliekama viena tokia paieška.
+
+Vietiniam ar CI testui su TEAM ant `127.0.0.1`: `TEAM_SSO_ENABLED=1`, `TEAM_SSO_URL=http://127.0.0.1:<TEAM prievadas>`, Supabase kintamieji tam pačiam vietiniam projektui. TEAM pusėje CLASSROOM registruojamas `TEAM_SSO_DEV_CLIENTS` (sutarties 2 skyrius).
 
 ## Svarbiausi principai
 
@@ -92,7 +109,8 @@ Supabase Auth → URL Configuration: Site URL `https://pamokos.kusteam.app`, Red
 - `lib/hosts.ts`: adresų vaidmenys ir senų adresų nukreipimai
 - `lib/ai/`: Claude užklausos ir schemos
 - `lib/supabase/`: `server.ts`, `client.ts`, `admin.ts`
-- `lib/auth/roles.ts`: RBAC `teacher` / `admin` / `super_admin`
+- `lib/auth/roles.ts`: RBAC `teacher` / `admin` / `super_admin` / `staff` (KU STEAM TEAM darbuotojas)
+- `lib/team-sso/`: prisijungimas per KU STEAM TEAM
 - `supabase/migrations/`: DB schema (`00001`…`00025`, žr. `docs/migration-history.md`)
 
 ## Patikros produkcijoje
