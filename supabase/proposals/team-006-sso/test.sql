@@ -300,6 +300,19 @@ BEGIN
   SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
   IF st.active OR st.reason <> 'logged_out' THEN RAISE EXCEPTION 'revoked: %', row_to_json(st); END IF;
 
+  -- A client ends its own session by handle; another client's handle does nothing.
+  PERFORM public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
+    '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-h'), 'hex'), ch);
+  SELECT * INTO r FROM public.team_sso_redeem_code('water-lab', encode(sha256('code-h'), 'hex'), v, encode(sha256('handle-h'), 'hex'));
+  IF public.team_sso_revoke_handle('ai-vault', encode(sha256('handle-h'), 'hex')) <> 0 THEN
+    RAISE EXCEPTION 'another client ended this session';
+  END IF;
+  IF public.team_sso_revoke_handle('water-lab', encode(sha256('handle-h'), 'hex')) <> 1 THEN
+    RAISE EXCEPTION 'the client could not end its session';
+  END IF;
+  SELECT * INTO st FROM public.team_sso_session_status('water-lab', r.session_id);
+  IF st.active OR st.reason <> 'logged_out' THEN RAISE EXCEPTION 'client sign-out: %', row_to_json(st); END IF;
+
   BEGIN
     PERFORM public.team_sso_revoke('00000000-0000-4000-8000-0000000000d1', 'whatever');
     RAISE EXCEPTION 'an unknown revoke reason was accepted';

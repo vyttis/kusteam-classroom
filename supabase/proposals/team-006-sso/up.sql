@@ -407,6 +407,26 @@ BEGIN
 END;
 $$;
 
+-- A client ends its own session (TEAM /api/sso/revoke, RFC 7009 shape):
+-- only a session of that client, found by its handle hash.
+CREATE FUNCTION public.team_sso_revoke_handle(p_client text, p_handle_hash text)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  s public.team_sso_sessions%ROWTYPE;
+BEGIN
+  SELECT * INTO s FROM public.team_sso_sessions
+  WHERE handle_hash = p_handle_hash AND client_id = p_client AND revoked_at IS NULL;
+  IF s.id IS NULL THEN
+    RETURN 0;
+  END IF;
+  RETURN public.team_sso_revoke(s.user_id, 'client_signed_out', NULL, p_client, s.id);
+END;
+$$;
+
 -- Revocation in the same transaction as the change that causes it, so no
 -- activity can miss a short gap (a grant removed and given back at once).
 CREATE FUNCTION public.team_sso_revoke_on_change()
@@ -434,6 +454,8 @@ CREATE TRIGGER team_sso_revoke_on_block
   FOR EACH ROW EXECUTE FUNCTION public.team_sso_revoke_on_change();
 
 REVOKE ALL ON FUNCTION public.team_sso_revoke_on_change() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.team_sso_revoke_handle(text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.team_sso_revoke_handle(text, text) TO service_role;
 REVOKE ALL ON FUNCTION public.team_register_session(uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.team_register_session(uuid, uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.team_sso_access(uuid, text, uuid) FROM PUBLIC, anon, authenticated;

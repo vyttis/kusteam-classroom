@@ -86,6 +86,7 @@ $$;
 DROP TRIGGER IF EXISTS team_sso_revoke_on_grant_removal ON public.team_activity_grants;
 DROP TRIGGER IF EXISTS team_sso_revoke_on_block ON public.team_members;
 DROP FUNCTION IF EXISTS public.team_sso_revoke_on_change();
+DROP FUNCTION IF EXISTS public.team_sso_revoke_handle(text, text);
 DROP FUNCTION IF EXISTS public.team_register_session(uuid, uuid);
 DROP FUNCTION IF EXISTS public.team_sso_revoke(uuid, text, uuid, text, uuid);
 DROP FUNCTION IF EXISTS public.team_sso_link_client_session(uuid, uuid);
