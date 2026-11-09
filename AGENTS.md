@@ -19,6 +19,7 @@ Ekosistemos dokumentai yra `vyttis/kusteam-ai-lab` repozitorijoje (čia nekopiju
 - **Atsakymai tikrinami tik serveryje** (`/api/submissions`, `lib/game/answer-hasher.ts`, bcrypt su SHA-256 iš anksto). SQL `check_answer()` nenaudojama. `answer_hash`, `accepted_answer_hashes` ir užuominos niekada nesiunčiami į naršyklę.
 - Dalyviai be paskyrų: komandos `session_token` naršyklės `localStorage`, perduodamas antrašte `x-session-token`.
 - DI tik siūlo: teisingą atsakymą visada patvirtina vedėjas. DI biudžetas ir limitai skaičiuojami Supabase (`ai_usage`), trumpo lango riba serverio atmintyje.
+- **KU STEAM TEAM darbuotojai (`profiles.role = 'staff'`)** patenka tik per TEAM prisijungimą (`lib/team-sso/`, `/auth/team/*`, sutartis `kusteam-ai-lab/docs/TEAM-SSO-INTEGRATION-CONTRACT.md`). Vaidmenį `staff` nustato tik service role; tai ne mokytojas ir ne administratorius. Jų duomenis saugo RESTRICTIVE RLS ir `is_active_account()` / `can_read_game()` su `team_staff_access_ok()` (TEAM-006). Nauja SECURITY DEFINER funkcija, kurią gali kviesti `authenticated`, turi taikyti tą pačią taisyklę (tikrina `test:db`). Mokytojų prisijungimas ir teisės nuo TEAM nepriklauso.
 - Server components: `@/lib/supabase/server`. API maršrutuose įvestis tikrinama su zod. Tipai: `@/types/database.ts`, `@/types/game.ts`.
 
 ## Duomenų bazė
