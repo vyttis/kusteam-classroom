@@ -21,7 +21,12 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
-DROP POLICY IF EXISTS "TEAM staff only through an active TEAM sign-in" ON storage.objects;
+DO $$
+BEGIN
+  IF to_regclass('storage.objects') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "TEAM staff only through an active TEAM sign-in" ON storage.objects;
+  END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.team_staff_access_ok();
 
 DROP TRIGGER IF EXISTS protect_staff_role ON public.profiles;

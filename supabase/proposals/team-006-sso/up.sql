@@ -468,7 +468,14 @@ BEGIN
   END LOOP;
 END $$;
 
-CREATE POLICY "TEAM staff only through an active TEAM sign-in" ON storage.objects AS RESTRICTIVE FOR ALL TO authenticated
-  USING ((SELECT public.team_staff_access_ok())) WITH CHECK ((SELECT public.team_staff_access_ok()));
+-- storage.objects exists wherever Supabase Storage runs (production, the
+-- test bootstrap); a local stack started without Storage has no such table.
+DO $$
+BEGIN
+  IF to_regclass('storage.objects') IS NOT NULL THEN
+    CREATE POLICY "TEAM staff only through an active TEAM sign-in" ON storage.objects AS RESTRICTIVE FOR ALL TO authenticated
+      USING ((SELECT public.team_staff_access_ok())) WITH CHECK ((SELECT public.team_staff_access_ok()));
+  END IF;
+END $$;
 
 COMMIT;
