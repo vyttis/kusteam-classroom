@@ -1,0 +1,11 @@
+column|228|9e7608fce82fbee74a67b16a1f7f7f9e|
+constraint|117|0074bca4ea0725168ccc6394ff5e4fd2|
+function|40|638f6221097a506ddf03ba466847e44a|
+grant.column|50|95c8dcc0fa52abb386b95f8942e022de|
+grant.function|68|75d4d0a471b9bf0fe3f4e1db40943598|
+grant.table|49|af94879cdd2d16607d32415b06326e55|
+index|40|dd2281cfe97f0d19241092ef7bc1769d|
+policy|76|a84af6fc5a640aaabf1c2f218b538d8e|
+realtime|5|d718741a8a346c9aa2c306739d3fada4|
+table|24|1e88087c44bacb15ab6ae3aa0c8a80af|
+trigger|16|fc083e3d84f4c8a2d439be134c89f23c|
