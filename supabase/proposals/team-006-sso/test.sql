@@ -381,6 +381,31 @@ END
 $$;
 RESET ROLE;
 
+-- The trigger itself: column rights alone already refuse the update above,
+-- so give authenticated the right to update profiles.role inside this
+-- rolled-back test. The trigger must still refuse, with its own message.
+GRANT UPDATE (role) ON public.profiles TO authenticated;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000d4', true);
+SELECT set_config('request.jwt.claims', '{"sub": "00000000-0000-4000-8000-0000000000d4", "role": "authenticated", "session_id": "00000000-0000-4000-8000-0000000000e5"}', true);
+DO $$
+DECLARE
+  msg text;
+BEGIN
+  BEGIN
+    UPDATE public.profiles SET role = 'staff' WHERE id = '00000000-0000-4000-8000-0000000000d4';
+    RAISE EXCEPTION 'protect_staff_role did not refuse a teacher';
+  EXCEPTION WHEN insufficient_privilege THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+    IF msg <> 'The staff role is set only by the KU STEAM TEAM sign-in' THEN
+      RAISE EXCEPTION 'refused, but not by protect_staff_role: %', msg;
+    END IF;
+  END;
+END
+$$;
+RESET ROLE;
+REVOKE UPDATE (role) ON public.profiles FROM authenticated;
+
 -- Staff through the linked CLASSROOM session e2: allowed while access is live.
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000d1', true);

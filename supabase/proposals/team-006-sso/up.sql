@@ -35,6 +35,10 @@
 -- It does not change Supabase Auth settings, handle_new_user() (CLS-011 is a
 -- separate decision) or any teacher's data.
 BEGIN;
+-- If a table lock cannot be taken within 5 s, the whole change stops and
+-- is undone (error 55P03), so requests wait on it at most that long
+-- (docs/migration-history.md, TEAM-006).
+SET LOCAL lock_timeout = '5s';
 
 -- 1. Tables ------------------------------------------------------------------
 
@@ -500,6 +504,8 @@ $$;
 CREATE TRIGGER protect_staff_role
   BEFORE INSERT OR UPDATE OF role ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.protect_staff_role();
+-- A trigger function: never called directly, so no client role needs it.
+REVOKE ALL ON FUNCTION public.protect_staff_role() FROM PUBLIC, anon, authenticated;
 
 -- TEAM-001 skipped every CLASSROOM profile of a TEAM user. A 'staff' profile
 -- (inserted by the CLASSROOM server at the TEAM sign-in) is now let through;
