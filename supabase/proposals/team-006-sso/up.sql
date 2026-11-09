@@ -13,7 +13,13 @@
 --                        session and a PKCE challenge)
 --   team_sso_sessions    the activity sessions opened with those codes; their
 --                        status is computed live (member, grant, TEAM session)
---   functions            issue, redeem, status, link, revoke: service role only
+--   team_sessions        the Supabase sessions TEAM itself created with a
+--                        password sign-in. Only these may open activities: a
+--                        session made elsewhere for the same person (CLASSROOM
+--                        creates one for staff) is never a TEAM session.
+--   functions            register, issue, redeem, status, link, revoke:
+--                        service role only. Removing a grant or blocking a
+--                        member revokes in the same transaction (triggers).
 --   profiles.role        new value 'staff': a TEAM staff member inside
 --                        CLASSROOM, created only by the TEAM sign-in, never a
 --                        teacher or an admin
@@ -22,6 +28,9 @@
 --                        session is linked to an active SSO session.
 --                        team_staff_access_ok() is true for everyone else, so
 --                        teachers, admins and participants are unaffected.
+--                        is_active_account() and can_read_game() (used by
+--                        the SECURITY DEFINER RPCs that skip RLS) get the
+--                        same rule.
 --
 -- It does not change Supabase Auth settings, handle_new_user() (CLS-011 is a
 -- separate decision) or any teacher's data.
@@ -63,18 +72,29 @@ CREATE TABLE public.team_sso_codes (
 CREATE INDEX team_sso_codes_user_created ON public.team_sso_codes (user_id, created_at);
 CREATE INDEX team_sso_codes_sso_session ON public.team_sso_codes (sso_session_id);
 
+-- The Supabase sessions TEAM created (password sign-in on komanda.*),
+-- registered by the TEAM server right after signing in.
+CREATE TABLE public.team_sessions (
+  session_id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES public.team_members(user_id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX team_sessions_user ON public.team_sessions (user_id, created_at);
+
 ALTER TABLE public.team_sso_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_sso_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_sessions ENABLE ROW LEVEL SECURITY;
 -- No client role reads or writes them; only the TEAM and CLASSROOM servers
 -- through the service role.
-REVOKE ALL ON public.team_sso_codes, public.team_sso_sessions FROM PUBLIC, anon, authenticated;
-GRANT ALL ON public.team_sso_codes, public.team_sso_sessions TO service_role;
+REVOKE ALL ON public.team_sso_codes, public.team_sso_sessions, public.team_sessions FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.team_sso_codes, public.team_sso_sessions, public.team_sessions TO service_role;
 
 -- 2. Live access check ---------------------------------------------------------
 -- 'ok', or why the member may not use the activity now. The client id is the
--- activity key (contract section 2). The TEAM session must still exist in
--- auth.sessions: a TEAM sign-out, a password change or Supabase ending the
--- session closes every activity session opened from it.
+-- activity key (contract section 2). The TEAM session must be one TEAM
+-- registered (team_sessions) and must still exist in auth.sessions: a TEAM
+-- sign-out, a password change or Supabase ending the session closes every
+-- activity session opened from it.
 CREATE FUNCTION public.team_sso_access(p_user uuid, p_activity text, p_team_session uuid)
 RETURNS text
 LANGUAGE sql
@@ -91,6 +111,10 @@ AS $$
       WHERE g.user_id = p_user AND g.activity = p_activity
     ) THEN 'grant_revoked'
     WHEN NOT EXISTS (
+      SELECT 1 FROM public.team_sessions t
+      WHERE t.session_id = p_team_session AND t.user_id = p_user
+    ) THEN 'logged_out'
+    WHEN NOT EXISTS (
       SELECT 1 FROM auth.sessions s
       WHERE s.id = p_team_session AND s.user_id = p_user
         AND (s.not_after IS NULL OR s.not_after > now())
@@ -101,10 +125,33 @@ AS $$
   LEFT JOIN public.team_members m ON m.user_id = p_user
 $$;
 
+-- 2b. Register a TEAM session (TEAM sign-in, invitation, reset, password
+--     change). Only a live session of that member counts. Forgets this
+--     member's sessions that Supabase already ended.
+CREATE FUNCTION public.team_register_session(p_user uuid, p_session uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  DELETE FROM public.team_sessions t
+  WHERE t.user_id = p_user
+    AND NOT EXISTS (SELECT 1 FROM auth.sessions s WHERE s.id = t.session_id);
+  IF NOT EXISTS (SELECT 1 FROM public.team_members m WHERE m.user_id = p_user)
+     OR NOT EXISTS (SELECT 1 FROM auth.sessions s WHERE s.id = p_session AND s.user_id = p_user) THEN
+    RETURN false;
+  END IF;
+  INSERT INTO public.team_sessions (session_id, user_id) VALUES (p_session, p_user)
+  ON CONFLICT (session_id) DO NOTHING;
+  RETURN EXISTS (SELECT 1 FROM public.team_sessions t WHERE t.session_id = p_session AND t.user_id = p_user);
+END;
+$$;
+
 -- 3. Issue a code (TEAM /sso/authorize) -------------------------------------
 -- Returns 'ok', 'invalid_client', 'rate_limited' or a reason from
 -- team_sso_access. A per-member lock makes parallel requests wait, so the
--- limit holds under a burst.
+-- limit (20 per member and activity per minute) holds under a burst.
 CREATE FUNCTION public.team_sso_issue_code(
   p_user uuid,
   p_client text,
@@ -133,15 +180,18 @@ BEGIN
   IF access <> 'ok' THEN
     RETURN access;
   END IF;
+  -- Per member and activity, so a burst for one activity never locks the others.
   IF (
     SELECT count(*) FROM public.team_sso_codes c
-    WHERE c.user_id = p_user AND c.created_at > now() - interval '1 minute'
+    WHERE c.user_id = p_user AND c.client_id = p_client AND c.created_at > now() - interval '1 minute'
   ) >= p_max_per_minute THEN
     RETURN 'rate_limited';
   END IF;
-  -- Housekeeping for this member only (index on user_id, created_at).
+  -- Housekeeping for this member only (indexes on user_id, created_at).
   DELETE FROM public.team_sso_codes c
   WHERE c.user_id = p_user AND c.created_at < now() - interval '1 day';
+  DELETE FROM public.team_sso_sessions s
+  WHERE s.user_id = p_user AND s.expires_at < now() - interval '30 days';
   INSERT INTO public.team_sso_codes (code_hash, client_id, user_id, team_session_id, code_challenge, expires_at)
   VALUES (p_code_hash, p_client, p_user, p_team_session, p_code_challenge, now() + p_ttl);
   RETURN 'ok';
@@ -195,9 +245,13 @@ BEGIN
   END IF;
 
   IF c.used_at IS NOT NULL THEN
-    UPDATE public.team_sso_sessions s
-    SET revoked_at = now(), revoke_reason = 'code_reused'
-    WHERE s.id = c.sso_session_id AND s.revoked_at IS NULL;
+    WITH ended AS (
+      UPDATE public.team_sso_sessions s
+      SET revoked_at = now(), revoke_reason = 'code_reused'
+      WHERE s.id = c.sso_session_id AND s.revoked_at IS NULL
+      RETURNING s.client_session_id
+    )
+    DELETE FROM auth.sessions a WHERE a.id IN (SELECT e.client_session_id FROM ended e);
     RETURN QUERY SELECT 'invalid_grant'::text, NULL::uuid, NULL::uuid, NULL::text, NULL::text, NULL::text, NULL::text, NULL::timestamptz;
     RETURN;
   END IF;
@@ -315,7 +369,9 @@ $$;
 
 -- 7. Explicit revocation (TEAM sign-out, blocking, grant removal, a client
 --    signing out). Status is computed live anyway; this records why and
---    makes the end permanent even if access comes back later.
+--    makes the end permanent even if access comes back later. A CLASSROOM
+--    Supabase session opened by a revoked SSO session is deleted with it
+--    (its refresh tokens go with it), so it cannot even be refreshed.
 CREATE FUNCTION public.team_sso_revoke(
   p_user uuid,
   p_reason text,
@@ -334,18 +390,52 @@ BEGIN
   IF p_reason NOT IN ('logged_out', 'blocked', 'grant_revoked', 'client_signed_out') THEN
     RAISE EXCEPTION 'team_sso_revoke: unknown reason %', p_reason;
   END IF;
-  UPDATE public.team_sso_sessions s
-  SET revoked_at = now(), revoke_reason = p_reason
-  WHERE s.user_id = p_user
-    AND s.revoked_at IS NULL
-    AND (p_team_session IS NULL OR s.team_session_id = p_team_session)
-    AND (p_client IS NULL OR s.client_id = p_client)
-    AND (p_session_id IS NULL OR s.id = p_session_id);
-  GET DIAGNOSTICS n = ROW_COUNT;
+  WITH ended AS (
+    UPDATE public.team_sso_sessions s
+    SET revoked_at = now(), revoke_reason = p_reason
+    WHERE s.user_id = p_user
+      AND s.revoked_at IS NULL
+      AND (p_team_session IS NULL OR s.team_session_id = p_team_session)
+      AND (p_client IS NULL OR s.client_id = p_client)
+      AND (p_session_id IS NULL OR s.id = p_session_id)
+    RETURNING s.client_session_id
+  ), gone AS (
+    DELETE FROM auth.sessions a WHERE a.id IN (SELECT e.client_session_id FROM ended e)
+  )
+  SELECT count(*) INTO n FROM ended;
   RETURN n;
 END;
 $$;
 
+-- Revocation in the same transaction as the change that causes it, so no
+-- activity can miss a short gap (a grant removed and given back at once).
+CREATE FUNCTION public.team_sso_revoke_on_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'team_activity_grants' THEN
+    PERFORM public.team_sso_revoke(OLD.user_id, 'grant_revoked', NULL, OLD.activity);
+    RETURN OLD;
+  END IF;
+  IF NEW.status = 'blocked' AND OLD.status IS DISTINCT FROM 'blocked' THEN
+    PERFORM public.team_sso_revoke(NEW.user_id, 'blocked');
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER team_sso_revoke_on_grant_removal
+  AFTER DELETE ON public.team_activity_grants
+  FOR EACH ROW EXECUTE FUNCTION public.team_sso_revoke_on_change();
+CREATE TRIGGER team_sso_revoke_on_block
+  AFTER UPDATE OF status ON public.team_members
+  FOR EACH ROW EXECUTE FUNCTION public.team_sso_revoke_on_change();
+
+REVOKE ALL ON FUNCTION public.team_sso_revoke_on_change() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.team_register_session(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.team_register_session(uuid, uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.team_sso_access(uuid, text, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.team_sso_issue_code(uuid, text, uuid, text, text, interval, integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.team_sso_redeem_code(text, text, text, text, interval) FROM PUBLIC, anon, authenticated;
@@ -446,6 +536,33 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.team_staff_access_ok() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.team_staff_access_ok() TO authenticated, service_role;
+
+-- The SECURITY DEFINER functions that clients call skip RLS; they rely on
+-- these two checks, which now include the staff rule too. Bodies otherwise
+-- as before (20261106130000, 20261106120000); grants are kept.
+CREATE OR REPLACE FUNCTION public.is_active_account()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND status = 'active')
+    AND public.team_staff_access_ok()
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_read_game(game_uuid uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT coalesce(auth.role(), '') = 'service_role'
+    OR (EXISTS (SELECT 1 FROM public.games g WHERE g.id = game_uuid AND g.teacher_id = auth.uid())
+        AND public.team_staff_access_ok())
+    OR coalesce(public.get_my_role(), '') IN ('admin', 'super_admin')
+$$;
 
 -- Every CLASSROOM facilitator table with RLS (profiles and the team_* tables
 -- excluded: own profile reads stay possible so the app can tell a staff

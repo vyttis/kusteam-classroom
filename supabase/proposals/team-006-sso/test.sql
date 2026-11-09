@@ -26,14 +26,15 @@ INSERT INTO public.team_activity_grants (user_id, activity) VALUES
   ('00000000-0000-4000-8000-0000000000d1', 'water-lab'),
   ('00000000-0000-4000-8000-0000000000d2', 'water-lab'),
   ('00000000-0000-4000-8000-0000000000d3', 'classroom');
--- e1: d1's TEAM session, e2: d1's CLASSROOM session, e3: d2's TEAM session,
--- e4: d3's TEAM session, e5: d4's CLASSROOM session.
+-- e1: d1's TEAM session, e2 and e6: d1's CLASSROOM sessions, e3: d2's TEAM
+-- session, e4: d3's TEAM session, e5: d4's CLASSROOM session.
 INSERT INTO auth.sessions (id, user_id) VALUES
   ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000d1'),
   ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-0000000000d1'),
   ('00000000-0000-4000-8000-0000000000e3', '00000000-0000-4000-8000-0000000000d2'),
   ('00000000-0000-4000-8000-0000000000e4', '00000000-0000-4000-8000-0000000000d3'),
-  ('00000000-0000-4000-8000-0000000000e5', '00000000-0000-4000-8000-0000000000d4');
+  ('00000000-0000-4000-8000-0000000000e5', '00000000-0000-4000-8000-0000000000d4'),
+  ('00000000-0000-4000-8000-0000000000e6', '00000000-0000-4000-8000-0000000000d1');
 
 -- 1. Client roles cannot touch the SSO tables or call the SSO functions.
 SET ROLE authenticated;
@@ -49,6 +50,16 @@ BEGIN
   BEGIN
     PERFORM 1 FROM public.team_sso_sessions;
     RAISE EXCEPTION 'authenticated read team_sso_sessions';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM 1 FROM public.team_sessions;
+    RAISE EXCEPTION 'authenticated read team_sessions';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM public.team_register_session('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000e2');
+    RAISE EXCEPTION 'authenticated registered a TEAM session';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
@@ -77,7 +88,7 @@ END
 $$;
 RESET ROLE;
 
--- 2. Issuing codes (as the service role, like the TEAM server).
+-- 2. TEAM sessions and issuing codes (as the service role, like the TEAM server).
 SET ROLE service_role;
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 SELECT set_config('request.jwt.claim.sub', '', true);
@@ -86,9 +97,27 @@ DECLARE
   ch constant text := 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
   r text;
 BEGIN
+  -- TEAM registers the sessions it created; nothing else counts.
+  IF NOT public.team_register_session('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000e1')
+     OR NOT public.team_register_session('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000e3')
+     OR NOT public.team_register_session('00000000-0000-4000-8000-0000000000d3', '00000000-0000-4000-8000-0000000000e4') THEN
+    RAISE EXCEPTION 'registering TEAM sessions failed';
+  END IF;
+  IF public.team_register_session('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000e3') THEN
+    RAISE EXCEPTION 'registered another person''s session';
+  END IF;
+  IF public.team_register_session('00000000-0000-4000-8000-0000000000d4', '00000000-0000-4000-8000-0000000000e5') THEN
+    RAISE EXCEPTION 'registered a session of someone who is not a TEAM member';
+  END IF;
+
   r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'classroom',
     '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-1'), 'hex'), ch);
   IF r <> 'ok' THEN RAISE EXCEPTION 'issue for a granted member: %', r; END IF;
+
+  -- A session of the same person that TEAM did not create (CLASSROOM's) is not a TEAM session.
+  r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
+    '00000000-0000-4000-8000-0000000000e2', encode(sha256('code-x'), 'hex'), ch);
+  IF r <> 'logged_out' THEN RAISE EXCEPTION 'issue with a non-TEAM session: %', r; END IF;
 
   r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d2', 'classroom',
     '00000000-0000-4000-8000-0000000000e3', encode(sha256('code-x'), 'hex'), ch);
@@ -106,7 +135,7 @@ BEGIN
     '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-x'), 'hex'), ch);
   IF r <> 'invalid_client' THEN RAISE EXCEPTION 'issue for an unknown client: %', r; END IF;
 
-  -- A TEAM session that does not exist, or belongs to someone else.
+  -- A TEAM session of someone else.
   r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'classroom',
     '00000000-0000-4000-8000-0000000000e3', encode(sha256('code-x'), 'hex'), ch);
   IF r <> 'logged_out' THEN RAISE EXCEPTION 'issue with another person''s session: %', r; END IF;
@@ -125,8 +154,8 @@ BEGIN
     IF SQLERRM NOT LIKE 'team_sso_issue_code: code lifetime%' THEN RAISE; END IF;
   END;
 
-  -- At most 20 codes per member per minute (one issued above).
-  FOR i IN 2..20 LOOP
+  -- At most 20 codes per member and activity per minute; other activities are not affected.
+  FOR i IN 1..20 LOOP
     r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
       '00000000-0000-4000-8000-0000000000e1', encode(sha256(convert_to('burst-' || i, 'UTF8')), 'hex'), ch);
     IF r <> 'ok' THEN RAISE EXCEPTION 'code % of 20 refused: %', i, r; END IF;
@@ -134,6 +163,9 @@ BEGIN
   r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
     '00000000-0000-4000-8000-0000000000e1', encode(sha256('burst-21'), 'hex'), ch);
   IF r <> 'rate_limited' THEN RAISE EXCEPTION 'the 21st code in a minute: %', r; END IF;
+  r := public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'classroom',
+    '00000000-0000-4000-8000-0000000000e1', encode(sha256('burst-other'), 'hex'), ch);
+  IF r <> 'ok' THEN RAISE EXCEPTION 'a burst for one activity blocked another: %', r; END IF;
   -- Let the burst age out for the rest of the test.
   UPDATE public.team_sso_codes SET created_at = now() - interval '2 minutes'
   WHERE user_id = '00000000-0000-4000-8000-0000000000d1';
@@ -207,7 +239,9 @@ BEGIN
 END
 $$;
 
--- 4. Status follows live data: grant, block, TEAM session, expiry, revoke.
+-- 4. Status follows live data; removing a grant and blocking end sessions for
+-- good. As the owner: one case switches a trigger off for a moment.
+RESET ROLE;
 DO $$
 DECLARE
   ch constant text := 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
@@ -216,26 +250,43 @@ DECLARE
   st record;
   sid uuid;
 BEGIN
+  -- Grant removed and given back at once: the session stays ended (trigger).
   PERFORM public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
-    '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-live'), 'hex'), ch);
-  SELECT * INTO r FROM public.team_sso_redeem_code('water-lab', encode(sha256('code-live'), 'hex'), v,
-    encode(sha256('handle-live'), 'hex'));
+    '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-g'), 'hex'), ch);
+  SELECT * INTO r FROM public.team_sso_redeem_code('water-lab', encode(sha256('code-g'), 'hex'), v, encode(sha256('handle-g'), 'hex'));
   sid := r.session_id;
-
   DELETE FROM public.team_activity_grants
   WHERE user_id = '00000000-0000-4000-8000-0000000000d1' AND activity = 'water-lab';
-  SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
-  IF st.active OR st.reason <> 'grant_revoked' THEN RAISE EXCEPTION 'grant removed: %', row_to_json(st); END IF;
   INSERT INTO public.team_activity_grants (user_id, activity)
   VALUES ('00000000-0000-4000-8000-0000000000d1', 'water-lab');
+  SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
+  IF st.active OR st.reason <> 'grant_revoked' THEN RAISE EXCEPTION 'grant removed and given back: %', row_to_json(st); END IF;
 
+  -- Blocked and unblocked at once: ended too.
+  PERFORM public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
+    '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-b'), 'hex'), ch);
+  SELECT * INTO r FROM public.team_sso_redeem_code('water-lab', encode(sha256('code-b'), 'hex'), v, encode(sha256('handle-b'), 'hex'));
+  sid := r.session_id;
   UPDATE public.team_members SET status = 'blocked' WHERE user_id = '00000000-0000-4000-8000-0000000000d1';
-  SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
-  IF st.active OR st.reason <> 'blocked' THEN RAISE EXCEPTION 'blocked: %', row_to_json(st); END IF;
   UPDATE public.team_members SET status = 'active' WHERE user_id = '00000000-0000-4000-8000-0000000000d1';
-
   SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
-  IF NOT st.active THEN RAISE EXCEPTION 'access back, session should be active: %', st.reason; END IF;
+  IF st.active OR st.reason <> 'blocked' THEN RAISE EXCEPTION 'blocked and unblocked: %', row_to_json(st); END IF;
+
+  -- Live: blocked right now (without a revocation record) is refused too.
+  PERFORM public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'water-lab',
+    '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-l'), 'hex'), ch);
+  SELECT * INTO r FROM public.team_sso_redeem_code('water-lab', encode(sha256('code-l'), 'hex'), v, encode(sha256('handle-l'), 'hex'));
+  sid := r.session_id;
+  ALTER TABLE public.team_members DISABLE TRIGGER team_sso_revoke_on_block;
+  UPDATE public.team_members SET status = 'blocked' WHERE user_id = '00000000-0000-4000-8000-0000000000d1';
+  ALTER TABLE public.team_members ENABLE TRIGGER team_sso_revoke_on_block;
+  SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
+  IF st.active OR st.reason <> 'blocked' THEN RAISE EXCEPTION 'live block: %', row_to_json(st); END IF;
+  ALTER TABLE public.team_members DISABLE TRIGGER team_sso_revoke_on_block;
+  UPDATE public.team_members SET status = 'active' WHERE user_id = '00000000-0000-4000-8000-0000000000d1';
+  ALTER TABLE public.team_members ENABLE TRIGGER team_sso_revoke_on_block;
+  SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
+  IF NOT st.active THEN RAISE EXCEPTION 'unrecorded block lifted, session should be active: %', st.reason; END IF;
 
   UPDATE public.team_sso_sessions SET expires_at = now() - interval '1 second' WHERE id = sid;
   SELECT * INTO st FROM public.team_sso_session_status('water-lab', sid);
@@ -258,7 +309,8 @@ BEGIN
 END
 $$;
 
--- 5. CLASSROOM: staff profile, link, restrictive RLS.
+-- 5. CLASSROOM: staff profile, link, restrictive RLS and the RPC checks.
+SET ROLE service_role;
 DO $$
 DECLARE
   ch constant text := 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
@@ -291,7 +343,7 @@ END
 $$;
 RESET ROLE;
 
--- The teacher cannot make themself staff, nor can anyone give it through the Data API.
+-- A teacher cannot make themself staff and is not affected by the staff rule.
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000d4', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
@@ -303,11 +355,14 @@ BEGIN
     RAISE EXCEPTION 'a teacher made themself staff';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
-  -- A teacher is not affected by the staff rule.
   INSERT INTO public.games (teacher_id, title, game_code)
   VALUES ('00000000-0000-4000-8000-0000000000d4', 'Teacher game', 'SSOT01');
   IF NOT EXISTS (SELECT 1 FROM public.games WHERE game_code = 'SSOT01') THEN
     RAISE EXCEPTION 'a teacher cannot read their own game';
+  END IF;
+  IF NOT public.is_active_account()
+     OR NOT public.can_read_game((SELECT id FROM public.games WHERE game_code = 'SSOT01')) THEN
+    RAISE EXCEPTION 'the RPC checks changed for a teacher';
   END IF;
 END
 $$;
@@ -324,6 +379,10 @@ BEGIN
   IF (SELECT count(*) FROM public.games WHERE game_code IN ('SSOS01', 'SSOT01')) <> 1 THEN
     RAISE EXCEPTION 'staff must see their own game and not the teacher''s';
   END IF;
+  IF NOT public.is_active_account()
+     OR NOT public.can_read_game((SELECT id FROM public.games WHERE game_code = 'SSOS01')) THEN
+    RAISE EXCEPTION 'the RPC checks refuse live staff';
+  END IF;
   BEGIN
     UPDATE public.profiles SET role = 'teacher' WHERE id = '00000000-0000-4000-8000-0000000000d1';
     RAISE EXCEPTION 'staff changed their own role';
@@ -333,12 +392,15 @@ END
 $$;
 
 -- The same person through a session that is not linked (signed in to
--- CLASSROOM directly): no data.
-SELECT set_config('request.jwt.claims', '{"sub": "00000000-0000-4000-8000-0000000000d1", "role": "authenticated", "session_id": "00000000-0000-4000-8000-0000000000e1"}', true);
+-- CLASSROOM directly): no data, and the RPC checks say no.
+SELECT set_config('request.jwt.claims', '{"sub": "00000000-0000-4000-8000-0000000000d1", "role": "authenticated", "session_id": "00000000-0000-4000-8000-0000000000e6"}', true);
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.games WHERE game_code = 'SSOS01') THEN
     RAISE EXCEPTION 'an unlinked session read staff data';
+  END IF;
+  IF public.is_active_account() THEN
+    RAISE EXCEPTION 'is_active_account() true for an unlinked staff session';
   END IF;
   BEGIN
     INSERT INTO public.games (teacher_id, title, game_code)
@@ -359,44 +421,97 @@ END
 $$;
 RESET ROLE;
 
--- Removing the grant ends data access at once, giving it back restores it.
+-- Removing the grant: data and RPC checks closed at once, the CLASSROOM
+-- session itself deleted, and giving the grant back does not reopen it.
 DELETE FROM public.team_activity_grants
 WHERE user_id = '00000000-0000-4000-8000-0000000000d1' AND activity = 'classroom';
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM auth.sessions WHERE id = '00000000-0000-4000-8000-0000000000e2') THEN
+    RAISE EXCEPTION 'the CLASSROOM session of a revoked SSO session still exists';
+  END IF;
+END
+$$;
+INSERT INTO public.team_activity_grants (user_id, activity)
+VALUES ('00000000-0000-4000-8000-0000000000d1', 'classroom');
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub": "00000000-0000-4000-8000-0000000000d1", "role": "authenticated", "session_id": "00000000-0000-4000-8000-0000000000e2"}', true);
 DO $$
+DECLARE
+  game uuid;
 BEGIN
   IF EXISTS (SELECT 1 FROM public.games WHERE game_code = 'SSOS01') THEN
-    RAISE EXCEPTION 'staff without the grant still read data';
+    RAISE EXCEPTION 'revoked staff still read data';
+  END IF;
+  SELECT id INTO game FROM public.games WHERE game_code = 'SSOT01';
+  IF public.is_active_account() THEN
+    RAISE EXCEPTION 'is_active_account() true for revoked staff';
   END IF;
 END
 $$;
 RESET ROLE;
-INSERT INTO public.team_activity_grants (user_id, activity)
-VALUES ('00000000-0000-4000-8000-0000000000d1', 'classroom');
+DO $$
+BEGIN
+  -- can_read_game is what get_game_stats and get_game_reflections check.
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  IF (SELECT public.can_read_game(id) FROM public.games WHERE game_code = 'SSOS01') THEN
+    RAISE EXCEPTION 'can_read_game() true for revoked staff';
+  END IF;
+END
+$$;
 
--- A TEAM sign-out (the TEAM Supabase session row is deleted) ends it too.
+-- A new SSO session works again; a TEAM sign-out ends it.
+SET ROLE service_role;
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claim.sub', '', true);
+DO $$
+DECLARE
+  r record;
+BEGIN
+  PERFORM public.team_sso_issue_code('00000000-0000-4000-8000-0000000000d1', 'classroom',
+    '00000000-0000-4000-8000-0000000000e1', encode(sha256('code-cls-2'), 'hex'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+  SELECT * INTO r FROM public.team_sso_redeem_code('classroom', encode(sha256('code-cls-2'), 'hex'),
+    'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk');
+  IF r.status <> 'ok' OR NOT public.team_sso_link_client_session(r.session_id, '00000000-0000-4000-8000-0000000000e6') THEN
+    RAISE EXCEPTION 'second classroom sign-in: %', r.status;
+  END IF;
+END
+$$;
+RESET ROLE;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000d1', true);
+SELECT set_config('request.jwt.claims', '{"sub": "00000000-0000-4000-8000-0000000000d1", "role": "authenticated", "session_id": "00000000-0000-4000-8000-0000000000e6"}', true);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.games WHERE game_code = 'SSOS01') THEN
+    RAISE EXCEPTION 'a new TEAM sign-in did not reopen CLASSROOM';
+  END IF;
+END
+$$;
+RESET ROLE;
 DELETE FROM auth.sessions WHERE id = '00000000-0000-4000-8000-0000000000e1';
 SET ROLE authenticated;
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.games WHERE game_code = 'SSOS01') THEN
+  IF EXISTS (SELECT 1 FROM public.games WHERE game_code = 'SSOS01') OR public.is_active_account() THEN
     RAISE EXCEPTION 'staff data readable after the TEAM session ended';
   END IF;
 END
 $$;
 RESET ROLE;
 
--- 6. Every public table with RLS is covered by the staff rule, or excluded on purpose.
+-- 6. Coverage guards.
 DO $$
 DECLARE
   missing text;
 BEGIN
+  -- Every public table with RLS has the staff rule, or is excluded on purpose.
   SELECT string_agg(c.relname, ', ' ORDER BY c.relname) INTO missing
   FROM pg_class c
   WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r' AND c.relrowsecurity
     AND c.relname NOT IN ('profiles', 'team_members', 'team_activity_grants', 'team_tokens',
-                          'team_sso_codes', 'team_sso_sessions')
+                          'team_sso_codes', 'team_sso_sessions', 'team_sessions')
     AND NOT EXISTS (
       SELECT 1 FROM pg_policy p
       WHERE p.polrelid = c.oid AND p.polname = 'TEAM staff only through an active TEAM sign-in'
@@ -404,6 +519,20 @@ BEGIN
     );
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'tables without the TEAM staff rule: %', missing;
+  END IF;
+
+  -- Every SECURITY DEFINER function a signed-in client may call skips RLS,
+  -- so it must apply the staff rule itself (directly or through
+  -- is_active_account / can_read_game), or be one of the few that reveal
+  -- nothing about facilitator data.
+  SELECT string_agg(p.oid::regprocedure::text, ', ' ORDER BY 1) INTO missing
+  FROM pg_proc p
+  WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+    AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    AND p.proname NOT IN ('handle_new_user', 'get_my_role', 'get_platform_stats', 'team_staff_access_ok')
+    AND p.prosrc !~ '(team_staff_access_ok|is_active_account|can_read_game)\(';
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'SECURITY DEFINER functions without the TEAM staff rule: %', missing;
   END IF;
 END
 $$;
