@@ -51,6 +51,16 @@ const nextConfig = {
           },
         ],
       },
+      // KU STEAM TEAM sign-in: the callback URL carries a one-time code, so
+      // nothing here is cached and no referrer leaves these pages. Listed
+      // after the site-wide rule, so this Referrer-Policy wins.
+      {
+        source: "/auth/team/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
       // /api/health is for uptime monitors — never cache.
       {
         source: "/api/health",
