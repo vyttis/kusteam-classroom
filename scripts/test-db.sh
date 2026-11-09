@@ -132,6 +132,24 @@ fi
 psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "DELETE FROM auth.users WHERE id = '00000000-0000-4000-8000-0000000000c1'"
 echo "TEAM-001: test, first superadmin and rollback check passed"
 
+# TEAM-006 proposal (docs/migration-history.md): KU STEAM TEAM sign-in for
+# activities. Apply on the migrated schema (TEAM-001 included), test, roll
+# back and check that the whole schema fingerprint is exactly as before.
+PROPOSAL="$ROOT/supabase/proposals/team-006-sso"
+if [[ -d "$PROPOSAL" ]]; then
+  BEFORE="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql")"
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/up.sql" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/test.sql" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/down.sql" >/dev/null
+  AFTER="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql")"
+  if [[ "$AFTER" != "$BEFORE" ]]; then
+    diff <(echo "$BEFORE") <(echo "$AFTER") >&2 || true
+    echo "TEAM-006 down.sql did not restore the schema" >&2
+    exit 1
+  fi
+  echo "TEAM-006 proposal: apply, test and rollback passed"
+fi
+
 if [[ "${TEST_ROLLBACK:-1}" == "1" ]]; then
   # Every rollback must apply cleanly newest first (later migrations may
   # depend on earlier ones), and the migrations must apply again on top.

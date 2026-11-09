@@ -19,6 +19,13 @@ CREATE TABLE auth.users (
   last_sign_in_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- Supabase Auth sessions (only what the TEAM sign-in reads, TEAM-006).
+CREATE TABLE auth.sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  not_after timestamptz
+);
 -- As in Supabase: SQL tests set request.jwt.claim.*, PostgREST (the Data
 -- API test, scripts/test-data-api.sh) sets request.jwt.claims from the JWT.
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
@@ -32,6 +39,12 @@ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
     nullif(current_setting('request.jwt.claim.role', true), ''),
     (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
   )::text
+$$;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.jwt.claim', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')
+  )::jsonb
 $$;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon, authenticated, service_role;
 
