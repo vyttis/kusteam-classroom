@@ -263,7 +263,8 @@ export async function proxy(request: NextRequest) {
   // (message page, 401) instead of landing on the teacher sign-in. Anyone
   // else (null) goes on as signed out. Facilitator pages and APIs only.
   const endedStaff = async (): Promise<NextResponse | null> => {
-    if (user || !userError) return null
+    // With the TEAM sign-in off nothing changes for anyone (no extra lookup).
+    if (user || !userError || !isTeamSsoEnabled()) return null
     const reason = await endedStaffSession(sessionCookies, createAdminClient)
     return reason ? staffEnded(request, reason, sessionCookieNames, () => response) : null
   }
