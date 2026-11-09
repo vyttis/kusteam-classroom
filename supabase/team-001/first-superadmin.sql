@@ -1,7 +1,10 @@
--- TEAM-001: the first and only TEAM superadmin, set once after up.sql.
--- Run in the Supabase SQL Editor only with Vytis's approval, replacing
--- APPROVED_USER_ID with the auth user id he confirmed. Superadmin rights are
--- never derived from an email address.
+-- TEAM-001: the first and only TEAM superadmin, set once after migration
+-- 20261109111400_team_staff_access. Run in the Supabase SQL Editor only with
+-- Vytis's approval, replacing APPROVED_USER_ID with the auth user id he
+-- confirmed. Superadmin rights are never derived from an email address.
+-- Production: done on 2026-11-09 for the separate TEAM account
+-- (docs/migration-history.md, TEAM-001); a second run fails on
+-- team_members_one_superadmin. scripts/test-db.sh tests the script.
 --
 -- The superadmin is a separate auth user used only for TEAM (Vytis,
 -- 2026-11-09), never his CLASSROOM account: a TEAM password, reset link or

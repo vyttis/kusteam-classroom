@@ -1,7 +1,8 @@
--- TEAM-001 proposal test, run by scripts/test-db.sh after up.sql on the fully
--- migrated test database (supabase/tests/bootstrap.sql provides auth.users,
--- auth.uid() and the anon/authenticated/service_role roles). Everything runs
--- in one transaction that is rolled back.
+-- TEAM-001 test (migration 20261109111400_team_staff_access), run by
+-- scripts/test-db.sh on the fully migrated test database
+-- (supabase/tests/bootstrap.sql provides auth.users, auth.uid() and the
+-- anon/authenticated/service_role roles). Everything runs in one transaction
+-- that is rolled back.
 BEGIN;
 
 -- Fixtures, as the postgres owner.

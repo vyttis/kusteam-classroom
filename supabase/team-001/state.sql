@@ -1,11 +1,14 @@
 -- TEAM-001 state, read-only (only SELECTs): run in the production SQL Editor
--- before up.sql, after it and after first-superadmin.sql. Prints no email
--- addresses and no function source, only counts and an md5.
+-- before and after any TEAM-001 step (migration
+-- 20261109111400_team_staff_access, rollback-check.sql, first-superadmin.sql,
+-- the rollback). Prints no email addresses and no function source, only
+-- counts and an md5.
 --
--- Before up.sql (2026-11-09): team_relations [], team_functions [],
+-- Before the migration (2026-11-09): team_relations [], team_functions [],
 -- profile_guard false, team_members null, handle_new_user_md5 as recorded.
--- After up.sql: 10 team_* relations (3 tables, 7 indexes), 3 functions,
--- profile_guard true, team_members {}, handle_new_user_md5 unchanged.
+-- After the migration: 10 team_* relations (3 tables, 7 indexes), 3
+-- functions, profile_guard true, team_members {}, handle_new_user_md5
+-- unchanged.
 -- After first-superadmin.sql: team_members {"superadmin/active": 1},
 -- users_marked_team 1, auth_users_without_profile 1.
 select jsonb_build_object(
@@ -17,7 +20,8 @@ select jsonb_build_object(
                        and p.proname in ('team_issue_token', 'team_touch_updated_at', 'skip_profile_for_team_users')),
   'profile_guard', exists(select 1 from pg_trigger where tgname = 'skip_profile_for_team_users'
                           and tgrelid = 'public.profiles'::regclass),
-  -- team_members is read dynamically, so the query also runs before up.sql.
+  -- team_members is read dynamically, so the query also runs without it
+  -- (before the migration or after the rollback).
   'team_members', case when to_regclass('public.team_members') is null then null else
                     ((xpath('/row/v/text()', query_to_xml(
                       'select coalesce(jsonb_object_agg(k, n), ''{}'')::text as v from (

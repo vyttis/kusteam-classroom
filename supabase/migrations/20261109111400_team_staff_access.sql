@@ -1,7 +1,10 @@
--- TEAM-001 proposal, not a migration yet: nothing in supabase/proposals is
--- applied by the Supabase CLI or to production. After Vytis approves it, it
--- becomes supabase/migrations/<timestamp>_team_staff_access.sql with down.sql
--- as its rollback (docs/migration-history.md, TEAM-001).
+-- TEAM-001. Applied in production on 2026-11-09 at about 11:14 UTC (Vytis
+-- approved; SQL Editor, this file exactly as the former proposal
+-- supabase/proposals/team-001-staff-access/up.sql), then the rollback dry
+-- run and the first superadmin. Rollback:
+-- supabase/rollback/20261109111400_team_staff_access.sql. Tests and the
+-- production scripts: supabase/team-001/. Procedure and checks:
+-- docs/migration-history.md, "TEAM-001".
 --
 -- KU STEAM TEAM (komanda.kusteam.app, repo vyttis/kusteam-team) shares this
 -- project's Supabase Auth (Vytis, 2026-11-09). Its staff accounts and their
