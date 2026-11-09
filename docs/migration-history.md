@@ -244,6 +244,23 @@ Laukiama: `active_super_admins` bent 1. Jei adreso paskyra jau yra, taisyklė ja
 4. Po taikymo: atspaudas `function` 29 `5ca910befaa9bd9e02e87cc93e03d058`, kitos sritys nepakitusios; `select count(*) from backup_cls011.handle_new_user` lygu 1.
 5. Grąžinimas: rollback failas (tas pats kaip `down.sql`).
 
+## TEAM-006: KU STEAM TEAM prisijungimas veiklose (pasiūlymas, produkcijoje netaikytas)
+
+Failai `supabase/proposals/team-006-sso/`: `up.sql`, `test.sql`, `down.sql`. Sprendimas ir sutartis: `kusteam-ai-lab` `docs/ADR-001-TEAM-SSO.md`, `docs/TEAM-SSO-INTEGRATION-CONTRACT.md` (v1). Produkcijoje taikomas tik su Vyčio patvirtinimu, nevykstant veikloms, su kasdiene kopija; po to tampa migracija ir atnaujinamas `schema-fingerprint.expected`.
+
+Ką prideda:
+
+- `team_sso_codes`, `team_sso_sessions`: vienkartiniai kodai (tik sha256, 60 s, susieti su klientu, nariu, TEAM sesija ir PKCE) ir jais atidarytos veiklų sesijos. Klientų rolės jų nemato; rašo ir skaito tik service role.
+- Funkcijos (tik `service_role`): `team_sso_access`, `team_sso_issue_code` (iki 20 kodų per minutę nariui), `team_sso_redeem_code` (kodas sudeginamas prieš bet kokią kitą patikrą, pakartotinis panaudojimas užbaigia pirmąją sesiją), `team_sso_session_status` (kiekvieną kartą skaičiuojama iš gyvų duomenų: narys, teisė, TEAM sesija `auth.sessions`, galiojimas, atšaukimas), `team_sso_link_client_session`, `team_sso_revoke`.
+- `profiles.role` reikšmė `staff`: KU STEAM darbuotojas CLASSROOM aplinkoje, kuriamas tik TEAM prisijungimo metu. Ją nustatyti ar nuimti gali tik service role (trigeris `protect_staff_role`). `skip_profile_for_team_users()` praleidžia `staff` profilį, automatinis `teacher` profilis TEAM naudotojui vis dar nekuriamas.
+- `team_staff_access_ok()` ir RESTRICTIVE politika „TEAM staff only through an active TEAM sign-in“ visoms CLASSROOM lentelėms su RLS (išskyrus `profiles` ir `team_*`) ir `storage.objects`: `staff` užklausa atmetama, jei jos Supabase sesija nesusieta su aktyvia SSO sesija. Kitiems (mokytojams, administratoriams) funkcija grąžina `true`, todėl jiems nieko nesikeičia.
+
+Ko nekeičia: Supabase Auth nustatymų, `handle_new_user()` (CLS-011 atskiras sprendimas), mokytojų duomenų.
+
+Patikrinta (`npm run test:db`): klientų rolės SSO lentelių ir funkcijų nepasiekia; kodų išdavimas pagal teisę, blokavimą, narystę, TEAM sesiją ir ribą; neteisingas PKCE, svetimas, pasibaigęs ir pakartotinis kodas atmetami; sesijos būsena seka teisę, blokavimą, TEAM atsijungimą, galiojimą ir atšaukimą; mokytojas negali tapti `staff`, `staff` negali pakeisti savo vaidmens; `staff` mato tik savo veiklas ir tik per susietą sesiją; atėmus teisę ar baigus TEAM sesiją duomenys iš karto neprieinami; kiekviena lentelė su RLS turi taisyklę arba yra sąmoningai išskirta. `down.sql` grąžina visą schemos atspaudą į buvusį.
+
+Grąžinimas (`down.sql`): SSO lentelės ir funkcijos pašalinamos, `staff` profiliai tampa užblokuotais `teacher` profiliais (jų veiklos lieka, niekas jomis nesinaudoja, kol administratorius nenuspręs).
+
 ## Schemos atspaudas
 
 `supabase/tests/schema-fingerprint.sql` tik skaito sistemos katalogus. Jis apima tai, ką kuria migracijos: `public` lenteles, stulpelius, apribojimus, indeksus, RLS, politikas (`public` ir `storage.objects`), funkcijas, trigerius, realtime lenteles ir `anon`, `authenticated`, `service_role`, `PUBLIC` teises. Plėtinių objektai ir teisių suteikėjas neįtraukiami. Užklausą galima paleisti produkcijos SQL Editor ir lokaliai po migracijų. Vienos srities objektus su jų md5 grąžina detalus režimas (aprašytas failo pradžioje).
