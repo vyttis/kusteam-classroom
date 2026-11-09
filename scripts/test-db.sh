@@ -87,6 +87,47 @@ PROPOSAL="$ROOT/supabase/proposals/team-001-staff-access"
 if [[ -d "$PROPOSAL" ]]; then
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/up.sql" >/dev/null
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/test.sql" >/dev/null
+  # first-superadmin.sql: used accounts are refused with nothing changed, a
+  # new account becomes the TEAM-only superadmin (first-superadmin.test.sql).
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "
+    INSERT INTO auth.users (id, email, last_sign_in_at) VALUES
+      ('00000000-0000-4000-8000-0000000000b1', 'signed-in@example.invalid', now()),
+      ('00000000-0000-4000-8000-0000000000b2', 'active@example.invalid', NULL),
+      ('00000000-0000-4000-8000-0000000000b3', 'owner@example.invalid', NULL),
+      ('00000000-0000-4000-8000-0000000000b4', 'Team-Admin@example.invalid', NULL);
+    UPDATE public.profiles SET status = 'active' WHERE id = '00000000-0000-4000-8000-0000000000b2';
+    INSERT INTO public.games (teacher_id, title, game_code) VALUES ('00000000-0000-4000-8000-0000000000b3', 'x', 'TEAMB3');"
+  for CASE_ in "b1|has signed in before" "b2|CLASSROOM profile in use" "b3|is referenced by games.teacher_id"; do
+    ID="00000000-0000-4000-8000-0000000000${CASE_%%|*}"
+    if OUT="$(sed "s/APPROVED_USER_ID/$ID/" "$PROPOSAL/first-superadmin.sql" | psql "$DATABASE_URL" "${PSQL_OPTS[@]}" 2>&1)"; then
+      echo "TEAM-001 first-superadmin.sql accepted used account $ID" >&2
+      exit 1
+    fi
+    if ! grep -q "${CASE_#*|}" <<<"$OUT"; then
+      echo "TEAM-001 first-superadmin.sql refused $ID for another reason: $OUT" >&2
+      exit 1
+    fi
+  done
+  sed "s/APPROVED_USER_ID/00000000-0000-4000-8000-0000000000b4/" "$PROPOSAL/first-superadmin.sql" | psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/first-superadmin.test.sql" >/dev/null
+  # rollback-check.sql runs exactly the DROP lines of down.sql, reports and
+  # undoes itself: the TEAM rows must still be there afterwards.
+  if ! diff <(grep '^DROP ' "$PROPOSAL/down.sql") <(grep '^DROP ' "$PROPOSAL/rollback-check.sql") >/dev/null; then
+    echo "TEAM-001 rollback-check.sql does not run the same DROP statements as down.sql" >&2
+    exit 1
+  fi
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "INSERT INTO auth.users (id, email) VALUES ('00000000-0000-4000-8000-0000000000c1', 'kept@example.invalid');
+    INSERT INTO public.team_members (user_id, email, role, status) VALUES ('00000000-0000-4000-8000-0000000000c1', 'kept@example.invalid', 'staff', 'active');"
+  OUT="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/rollback-check.sql" 2>&1 || true)"
+  if ! grep -q "TEAM-001 rollback dry run OK: 0 TEAM relations, 0 TEAM functions, profile guard false" <<<"$OUT"; then
+    echo "TEAM-001 rollback-check.sql: $OUT" >&2
+    exit 1
+  fi
+  if [[ "$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "select count(*) from public.team_members")" != "1" ]]; then
+    echo "TEAM-001 rollback-check.sql changed data" >&2
+    exit 1
+  fi
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "DELETE FROM auth.users WHERE id = '00000000-0000-4000-8000-0000000000c1'"
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/down.sql" >/dev/null
   LEFT="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname like 'team\_%'")"
   LEFT_FN="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "select count(*) from pg_proc where proname in ('team_issue_token', 'team_touch_updated_at', 'skip_profile_for_team_users')")"
@@ -94,7 +135,7 @@ if [[ -d "$PROPOSAL" ]]; then
     echo "TEAM-001 down.sql left objects behind: $LEFT relations, $LEFT_FN functions" >&2
     exit 1
   fi
-  echo "TEAM-001 proposal: apply, test and rollback passed"
+  echo "TEAM-001 proposal: apply, test, first superadmin, rollback check and rollback passed"
 fi
 
 if [[ "${TEST_ROLLBACK:-1}" == "1" ]]; then
