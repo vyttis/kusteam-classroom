@@ -562,6 +562,12 @@ GRANT EXECUTE ON FUNCTION public.team_staff_access_ok() TO authenticated, servic
 -- The SECURITY DEFINER functions that clients call skip RLS; they rely on
 -- these two checks, which now include the staff rule too. Bodies otherwise
 -- as before (20261106130000, 20261106120000); grants are kept.
+-- (Guarded so the TEAM repo's local stand-in schema, which has neither
+-- function, can apply this file unchanged; both exist in production.)
+DO $do$
+BEGIN
+  IF to_regprocedure('public.is_active_account()') IS NOT NULL THEN
+    EXECUTE $f$
 CREATE OR REPLACE FUNCTION public.is_active_account()
 RETURNS boolean
 LANGUAGE sql
@@ -571,8 +577,11 @@ SET search_path = public
 AS $$
   SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND status = 'active')
     AND public.team_staff_access_ok()
-$$;
-
+$$
+$f$;
+  END IF;
+  IF to_regprocedure('public.can_read_game(uuid)') IS NOT NULL THEN
+    EXECUTE $f$
 CREATE OR REPLACE FUNCTION public.can_read_game(game_uuid uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -584,7 +593,11 @@ AS $$
     OR (EXISTS (SELECT 1 FROM public.games g WHERE g.id = game_uuid AND g.teacher_id = auth.uid())
         AND public.team_staff_access_ok())
     OR coalesce(public.get_my_role(), '') IN ('admin', 'super_admin')
-$$;
+$$
+$f$;
+  END IF;
+END
+$do$;
 
 -- Every CLASSROOM facilitator table with RLS (profiles and the team_* tables
 -- excluded: own profile reads stay possible so the app can tell a staff
