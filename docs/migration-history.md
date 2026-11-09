@@ -244,7 +244,7 @@ Laukiama: `active_super_admins` bent 1. Jei adreso paskyra jau yra, taisyklė ja
 4. Po taikymo: atspaudas `function` 29 `5ca910befaa9bd9e02e87cc93e03d058`, kitos sritys nepakitusios; `select count(*) from backup_cls011.handle_new_user` lygu 1.
 5. Grąžinimas: rollback failas (tas pats kaip `down.sql`).
 
-## TEAM-006: KU STEAM TEAM prisijungimas veiklose (pasiūlymas, produkcijoje netaikytas)
+## TEAM-006: KU STEAM TEAM prisijungimas veiklose (taikyta produkcijoje 2026-11-09, failai dar pasiūlymo kataloge)
 
 Failai `supabase/proposals/team-006-sso/`: `up.sql`, `test.sql`, `down.sql`. Sprendimas ir sutartis: `kusteam-ai-lab` `docs/ADR-001-TEAM-SSO.md`, `docs/TEAM-SSO-INTEGRATION-CONTRACT.md` (v1). Produkcijoje taikomas tik su Vyčio patvirtinimu, nevykstant veikloms, su kasdiene kopija; po to tampa migracija ir atnaujinamas `schema-fingerprint.expected`.
 
@@ -266,7 +266,7 @@ Patikrinta (`npm run test:db`): klientų rolės SSO lentelių ir funkcijų nepas
 
 Grąžinimas (`down.sql`): pirmiausia ištrinamos per TEAM sukurtos CLASSROOM sesijos, `is_active_account()` ir `can_read_game()` grąžinamos į ankstesnes, SSO lentelės ir funkcijos pašalinamos, `staff` profiliai tampa užblokuotais `teacher` profiliais (jų veiklos lieka, niekas jomis nesinaudoja, kol administratorius nenuspręs).
 
-### Produkcinis taikymas (paruošta 2026-11-09, netaikyta)
+### Produkcinis taikymas (procedūra; atlikta 2026-11-09, žr. žemiau)
 
 Tik su atskiru Vyčio leidimu. Visa paleidimo seka kartu su jungikliais ir ribotu bandymu: `kusteam-ai-lab` `docs/TEAM-SSO-LAUNCH.md`.
 
@@ -304,6 +304,33 @@ Skubiai nutraukti visas darbuotojų veiklų sesijas be grąžinimo. Paleisti, **
 SELECT sum(public.team_sso_revoke(user_id, 'logged_out'))
 FROM (SELECT DISTINCT user_id FROM public.team_sso_sessions WHERE revoked_at IS NULL) s;
 ```
+
+### Taikyta produkcijoje 2026-11-09
+
+Vyčio sąlyginis leidimas tik A etapui (DB): taikyti, jei visos patikros žalios ir nevyksta veiklos. Jungikliai neįjungti. Vykdė Claude Code, SQL Editor, `postgres`. Kiekvieno paleisto failo SHA-256 redaktoriuje sutapo su `main` (`4d41564`).
+
+| Žingsnis | Laikas (UTC) | Rezultatas |
+| --- | --- | --- |
+| Veiklos ir atspaudas, 1 kartas | 21:00 | aktyvių ar pristabdytų 0; atspaudas kaip `schema-fingerprint.expected`, `function` `29\|d454994ddc3688e3d4e60dcd90e49082` (CLS-011) |
+| `apply-check.sql`, 1 kartas | ~21:03 | `FAILED` tik dėl `teacher none` abiejose dalyse, kitos reikšmės laukiamos. Visos 34 veiklos priklausė vienai `super_admin` paskyrai, mokytojai veiklų neturėjo. Sustota; patikrinta, kad DB nepakito |
+| Bandomoji veikla | 21:13 | Vyčio sprendimu (patikra nekeičiama) jo testinei mokytojo paskyrai įrašytas juodraštis „TEAM-006 patikra“, kodas `TEAM06`, id `eca62401-d924-48f8-bddd-bf660bbc6e74`. Įrašyta SQL užklausa, nes agentas į paskyras neprisijungia |
+| Atsarginė kopija | 21:13 | paskutinė kasdienė (PHYSICAL) 2026-11-08 23:41, 21 h 32 min, atkūrimas galimas |
+| Veiklos ir atspaudas, 2 kartas | 21:14, 21:16 | aktyvių ar pristabdytų 0 (paskutinis dalyvio veiksmas 2026-11-08 13:09); atspaudas toks pat kaip 1 kartą |
+| `apply-check.sql`, 2 kartas | 21:15 | `OK`, abiejose dalyse `teacher 1/1 active` |
+| `up.sql` | ~21:17 | `Success. No rows returned` |
+| `verify.sql` | ~21:17 | `TEAM-006 verify OK`, `teacher 1/1 active` |
+| Atspaudas po | ~21:18 | kaip `fingerprint-after.expected`, `function` `40\|1f98d3c00fb11c1193271d57751b066d` (md5 kitoks dėl CLS-011) |
+| `rollback-check.sql` | ~21:18 | `TEAM-006 rollback dry run OK`, `teacher 1/1 active`; po jo TEAM-006 vis dar pritaikytas |
+| Visos aktyvios paskyros per RLS | 21:19 | `super_admin` 34/34, mokytojai 0/0 ir 1/1; visos aktyvios, `can_read_game` savoms veikloms tiesa |
+| `E2E smoke (production)` | 21:20 | run `42701394552`: 22 passed |
+| Vercel runtime klaidos | ~21:21 | `ctf-builder` ir `kusteam-team` per paskutinę valandą: nėra |
+| Vedėjo pultas | ~21:22 | jau prisijungusio Vyčio sesija `pamokos.kusteam.app/dashboard`: rodomos visos 34 veiklos |
+
+Liko:
+
+- Vytis prisijungia testine mokytojo paskyra ir mato juodraštį „TEAM-006 patikra“. Po to juodraštis pašalinamas.
+- 9 žingsnis (pasiūlymas tampa migracija `20261109211700_team_sso.sql`) daromas kartu su TEAM: TEAM darbas `SSO E2E (TEAM -> CLASSROOM)` paleidžia CLASSROOM migracijas ir ant jų taiko savo TEAM-006 kopiją, todėl perkėlus failą reikia pakeisti ir jį. Iki tol produkcija lyginama su `fingerprint-after.expected` (`function` `40\|1f98d3c00fb11c1193271d57751b066d`), ne su `schema-fingerprint.expected`.
+- Jungikliai išjungti. B etapas (`kusteam-ai-lab` `docs/TEAM-SSO-LAUNCH.md`) tik su atskiru Vyčio leidimu.
 
 ## Schemos atspaudas
 
