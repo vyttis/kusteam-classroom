@@ -235,37 +235,38 @@ select
 
 Laukiama: `active_super_admins` bent 1. Jei adreso paskyra jau yra, taisyklė jai nebeturi įtakos, o pasiūlymas jos vaidmens nekeičia.
 
-### Taikymo planas, kai Vytis patvirtins
+### Produkcijos patikra prieš taikymą (2026-11-09, tik skaitymas)
 
-1. PR: `up.sql` → `supabase/migrations/<laikas>_handle_new_user_without_email_role.sql`, `down.sql` → `supabase/rollback/<tas pats>.sql`, `test.sql` → `supabase/tests/`, paleidžiamas `test:db`. `schema-fingerprint.expected` eilutė `function` → `9d3d3d665d481c8ed0139cf81b8bd8f1`. Proposal etapas iš `test-db.sh` pašalinamas.
-2. Prieš taikymą (tik skaitymas): aukščiau esanti užklausa, 0 vykstančių veiklų.
-3. Taikymas produkcijoje: SQL Editor, visas failas, arba `db push --remote` po CLS-005. Jei per SQL Editor ir CLS-005 jau atliktas: `migration repair --status applied --remote <laikas>`.
-4. Po taikymo: atspaudas `function` 26 `9d3d3d665d481c8ed0139cf81b8bd8f1`, kitos sritys nepakitusios; `select count(*) from backup_cls011.handle_new_user` lygu 1.
-5. Grąžinimas: rollback failas (tas pats kaip `down.sql`).
+- Postgres 17.6. TEAM objektų nėra: `team_*` lentelių, funkcijų ir trigerio `skip_profile_for_team_users` nėra.
+- Schemos atspaudas (`supabase/tests/schema-fingerprint.sql`) sutampa su `schema-fingerprint.expected` visose 11 srityse, išskyrus `function` (`af321e0f4f59a6180d4df6c55e72273b`, toks pat kaip 2026-11-07). Vienintelis skirtumas yra ranka keista `handle_new_user()` (CLS-011).
+- `auth.users` turi vieną trigerį `on_auth_user_created` (AFTER INSERT, `handle_new_user()`). Ji tik įrašo profilį ir grąžina `NEW`, todėl TEAM trigeris, praleidžiantis įrašą, jos nesugadina. `public.profiles` turi tik `set_updated_at` (BEFORE UPDATE), vardų konfliktų nėra.
+- Į `profiles` rodo 11 išorinių raktų, `games` ir `lesson_plans` su `ON DELETE CASCADE`. Todėl `first-superadmin.sql` atsisako paskyros, į kurią rodo bet kuri CLASSROOM eilutė.
+- SQL Editor rolė `postgres` gali skaityti ir keisti `auth.users`, trinti `profiles` ir kurti objektus `public`.
+- Atsarginės kopijos: kasdienės fizinės, paskutinė 2026-11-08 23:41 UTC. PITR neįjungtas.
 
-## TEAM-001: KU STEAM TEAM darbuotojų lentelės (pasiūlymas, laukia patvirtinimo)
+Repeticija vietinėje kopijoje (migracijos ir produkcijos `handle_new_user()`, funkcijų atspaudas sutapo su produkcija): `up.sql`, `test.sql`, `first-superadmin.sql`, CLS-011 ant viršaus ir TEAM testas po jo, abiejų grąžinimas atgal iki produkcijos atspaudo, pakartotinis taikymas. Viskas praėjo.
 
-Vytis 2026-11-09 nusprendė, kad KU STEAM TEAM (`vyttis/kusteam-team`, būsimas `komanda.kusteam.app`) naudos šio projekto Supabase Auth. Pasiūlymas: `supabase/proposals/team-001-staff-access/` (`up.sql`, `down.sql`, `test.sql`, `first-superadmin.sql`). Supabase CLI ir produkcija jo netaiko. Architektūra: `kusteam-team/docs/ARCHITECTURE.md`.
+### Pirmasis superadministratorius: atskira TEAM paskyra
 
-### Ką daro `up.sql`
+Vytis CLASSROOM jungiasi Google paskyra, kuri neturi slaptažodžio. Jei TEAM superadministratorius būtų ta pati paskyra, TEAM slaptažodžio nustatymas ar atkūrimas jai sukurtų slaptažodį, kuriuo būtų galima jungtis ir į CLASSROOM, o TEAM slaptažodžio keitimas baigtų CLASSROOM sesijas. Todėl superadministratorius yra atskiras auth naudotojas, naudojamas tik TEAM (rekomenduojamas `vytis.radvila@ku.lt`, kurio auth naudotojų sąraše nėra; KU pašto dėžutė saugoma KU kelių veiksnių autentifikacija).
 
-- Trys lentelės `public.team_members`, `public.team_activity_grants`, `public.team_tokens` su RLS. Prisijungęs naudotojas skaito tik savo nario eilutę ir savo veiklas; `anon` nieko; `team_tokens` neskaito jokia kliento rolė. Rašo tik TEAM serveris su service role.
-- Vienas superadministratorius (dalinis unikalus indeksas). Programa vaidmens nekeičia.
-- `team_issue_token()`: nuorodos išdavimas vienu žingsniu su užraktu narui (riba, senų nuorodų atšaukimas). Tik service role.
-- Trigeris `skip_profile_for_team_users` prieš įrašant į `public.profiles`: auth naudotojui su `user_metadata.kusteam_app = 'team'` CLASSROOM profilis nekuriamas, todėl TEAM darbuotojas automatiškai netampa CLASSROOM vedėju. `handle_new_user()` nekeičiama (CLS-011 atskiras sprendimas). Žymė gali tik praleisti profilį, teisių nesuteikia.
-- CLASSROOM lentelių, funkcijų ir teisių nekeičia.
+`first-superadmin.sql` (perrašytas 2026-11-09): paskyra sukuriama Authentication > Users > Add user > Create new user (laikinas slaptažodis, Auto Confirm). Skriptas vienoje transakcijoje atsisako jau naudotos paskyros (prisijungusios, su naudojamu profiliu ar CLASSROOM duomenimis), pažymi naudotoją `kusteam_app = 'team'`, ištrina tuščią automatiškai sukurtą CLASSROOM profilį ir įrašo aktyvų superadministratorių su trimis veiklomis. `npm run test:db` tikrina visus tris atsisakymus ir sėkmingą atvejį.
 
-### Patikrinta
+### Failai produkcijai
 
-`npm run test:db` (CI su Postgres 17, lokaliai 16): `up.sql`, `test.sql`, `down.sql`, po grąžinimo neliko nė vieno TEAM objekto. `test.sql` tikrina: TEAM naudotojas negauna profilio, CLASSROOM registracija veikia kaip anksčiau; antras superadministratorius ir nežinoma veikla atmetami; nuorodų riba ir senų atšaukimas; narys mato tik savo eilutę ir veiklas, negali keisti eilučių, suteikti sau veiklos, skaityti `team_tokens` ar kviesti `team_issue_token`; TEAM naudotojas nemato CLASSROOM duomenų ir negali kurti veiklų; `anon` nieko neskaito; ištrynus auth naudotoją dingsta ir TEAM eilutės.
+- `state.sql`: tik skaito, rodo TEAM objektų ir narių būseną, `handle_new_user()` md5, be el. pašto adresų. Paleidžiamas prieš ir po kiekvieno žingsnio.
+- `rollback-check.sql`: vykdo tas pačias `DROP` eilutes kaip `down.sql` (tikrina `test:db`) ir pats viską atšaukia. Laukiamas rezultatas yra klaida `TEAM-001 rollback dry run OK: 0 TEAM relations, 0 TEAM functions, profile guard false`. Taip produkcijoje patikrinama, kad grąžinimas veiktų, nieko nekeičiant.
 
-### Taikymo planas, kai Vytis patvirtins
+### Taikymo eiga, kai Vytis patvirtins
 
-1. Atsarginė kopija arba Supabase PITR taškas, nevykstant veikloms.
-2. SQL Editor: `up.sql` turinys. Patikra: `select count(*) from pg_class where relname like 'team\_%'` (3 lentelės ir indeksai), `select 1 from pg_trigger where tgname = 'skip_profile_for_team_users'`.
-3. Pasiūlymas tampa migracija `supabase/migrations/<laikas>_team_staff_access.sql`, `down.sql` keliauja į `supabase/rollback/`, atnaujinamas `supabase/tests/schema-fingerprint.expected`, įrašas šiame faile.
-4. `first-superadmin.sql` su Vyčio patvirtintu auth naudotojo ID (ne pagal el. paštą).
-5. Grąžinimas: `down.sql` (ištrina TEAM eilutes, nuorodas ir trigerį; CLASSROOM profiliai nekeičiami; TEAM sukurti auth naudotojai lieka, juos galima ištrinti Supabase skydelyje).
+Visa seka su Vercel, domenu ir E2E: `kusteam-team/docs/LAUNCH.md`. DB dalis:
+
+1. Nevyksta veiklos. Paskutinė kasdienė kopija ne senesnė nei 24 h (Database > Backups). `state.sql`: TEAM objektų nėra, `handle_new_user_md5` užrašomas.
+2. SQL Editor: `up.sql`. `state.sql`: 10 `team_*` ryšių, 3 funkcijos, `profile_guard` true, `handle_new_user_md5` nepakitęs.
+3. `rollback-check.sql`: laukiama klaida `... dry run OK ...`, po jos `state.sql` nepakitęs.
+4. Vytis sukuria atskirą TEAM paskyrą ir patvirtina jos ID. `first-superadmin.sql` su tuo ID. `state.sql`: `team_members` `{"superadmin/active": 1}`.
+5. Pasiūlymas tampa migracija `supabase/migrations/<laikas>_team_staff_access.sql`, `down.sql` keliauja į `supabase/rollback/`, atnaujinamas `schema-fingerprint.expected`, įrašas šiame faile.
+6. Grąžinimas: `down.sql` (TEAM eilutės, nuorodos ir trigeris dingsta, CLASSROOM profiliai nekeičiami). TEAM sukurti auth naudotojai lieka be CLASSROOM profilio, juos galima ištrinti Authentication > Users. Kraštutiniu atveju kasdienė fizinė kopija, bet ji grąžina visą projektą į tos nakties būseną.
 
 ## Schemos atspaudas
 

@@ -16,6 +16,7 @@ CREATE TABLE auth.users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text,
   raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  last_sign_in_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 -- As in Supabase: SQL tests set request.jwt.claim.*, PostgREST (the Data
