@@ -56,6 +56,23 @@ if (( SERVER_VERSION >= 170000 )); then
     exit 1
   fi
   echo "schema fingerprint matches"
+  # TEAM-006 on the plain migrated schema (before any test helper exists):
+  # the fingerprint production must show right after up.sql, all kinds but
+  # `function` (CLS-011), and down.sql brings back the expected one.
+  TEAM006="$ROOT/supabase/proposals/team-006-sso"
+  if [[ -d "$TEAM006" ]]; then
+    psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$TEAM006/up.sql" >/dev/null
+    if ! diff <(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql") "$TEAM006/fingerprint-after.expected"; then
+      echo "TEAM-006 schema fingerprint after up.sql differs from fingerprint-after.expected" >&2
+      exit 1
+    fi
+    psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$TEAM006/down.sql" >/dev/null
+    if ! diff <(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql") "$ROOT/supabase/tests/schema-fingerprint.expected"; then
+      echo "TEAM-006 down.sql did not bring back the expected fingerprint" >&2
+      exit 1
+    fi
+    echo "TEAM-006 fingerprint after up.sql matches, and down.sql restores the expected one"
+  fi
 else
   echo "schema fingerprint not compared: Postgres $SERVER_VERSION, expected values are for 17"
 fi
@@ -134,10 +151,10 @@ echo "TEAM-001: test, first superadmin and rollback check passed"
 
 # TEAM-006 proposal (docs/migration-history.md): KU STEAM TEAM sign-in for
 # activities. On the migrated schema (TEAM-001 included): the production
-# apply check must succeed without changing anything, up.sql must give the
-# expected fingerprint (Postgres 17), the verification and the rollback
-# check must succeed, the test must pass, and down.sql must bring back the
-# exact fingerprint from before.
+# apply check must succeed without changing anything, the verification and
+# the rollback check must succeed, the test must pass, and down.sql must
+# bring back the exact fingerprint from before. (Its fingerprint after
+# up.sql is compared above, on Postgres 17.)
 PROPOSAL="$ROOT/supabase/proposals/team-006-sso"
 if [[ -d "$PROPOSAL" ]]; then
   fingerprint() { psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql"; }
@@ -177,12 +194,6 @@ if [[ -d "$PROPOSAL" ]]; then
   fi
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/up.sql" >/dev/null
   APPLIED="$(fingerprint)"
-  if (( SERVER_VERSION >= 170000 )); then
-    if ! diff <(echo "$APPLIED") "$PROPOSAL/fingerprint-after.expected"; then
-      echo "TEAM-006 schema fingerprint after up.sql differs from fingerprint-after.expected" >&2
-      exit 1
-    fi
-  fi
   expect_check "$PROPOSAL/verify.sql" "TEAM-006 verify OK: .* teacher \\([0-9]*\\)/\\1 active"
   expect_check "$PROPOSAL/rollback-check.sql" "TEAM-006 rollback dry run OK: .* teacher \\([0-9]*\\)/\\1 active"
   if [[ "$(fingerprint)" != "$APPLIED" ]]; then
