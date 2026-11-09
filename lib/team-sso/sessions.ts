@@ -41,6 +41,26 @@ export async function revokeSsoSession(admin: SupabaseClient, userId: string, ss
   if (error) console.error("[team-sso] revoke failed", { pg: error.code })
 }
 
+type SsoStatus = { found: false } | { found: true; active: boolean; reason: string | null }
+
+/** Live status of the CLASSROOM SSO session linked to a CLASSROOM Supabase session. */
+async function ssoStatusForClientSession(
+  admin: SupabaseClient,
+  userId: string,
+  clientSessionId: string,
+): Promise<SsoStatus | null> {
+  const ssoId = await ssoSessionForClientSession(admin, userId, clientSessionId)
+  if (!ssoId) return { found: false }
+  const { data, error } = await admin.rpc("team_sso_session_status", {
+    p_client: TEAM_SSO_CLIENT_ID,
+    p_session_id: ssoId,
+  })
+  if (error) return null
+  const row = rpcRow<{ active: boolean; reason: string | null }>(data)
+  if (!row) return null
+  return { found: true, active: row.active, reason: row.reason }
+}
+
 /**
  * Why a staff member's CLASSROOM session no longer gives access, as a
  * contract reason: blocked, grant_revoked, not_member, logged_out, expired
@@ -50,17 +70,35 @@ export async function revokeSsoSession(admin: SupabaseClient, userId: string, ss
 export async function ssoEndReason(admin: SupabaseClient, userId: string, clientSessionId: string | null): Promise<string> {
   if (!clientSessionId) return "unknown"
   try {
-    const ssoId = await ssoSessionForClientSession(admin, userId, clientSessionId)
-    if (!ssoId) return "unknown"
-    const { data, error } = await admin.rpc("team_sso_session_status", {
-      p_client: TEAM_SSO_CLIENT_ID,
-      p_session_id: ssoId,
-    })
-    if (error) return "unknown"
-    const row = rpcRow<{ active: boolean; reason: string | null }>(data)
-    if (!row || row.active) return "unknown"
-    return row.reason ?? "unknown"
+    const status = await ssoStatusForClientSession(admin, userId, clientSessionId)
+    if (!status?.found || status.active) return "unknown"
+    return status.reason ?? "unknown"
   } catch {
     return "unknown"
+  }
+}
+
+/**
+ * For a CLASSROOM Supabase session that Supabase no longer knows (deleted on
+ * the server): if it was opened through the TEAM sign-in, why it ended;
+ * null if it was not (an ordinary teacher session, or nothing found).
+ * Revoking an SSO session deletes its CLASSROOM session (TEAM-006), so this
+ * is how a staff member whose access was taken away gets the right message
+ * instead of the teacher sign-in page. An SSO session that is still active
+ * reads as "expired": the person goes through TEAM again.
+ */
+export async function endedSsoSessionReason(
+  admin: SupabaseClient,
+  userId: string,
+  clientSessionId: string,
+): Promise<string | null> {
+  try {
+    const status = await ssoStatusForClientSession(admin, userId, clientSessionId)
+    if (!status) return "unknown"
+    if (!status.found) return null
+    if (status.active) return "expired"
+    return status.reason ?? "unknown"
+  } catch {
+    return null
   }
 }

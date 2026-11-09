@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { TEAM_SSO_MESSAGES, messageKindFor, parseMessageKind } from "@/lib/team-sso/messages"
 import type { CookieJar } from "@/lib/team-sso/session-client"
 import { signOutStaff } from "@/lib/team-sso/sign-out"
-import { CLIENT_SESSION, SSO_SESSION, USER, fakeAccessToken, queryDouble, silenceConsole } from "./helpers/team-sso"
+import { CLIENT_SESSION, SSO_SESSION, USER, fakeAccessToken, queryDouble, sessionCookie, silenceConsole } from "./helpers/team-sso"
 
 const ENV = { ...process.env }
 let consoleCapture: ReturnType<typeof silenceConsole>
@@ -114,16 +114,30 @@ describe("messages (contract section 7)", () => {
 })
 
 describe("POST /auth/team/sign-out", () => {
-  function setup(role: string | null) {
-    const rpc = vi.fn(async () => ({ data: 1, error: null }))
+  const AUTH_COOKIE = "sb-menmndjyfeuwfweubwnl-auth-token"
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://menmndjyfeuwfweubwnl.supabase.co"
+  })
+
+  function setup(role: string | null, opts: { signOutFails?: boolean; endedReason?: string } = {}) {
+    const rpc = vi.fn(async (fn: string) =>
+      fn === "team_sso_session_status"
+        ? { data: [{ active: false, reason: opts.endedReason ?? "logged_out", user_id: USER, expires_at: null }], error: null }
+        : { data: 1, error: null },
+    )
     const signOut = vi.fn(async () => {
-      jar!.setAll([{ name: "sb-test-auth-token", value: "", options: { path: "/", maxAge: 0 } }])
+      // As after team_sso_revoke: Supabase no longer knows the session.
+      if (opts.signOutFails) return { error: { name: "AuthApiError", status: 500, message: "boom" } }
+      jar!.setAll([{ name: AUTH_COOKIE, value: "", options: { path: "/", maxAge: 0 } }])
       return { error: null }
     })
     let jar: CookieJar | null = null
     const admin = {
       from: (table: string) =>
-        queryDouble({ data: table === "profiles" ? (role ? { role } : null) : { id: SSO_SESSION }, error: null }),
+        queryDouble({
+          data: table === "profiles" ? (role ? { role } : null) : opts.endedReason === undefined && !role ? null : { id: SSO_SESSION },
+          error: null,
+        }),
       rpc,
     } as unknown as SupabaseClient
     const session = {
@@ -148,8 +162,14 @@ describe("POST /auth/team/sign-out", () => {
   const post = (headers: Record<string, string> = {}) =>
     new NextRequest("https://pamokos.kusteam.app/auth/team/sign-out", {
       method: "POST",
-      headers: { host: "pamokos.kusteam.app", origin: "https://pamokos.kusteam.app", ...headers },
+      headers: {
+        host: "pamokos.kusteam.app",
+        origin: "https://pamokos.kusteam.app",
+        cookie: `${AUTH_COOKIE}=${sessionCookie({ sub: USER, session_id: CLIENT_SESSION })}`,
+        ...headers,
+      },
     })
+  const clears = (res: Response) => res.headers.getSetCookie().some((c) => c.startsWith(`${AUTH_COOKIE}=;`) && /Max-Age=0/.test(c))
 
   it("staff: ends this CLASSROOM session (local) and its SSO session, back to TEAM", async () => {
     const m = setup("staff")
@@ -163,8 +183,31 @@ describe("POST /auth/team/sign-out", () => {
       p_session_id: SSO_SESSION,
     })
     expect(m.signOut).toHaveBeenCalledWith({ scope: "local" })
-    expect(res.headers.getSetCookie().some((c) => c.startsWith("sb-test-auth-token=;"))).toBe(true)
+    expect(m.rpc.mock.invocationCallOrder[0]).toBeLessThan(m.signOut.mock.invocationCallOrder[0])
+    expect(clears(res)).toBe(true)
     expect(res.headers.get("cache-control")).toBe("no-store")
+  })
+
+  it("staff: still succeeds and clears the cookies when the revoke already deleted the session", async () => {
+    const m = setup("staff", { signOutFails: true })
+    const res = await signOutStaff(post(), m.deps)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, redirect: "https://komanda.kusteam.app/" })
+    expect(clears(res)).toBe(true)
+  })
+
+  it("a staff session TEAM had already revoked goes back to TEAM, cookies cleared", async () => {
+    const m = setup(null, { endedReason: "grant_revoked" })
+    const res = await signOutStaff(post(), m.deps)
+    expect(await res.json()).toEqual({ ok: true, redirect: "https://komanda.kusteam.app/" })
+    expect(clears(res)).toBe(true)
+  })
+
+  it("no session at all: /vedejui, nothing revoked", async () => {
+    const m = setup(null)
+    const res = await signOutStaff(post(), m.deps)
+    expect(await res.json()).toEqual({ ok: true, redirect: "/vedejui" })
+    expect(m.rpc).not.toHaveBeenCalled()
   })
 
   it("teacher: no SSO revoke, local sign-out only", async () => {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { accessTokenFromCookies } from "@/lib/team-sso/auth-cookies"
 import { accessTokenClaims } from "@/lib/team-sso/jwt"
-import { ssoEndReason } from "@/lib/team-sso/sessions"
+import { endedSsoSessionReason, ssoEndReason } from "@/lib/team-sso/sessions"
 
 export type StaffDecision =
   | { kind: "allow" }
@@ -44,4 +45,23 @@ export async function staffAccess(
     reason = "unknown"
   }
   return { kind: "end", reason }
+}
+
+/**
+ * getUser() found no user although the request carried a CLASSROOM session
+ * cookie: Supabase no longer knows that session. If it was a staff session
+ * opened through TEAM (revoking deletes it, TEAM-006), the reason it ended;
+ * otherwise null and the request goes on as for anyone signed out.
+ */
+export async function endedStaffSession(
+  cookies: { name: string; value: string }[],
+  admin: () => SupabaseClient,
+): Promise<string | null> {
+  const claims = accessTokenClaims(await accessTokenFromCookies(cookies))
+  if (!claims) return null
+  try {
+    return await endedSsoSessionReason(admin(), claims.sub, claims.sessionId)
+  } catch {
+    return null
+  }
 }
