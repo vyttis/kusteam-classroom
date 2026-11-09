@@ -18,7 +18,7 @@ import { GameResultsSummary } from "@/components/teacher/game-results-summary"
 import {
   ArrowLeft,
   Puzzle,
-  Settings,
+  Pencil,
   Users,
   Clock,
   Trophy,
@@ -176,8 +176,8 @@ export default async function GameDetailPage(
             size="sm"
             className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1"
           >
-            <Settings className="h-3.5 w-3.5" />
-            Valdyti
+            <Pencil className="h-3.5 w-3.5" />
+            Redaguoti užduotis
           </Button>
         </Link>
       </CardHeader>
@@ -187,9 +187,11 @@ export default async function GameDetailPage(
             {[...challenges]
               .sort((a, b) => a.order_index - b.order_index)
               .map((challenge, index) => (
-                <div
+                <Link
                   key={challenge.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30"
+                  href={`/games/${game.id}/builder?task=${challenge.id}`}
+                  aria-label={`Redaguoti „${challenge.title}“`}
+                  className="group flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30 transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary-ink shrink-0">
                     {index + 1}
@@ -219,7 +221,8 @@ export default async function GameDetailPage(
                   <Badge variant="outline" className="shrink-0 text-xs">
                     {challenge.points} tšk.
                   </Badge>
-                </div>
+                  <Pencil className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary-ink" aria-hidden="true" />
+                </Link>
               ))}
           </div>
         ) : (

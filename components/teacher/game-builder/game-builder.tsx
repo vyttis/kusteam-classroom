@@ -52,9 +52,11 @@ interface GameBuilderProps {
     game_code: string
   }
   initialChallenges: Challenge[]
+  /** A task to open in the editor on arrival (?task= from the activity page). */
+  initialTaskId?: string | null
 }
 
-export function GameBuilder({ initialGame, initialChallenges }: GameBuilderProps) {
+export function GameBuilder({ initialGame, initialChallenges, initialTaskId = null }: GameBuilderProps) {
   const router = useRouter()
   const { toast } = useToast()
 
@@ -70,10 +72,11 @@ export function GameBuilder({ initialGame, initialChallenges }: GameBuilderProps
   // fetches, double autoFocus) whenever the mobile sheet is open.
   const isDesktop = useIsDesktop()
   const [challenges, setChallenges] = useState<Challenge[]>(initialChallenges)
-  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null)
+  const initialTask = initialTaskId ? initialChallenges.find((c) => c.id === initialTaskId) ?? null : null
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(initialTask?.id ?? null)
 
   // Editor state
-  const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null)
+  const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(initialTask)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [prefillData, setPrefillData] = useState<AiSuggestion | null>(null)
   const [previewChallenge, setPreviewChallenge] = useState<Challenge | null>(null)
@@ -81,8 +84,8 @@ export function GameBuilder({ initialGame, initialChallenges }: GameBuilderProps
   // Settings
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // Workspace tab
-  const [activeTab, setActiveTab] = useState("di")
+  // Workspace tab: the editor when a task was asked for, else DI.
+  const [activeTab, setActiveTab] = useState(initialTask ? "manual" : "di")
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -102,6 +105,14 @@ export function GameBuilder({ initialGame, initialChallenges }: GameBuilderProps
 
   // Mobile sheet
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
+  // Below lg the editor lives in a sheet: open it once for the asked-for task.
+  // useIsDesktop starts true and settles after mount, hence the effect.
+  const initialTaskShown = useRef(false)
+  useEffect(() => {
+    if (!initialTask || initialTaskShown.current || isDesktop) return
+    initialTaskShown.current = true
+    setMobileSheetOpen(true)
+  }, [initialTask, isDesktop])
 
   // DI suggestions survive a reload of this tab: generating them took a
   // minute of DI work. Kept per activity, for this tab only.

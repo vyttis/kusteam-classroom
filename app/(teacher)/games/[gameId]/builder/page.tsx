@@ -9,9 +9,13 @@ export const metadata: Metadata = { title: "Veiklos redaktorius" }
 export default async function BuilderPage(
   props: {
     params: Promise<{ gameId: string }>
+    searchParams: Promise<{ task?: string | string[] }>
   }
 ) {
   const params = await props.params;
+  // ?task=<id>: open that task in the editor (links from the activity page).
+  const { task } = await props.searchParams
+  const initialTaskId = typeof task === "string" ? task : null
   const supabase = await createClient()
   const {
     data: { user },
@@ -61,6 +65,7 @@ export default async function BuilderPage(
         game_code: game.game_code,
       }}
       initialChallenges={sortedChallenges}
+      initialTaskId={initialTaskId}
     />
   )
 }
