@@ -70,8 +70,8 @@ neliktų Vyčio sesijos. Kiekviename žingsnyje daroma ekrano nuotrauka.
 | --- | --- | --- | --- |
 | C1 | T1 | Atidaro kvietimo laišką | Siuntėjas `noreply@kusteam.app`, lietuviškos raidės teisingos, logotipas matomas. Nuoroda veda į `pamokos.kusteam.app`, ne į `*.vercel.app` ar `supabase.co` puslapį be peradresavimo |
 | C2 | T1 | Pašto programoje atidaro laiško originalą (antraštes) | `Authentication-Results`: `spf=pass`, `dkim=pass` |
-| C3 | T1 | Spaudžia mygtuką laiške | `/auth/confirm` → `/onboarding`. Forma užpildoma, sutikimas pažymimas. Po išsaugojimo atsidaro vedėjo pradžia. `profiles.onboarding_completed = true` |
-| C4 | T1 | Tą pačią kvietimo nuorodą atidaro antrą kartą | „Nuoroda nebegalioja“ ir mygtukas „Prisijungti“. Prisijungimo be kodo nėra |
+| C3 | T1 | Spaudžia „Prisijungti“ laiške, jungiasi per Google arba su kodu | `/vedejui` → `/onboarding`. Forma užpildoma, sutikimas pažymimas. Po išsaugojimo atsidaro vedėjo pradžia. `profiles.onboarding_completed = true` |
+| C4 | T1 | Tą patį laišką atidaro kitą dieną | Nuoroda veda į `/vedejui` ir veikia: laiške nėra vienkartinės nuorodos, kuri pasibaigtų (nuo 2026-11-09) |
 | C5 | T1 | Atsijungia. `/auth/login` prašo kodo, įveda jį | Kodo laiškas ateina, prisijungimas pavyksta |
 
 ### D. Administratoriaus vaidmuo
