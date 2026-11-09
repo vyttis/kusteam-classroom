@@ -93,7 +93,8 @@ export interface SubmissionResult {
 // Sprint 2: RBAC, Library, Analytics
 // ============================================
 
-export type UserRole = "teacher" | "admin" | "super_admin"
+// 'staff': KU STEAM TEAM staff member inside CLASSROOM (lib/auth/roles.ts).
+export type UserRole = "teacher" | "admin" | "super_admin" | "staff"
 
 export interface Profile {
   id: string

@@ -199,6 +199,7 @@ export function UsersManager({ users, currentUserId, currentUserRole, defaultAiL
               <SelectItem value="teacher">Vedėjai</SelectItem>
               <SelectItem value="admin">Administratoriai</SelectItem>
               <SelectItem value="super_admin">Super administratoriai</SelectItem>
+              <SelectItem value="staff">KU STEAM darbuotojai</SelectItem>
             </SelectContent>
           </Select>
           <Select value={municipality} onValueChange={setMunicipality}>
@@ -552,28 +553,39 @@ function ManageUserDialog({
                   )}
                 </dl>
 
-                <div className="space-y-2">
-                  <Label htmlFor="manage-role">Rolė</Label>
-                  <div className="flex gap-2">
-                    <Select value={role} onValueChange={(v) => setRoleDraft(v as UserRole)}>
-                      <SelectTrigger id="manage-role" className="flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="teacher">{ROLE_LABEL.teacher}</SelectItem>
-                        <SelectItem value="admin">{ROLE_LABEL.admin}</SelectItem>
-                        <SelectItem value="super_admin">{ROLE_LABEL.super_admin}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      disabled={busy || role === user.role}
-                      onClick={() => setStep({ kind: "confirm-role", next: role })}
-                    >
-                      Keisti
-                    </Button>
+                {user.role === "staff" ? (
+                  <div className="space-y-1 text-sm">
+                    <p className="text-xs text-muted-foreground">Rolė</p>
+                    <p>{ROLE_LABEL.staff}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Prisijungia per KU STEAM TEAM. Rolę ir prieigą prie veiklos valdo KU STEAM TEAM. Čia paskyrą galite
+                      užblokuoti arba atblokuoti.
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="manage-role">Rolė</Label>
+                    <div className="flex gap-2">
+                      <Select value={role} onValueChange={(v) => setRoleDraft(v as UserRole)}>
+                        <SelectTrigger id="manage-role" className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="teacher">{ROLE_LABEL.teacher}</SelectItem>
+                          <SelectItem value="admin">{ROLE_LABEL.admin}</SelectItem>
+                          <SelectItem value="super_admin">{ROLE_LABEL.super_admin}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        disabled={busy || role === user.role}
+                        onClick={() => setStep({ kind: "confirm-role", next: role })}
+                      >
+                        Keisti
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {user.role !== "super_admin" && (
                   <div className="space-y-2">
