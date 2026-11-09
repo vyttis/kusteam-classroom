@@ -255,11 +255,16 @@ Ką prideda:
 - `profiles.role` reikšmė `staff`: KU STEAM darbuotojas CLASSROOM aplinkoje, kuriamas tik TEAM prisijungimo metu. Ją nustatyti ar nuimti gali tik service role (trigeris `protect_staff_role`). `skip_profile_for_team_users()` praleidžia `staff` profilį, automatinis `teacher` profilis TEAM naudotojui vis dar nekuriamas.
 - `team_staff_access_ok()` ir RESTRICTIVE politika „TEAM staff only through an active TEAM sign-in“ visoms CLASSROOM lentelėms su RLS (išskyrus `profiles` ir `team_*`) ir `storage.objects`: `staff` užklausa atmetama, jei jos Supabase sesija nesusieta su aktyvia SSO sesija. Kitiems (mokytojams, administratoriams) funkcija grąžina `true`, todėl jiems nieko nesikeičia.
 
+- `team_sessions` ir `team_register_session`: TEAM registruoja tik savo slaptažodžiu sukurtas sesijas. Kitur sukurta to paties žmogaus sesija (pvz. CLASSROOM, kurią CLASSROOM sukuria darbuotojui) niekada nėra TEAM sesija ir veiklų neatidaro (nepriklausomos peržiūros P1).
+- Trigeriai `team_sso_revoke_on_grant_removal` ir `team_sso_revoke_on_block`: teisės atėmimas ir blokavimas užbaigia veiklų sesijas toje pačioje transakcijoje. Atšaukiant CLASSROOM SSO sesiją ištrinama ir jos CLASSROOM Supabase sesija (kartu su atnaujinimo žetonais).
+- `is_active_account()` ir `can_read_game()` papildytos ta pačia `staff` taisykle: SECURITY DEFINER funkcijos (`get_game_stats`, `get_game_reflections`, `moderate_team`), kurios apeina RLS, neleidžia atšaukto darbuotojo (nepriklausomos peržiūros P0). Testas tikrina, kad kiekviena `authenticated` kviečiama SECURITY DEFINER funkcija turi šią taisyklę arba yra sąmoningai išimtis.
+- Kodų riba: 20 per minutę nariui ir veiklai.
+
 Ko nekeičia: Supabase Auth nustatymų, `handle_new_user()` (CLS-011 atskiras sprendimas), mokytojų duomenų.
 
 Patikrinta (`npm run test:db`): klientų rolės SSO lentelių ir funkcijų nepasiekia; kodų išdavimas pagal teisę, blokavimą, narystę, TEAM sesiją ir ribą; neteisingas PKCE, svetimas, pasibaigęs ir pakartotinis kodas atmetami; sesijos būsena seka teisę, blokavimą, TEAM atsijungimą, galiojimą ir atšaukimą; mokytojas negali tapti `staff`, `staff` negali pakeisti savo vaidmens; `staff` mato tik savo veiklas ir tik per susietą sesiją; atėmus teisę ar baigus TEAM sesiją duomenys iš karto neprieinami; kiekviena lentelė su RLS turi taisyklę arba yra sąmoningai išskirta. `down.sql` grąžina visą schemos atspaudą į buvusį.
 
-Grąžinimas (`down.sql`): SSO lentelės ir funkcijos pašalinamos, `staff` profiliai tampa užblokuotais `teacher` profiliais (jų veiklos lieka, niekas jomis nesinaudoja, kol administratorius nenuspręs).
+Grąžinimas (`down.sql`): pirmiausia ištrinamos per TEAM sukurtos CLASSROOM sesijos, `is_active_account()` ir `can_read_game()` grąžinamos į ankstesnes, SSO lentelės ir funkcijos pašalinamos, `staff` profiliai tampa užblokuotais `teacher` profiliais (jų veiklos lieka, niekas jomis nesinaudoja, kol administratorius nenuspręs).
 
 ## Schemos atspaudas
 
