@@ -15,5 +15,10 @@ DECLARE
   chk_own bigint;
   chk_seen bigint;
   chk_active boolean;
-  chk_ok boolean;
+  chk_auth boolean;
+  chk_fn text;
+  chk_ok_applied boolean;
+  chk_msg_applied text;
+  chk_ok_back boolean;
+  chk_msg_back text;
 BEGIN

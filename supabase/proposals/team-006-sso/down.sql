@@ -10,8 +10,9 @@
 -- Teachers, admins, participants and the TEAM-001 tables are not touched,
 -- except that skip_profile_for_team_users() gets its TEAM-001 definition back.
 BEGIN;
--- A table lock that cannot be taken within 5 s ends the whole rollback, so
--- requests never queue behind it (docs/migration-history.md, TEAM-006).
+-- If a table lock cannot be taken within 5 s, the whole rollback stops and
+-- is undone (error 55P03), so requests wait on it at most that long
+-- (docs/migration-history.md, TEAM-006).
 SET LOCAL lock_timeout = '5s';
 
 DELETE FROM auth.sessions a

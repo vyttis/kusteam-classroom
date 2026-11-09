@@ -35,8 +35,9 @@
 -- It does not change Supabase Auth settings, handle_new_user() (CLS-011 is a
 -- separate decision) or any teacher's data.
 BEGIN;
--- A table lock that cannot be taken within 5 s ends the whole change, so
--- requests never queue behind it (docs/migration-history.md, TEAM-006).
+-- If a table lock cannot be taken within 5 s, the whole change stops and
+-- is undone (error 55P03), so requests wait on it at most that long
+-- (docs/migration-history.md, TEAM-006).
 SET LOCAL lock_timeout = '5s';
 
 -- 1. Tables ------------------------------------------------------------------
