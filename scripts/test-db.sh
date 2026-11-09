@@ -133,21 +133,72 @@ psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "DELETE FROM auth.users WHE
 echo "TEAM-001: test, first superadmin and rollback check passed"
 
 # TEAM-006 proposal (docs/migration-history.md): KU STEAM TEAM sign-in for
-# activities. Apply on the migrated schema (TEAM-001 included), test, roll
-# back and check that the whole schema fingerprint is exactly as before.
+# activities. On the migrated schema (TEAM-001 included): the production
+# apply check must succeed without changing anything, up.sql must give the
+# expected fingerprint (Postgres 17), the verification and the rollback
+# check must succeed, the test must pass, and down.sql must bring back the
+# exact fingerprint from before.
 PROPOSAL="$ROOT/supabase/proposals/team-006-sso"
 if [[ -d "$PROPOSAL" ]]; then
-  BEFORE="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql")"
+  fingerprint() { psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql"; }
+  # The check files run exactly the statements of up.sql and down.sql.
+  CHECKS="$(mktemp -d)"
+  "$ROOT/scripts/team-006-checks.sh" "$CHECKS"
+  for f in apply-check.sql verify.sql rollback-check.sql; do
+    if ! diff -q "$CHECKS/$f" "$PROPOSAL/$f" >/dev/null; then
+      echo "TEAM-006 $f is out of date: run scripts/team-006-checks.sh" >&2
+      exit 1
+    fi
+  done
+  rm -rf "$CHECKS"
+  # Each check ends with an error on purpose; its message is the result.
+  expect_check() {
+    local out
+    out="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$1" 2>&1 || true)"
+    if ! grep -q "$2" <<<"$out"; then
+      echo "TEAM-006 $(basename "$1"): $out" >&2
+      exit 1
+    fi
+    grep -o 'TEAM-006 .*' <<<"$out" | head -1
+  }
+  # A teacher with activities, so the checks look at real rows.
+  TEACHER_ID="00000000-0000-4000-8000-0000000000f1"
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "
+    INSERT INTO auth.users (id, email) VALUES ('$TEACHER_ID', 'check-teacher@example.invalid');
+    UPDATE public.profiles SET status = 'active', onboarding_completed = true WHERE id = '$TEACHER_ID';
+    INSERT INTO public.games (teacher_id, title, game_code) VALUES
+      ('$TEACHER_ID', 'Patikra 1', 'CHKT01'), ('$TEACHER_ID', 'Patikra 2', 'CHKT02');"
+
+  BEFORE="$(fingerprint)"
+  expect_check "$PROPOSAL/apply-check.sql" "TEAM-006 apply dry run OK: .* teacher \\([0-9]*\\)/\\1 active"
+  if [[ "$(fingerprint)" != "$BEFORE" ]]; then
+    echo "TEAM-006 apply-check.sql changed the schema" >&2
+    exit 1
+  fi
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/up.sql" >/dev/null
+  APPLIED="$(fingerprint)"
+  if (( SERVER_VERSION >= 170000 )); then
+    if ! diff <(echo "$APPLIED") "$PROPOSAL/fingerprint-after.expected"; then
+      echo "TEAM-006 schema fingerprint after up.sql differs from fingerprint-after.expected" >&2
+      exit 1
+    fi
+  fi
+  expect_check "$PROPOSAL/verify.sql" "TEAM-006 verify OK: .* teacher \\([0-9]*\\)/\\1 active"
+  expect_check "$PROPOSAL/rollback-check.sql" "TEAM-006 rollback dry run OK: .* teacher \\([0-9]*\\)/\\1 active"
+  if [[ "$(fingerprint)" != "$APPLIED" ]]; then
+    echo "TEAM-006 rollback-check.sql changed the schema" >&2
+    exit 1
+  fi
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/test.sql" >/dev/null
   psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/down.sql" >/dev/null
-  AFTER="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -F'|' -f "$ROOT/supabase/tests/schema-fingerprint.sql")"
+  AFTER="$(fingerprint)"
   if [[ "$AFTER" != "$BEFORE" ]]; then
     diff <(echo "$BEFORE") <(echo "$AFTER") >&2 || true
     echo "TEAM-006 down.sql did not restore the schema" >&2
     exit 1
   fi
-  echo "TEAM-006 proposal: apply, test and rollback passed"
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" >/dev/null -c "DELETE FROM auth.users WHERE id = '$TEACHER_ID'"
+  echo "TEAM-006 proposal: apply check, apply, verification, rollback check, test and rollback passed"
 fi
 
 if [[ "${TEST_ROLLBACK:-1}" == "1" ]]; then
