@@ -11,7 +11,8 @@ import { LogOut, Gamepad2, GraduationCap, BookOpen, Shield, Menu } from "lucide-
 import Link from "next/link"
 import { UserRole } from "@/types/game"
 import Image from "next/image"
-import { canViewAdminDashboard } from "@/lib/auth/roles"
+import { canViewAdminDashboard, getRoleLabel } from "@/lib/auth/roles"
+import { signOutTeamStaff } from "@/lib/team-sso/client-sign-out"
 
 interface TeacherNavProps {
   email: string
@@ -50,11 +51,20 @@ export function TeacherNav({
 
   async function handleLogout() {
     clearLocalWork()
+    // KU STEAM TEAM staff: end only this CLASSROOM session (TEAM stays
+    // signed in) and go back to TEAM.
+    if (role === "staff") {
+      window.location.assign(await signOutTeamStaff())
+      return
+    }
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push("/auth/login")
     router.refresh()
   }
+
+  // Second line under the name: the email, or for TEAM staff their role.
+  const secondaryLine = role === "staff" ? getRoleLabel(role) : fullName ? email : null
 
   const pathname = usePathname()
   const links = [
@@ -128,8 +138,8 @@ export function TeacherNav({
                 <p className="truncate text-sm font-medium text-steam-dark leading-none">
                   {fullName || email}
                 </p>
-                {fullName && (
-                  <p className="truncate text-xs text-muted-foreground">{email}</p>
+                {secondaryLine && (
+                  <p className="truncate text-xs text-muted-foreground">{secondaryLine}</p>
                 )}
               </div>
             </div>
@@ -174,7 +184,7 @@ export function TeacherNav({
               )}
               <div>
                 <p className="text-sm font-medium text-steam-dark">{fullName || email}</p>
-                {fullName && <p className="text-xs text-muted-foreground">{email}</p>}
+                {secondaryLine && <p className="text-xs text-muted-foreground">{secondaryLine}</p>}
               </div>
             </div>
 
