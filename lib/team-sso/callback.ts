@@ -1,14 +1,14 @@
 import type { NextRequest, NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { FLOW_COOKIE, TEAM_SSO_CLIENT_ID } from "@/lib/team-sso/config"
-import { openFlow, sameSecret, sha256Hex } from "@/lib/team-sso/crypto"
-import { clearFlowCookie, redirectHere, ssoHeaders } from "@/lib/team-sso/http"
+import { TEAM_SSO_CLIENT_ID } from "@/lib/team-sso/config"
+import { openFlow, randomToken, sameSecret, sha256Hex } from "@/lib/team-sso/crypto"
+import { clearFlowCookie, readFlowCookie, redirectHere, ssoHeaders } from "@/lib/team-sso/http"
 import { accessTokenClaims } from "@/lib/team-sso/jwt"
 import { messageKindFor, messagePath } from "@/lib/team-sso/messages"
 import { safeNextPath } from "@/lib/team-sso/next-path"
 import { ensureClassroomProfile } from "@/lib/team-sso/profile"
 import { revokeSsoSession } from "@/lib/team-sso/sessions"
-import { applyCookieWrites, cookieJar, type CookieJar } from "@/lib/team-sso/session-client"
+import { applyCookieWrites, cookieJar, signOutLocal, type CookieJar } from "@/lib/team-sso/session-client"
 import { rpcRow } from "@/lib/supabase/rpc-row"
 
 export interface CallbackDeps {
@@ -43,7 +43,7 @@ const CODE = /^[A-Za-z0-9_-]{43}$/
  */
 export async function finishTeamSignIn(request: NextRequest, deps: CallbackDeps): Promise<NextResponse> {
   const url = request.nextUrl
-  const flow = openFlow(request.cookies.get(FLOW_COOKIE)?.value)
+  const flow = openFlow(readFlowCookie(request))
   // CLASSROOM session cookies: whatever the Supabase client signs out or in
   // below lands on the response, success or not.
   const jar = cookieJar(request.cookies.getAll())
@@ -58,15 +58,22 @@ export async function finishTeamSignIn(request: NextRequest, deps: CallbackDeps)
   }
   const fail = (reason: string) => respond(messagePath(messageKindFor(reason)))
 
-  // 1. Login CSRF: the state must be the one this browser started with.
+  const code = url.searchParams.get("code")
+
+  // 1. Login CSRF: the state must be the one this browser started with. A
+  //    code that reached a browser whose flow it is not is burnt before the
+  //    answer (contract 3.3, v1.2): it may sit in logs or history, and must
+  //    not stay valid for its remaining seconds.
   const state = url.searchParams.get("state")
-  if (!flow || !state || !sameSecret(state, flow.state)) return fail("invalid_state")
+  if (!flow || !state || !sameSecret(state, flow.state)) {
+    if (code && CODE.test(code)) await burnCode(deps.admin, code)
+    return fail("invalid_state")
+  }
 
   // 2. TEAM refused (no grant, rate limit, malformed request).
   const teamError = url.searchParams.get("error")
   if (teamError) return fail(teamError)
 
-  const code = url.searchParams.get("code")
   if (!code || !CODE.test(code)) return fail("invalid_request")
 
   // 3. Redeem: single use, PKCE and live access are checked in the database.
@@ -103,13 +110,7 @@ export async function finishTeamSignIn(request: NextRequest, deps: CallbackDeps)
     return fail(reason)
   }
   const session = deps.sessionClient(jar)
-  const signOutHere = async () => {
-    try {
-      await session.auth.signOut({ scope: "local" })
-    } catch {
-      console.error("[team-sso] sign-out failed")
-    }
-  }
+  const signOutHere = () => signOutLocal(session, jar)
   let signedIn = false
 
   try {
@@ -168,4 +169,27 @@ export async function finishTeamSignIn(request: NextRequest, deps: CallbackDeps)
 
   // 7. Into CLASSROOM, so the code leaves the address bar.
   return respond(safeNextPath(flow.next, url.origin))
+}
+
+/**
+ * Uses a code once with a fresh random verifier, so it fails (invalid_grant)
+ * and can never be redeemed again. The answer is ignored; should it ever be
+ * "ok" (a verifier collision, 2^-256), the session it made is ended at once.
+ */
+async function burnCode(admin: SupabaseClient, code: string): Promise<void> {
+  try {
+    const { data, error } = await admin.rpc("team_sso_redeem_code", {
+      p_client: TEAM_SSO_CLIENT_ID,
+      p_code_hash: sha256Hex(code),
+      p_code_verifier: randomToken(),
+    })
+    if (error) {
+      console.error("[team-sso] code burn failed", { pg: error.code })
+      return
+    }
+    const row = rpcRow<RedeemRow>(data)
+    if (row?.status === "ok" && row.user_id && row.session_id) await revokeSsoSession(admin, row.user_id, row.session_id)
+  } catch {
+    console.error("[team-sso] code burn failed")
+  }
 }

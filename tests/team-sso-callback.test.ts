@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createHash } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { finishTeamSignIn } from "@/lib/team-sso/callback"
-import { FLOW_COOKIE } from "@/lib/team-sso/config"
+import { FLOW_COOKIE, FLOW_COOKIE_HOST } from "@/lib/team-sso/config"
 import type { CookieJar } from "@/lib/team-sso/session-client"
 import {
   CLIENT_SESSION,
@@ -114,7 +115,26 @@ function messageOf(res: Response): string | null {
 function deletesFlowCookie(res: Response): boolean {
   return res.headers
     .getSetCookie()
-    .some((c) => c.startsWith(`${FLOW_COOKIE}=;`) && /Max-Age=0/.test(c) && /Path=\/auth\/team/.test(c))
+    .some((c) => c.startsWith(`${FLOW_COOKIE_HOST}=;`) && /Max-Age=0/.test(c) && /Path=\/(;|$)/.test(c) && /Secure/.test(c))
+}
+
+const INVALID_GRANT = { data: [{ ...OK_ROW, status: "invalid_grant", session_id: null, user_id: null }], error: null }
+
+/** Exactly one redeem, of this code with a fresh 43-character verifier, and no session work. */
+function expectBurnt(m: ReturnType<typeof setup>) {
+  expect(m.calls).toEqual(["rpc:team_sso_redeem_code"])
+  const [, args] = m.rpc.mock.calls[0]
+  expect(args.p_client).toBe("classroom")
+  expect(args.p_code_hash).toBe(createHash("sha256").update(CODE).digest("hex"))
+  expect(args.p_code_verifier).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  expect(m.generateLink).not.toHaveBeenCalled()
+  expect(m.verifyOtp).not.toHaveBeenCalled()
+  expect(m.signOut).not.toHaveBeenCalled()
+}
+
+/** The redeem calls made to burn a code (anything but the cookie's verifier). */
+function burnCalls(m: ReturnType<typeof setup>, verifier?: string) {
+  return m.rpc.mock.calls.filter(([fn, args]) => fn === "team_sso_redeem_code" && args.p_code_verifier !== verifier)
 }
 
 let consoleCapture: ReturnType<typeof silenceConsole>
@@ -129,34 +149,67 @@ afterEach(() => {
 })
 
 describe("GET /auth/team/callback: refusals before the code is used", () => {
-  it("refuses without the flow cookie (invalid_state) and never redeems", async () => {
-    const m = setup()
+  it("refuses without the flow cookie (invalid_state) and burns the code", async () => {
+    const m = setup({ redeem: INVALID_GRANT })
     const flow = startedFlow()
     const res = await finishTeamSignIn(callbackRequest({ code: CODE, state: flow.state }), m)
     expect(res.status).toBe(303)
     expect(messageOf(res)).toBe("negalioja")
-    expect(m.rpc).not.toHaveBeenCalled()
     expect(deletesFlowCookie(res)).toBe(true)
+    expectBurnt(m)
   })
 
-  it("refuses a wrong state (another browser's code) and deletes the flow cookie", async () => {
-    const m = setup()
+  it("refuses a wrong state (another browser's code), burns the code with a verifier that is not the cookie's", async () => {
+    const m = setup({ redeem: INVALID_GRANT })
     const flow = startedFlow()
     const other = startedFlow()
     const res = await finishTeamSignIn(callbackRequest({ code: CODE, state: other.state }, withFlowCookie(flow.cookie)), m)
     expect(messageOf(res)).toBe("negalioja")
-    expect(m.rpc).not.toHaveBeenCalled()
     expect(deletesFlowCookie(res)).toBe(true)
+    expectBurnt(m)
+    const [, args] = m.rpc.mock.calls[0]
+    expect(args.p_code_verifier).not.toBe(flow.verifier)
+    expect(args.p_code_verifier).not.toBe(other.verifier)
+  })
+
+  it("burns the code even when the redeem answer is ignored or fails, and ends a session it should never make", async () => {
+    const collision = setup()
+    const flow = startedFlow()
+    await finishTeamSignIn(callbackRequest({ code: CODE, state: "wrong" }, withFlowCookie(flow.cookie)), collision)
+    expect(collision.calls).toEqual(["rpc:team_sso_redeem_code", "rpc:team_sso_revoke"])
+    const failing = setup({ redeem: { data: null, error: { code: "57P01" } } })
+    const res = await finishTeamSignIn(callbackRequest({ code: CODE, state: "wrong" }, withFlowCookie(flow.cookie)), failing)
+    expect(messageOf(res)).toBe("negalioja")
+  })
+
+  it("does not call the database for a missing or malformed code on a failed state", async () => {
+    const flow = startedFlow()
+    const cases: Record<string, string>[] = [{ state: "wrong" }, { state: "wrong", code: "short" }, { state: "wrong", code: CODE + "x" }]
+    for (const params of cases) {
+      const m = setup()
+      const res = await finishTeamSignIn(callbackRequest(params, withFlowCookie(flow.cookie)), m)
+      expect(messageOf(res)).toBe("negalioja")
+      expect(m.rpc).not.toHaveBeenCalled()
+    }
   })
 
   it("refuses an edited flow cookie and an expired one", async () => {
-    const m = setup()
+    const m = setup({ redeem: INVALID_GRANT })
     const flow = startedFlow()
     const edited = flow.cookie.slice(0, -2) + (flow.cookie.endsWith("A") ? "BB" : "AA")
     expect(messageOf(await finishTeamSignIn(callbackRequest({ code: CODE, state: flow.state }, withFlowCookie(edited)), m))).toBe("negalioja")
     const old = startedFlow("/dashboard", Date.now() - 11 * 60 * 1000)
     expect(messageOf(await finishTeamSignIn(callbackRequest({ code: CODE, state: old.state }, withFlowCookie(old.cookie)), m))).toBe("negalioja")
-    expect(m.rpc).not.toHaveBeenCalled()
+    expect(burnCalls(m, flow.verifier)).toHaveLength(2)
+    expect(m.generateLink).not.toHaveBeenCalled()
+  })
+
+  it("on https ignores a flow cookie without the __Host- prefix (could be planted by a sibling site)", async () => {
+    const m = setup({ redeem: INVALID_GRANT })
+    const flow = startedFlow()
+    const res = await finishTeamSignIn(callbackRequest({ code: CODE, state: flow.state }, { [FLOW_COOKIE]: flow.cookie }), m)
+    expect(messageOf(res)).toBe("negalioja")
+    expectBurnt(m)
   })
 
   it("shows TEAM's error with the contract message", async () => {

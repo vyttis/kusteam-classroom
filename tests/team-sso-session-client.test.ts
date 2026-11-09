@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createServer, type Server } from "node:http"
 import type { AddressInfo } from "node:net"
-import { cookieJar, createSessionClient } from "@/lib/team-sso/session-client"
+import { accessTokenFromCookies, authCookieDeletions, isAuthCookie } from "@/lib/team-sso/auth-cookies"
+import { cookieJar, createSessionClient, signOutLocal } from "@/lib/team-sso/session-client"
 import { accessTokenClaims } from "@/lib/team-sso/jwt"
 import { CLIENT_SESSION, OTHER_USER, USER, fakeAccessToken } from "./helpers/team-sso"
 
@@ -10,6 +11,9 @@ import { CLIENT_SESSION, OTHER_USER, USER, fakeAccessToken } from "./helpers/tea
 // is signed out with scope local, the new one lands in the jar's writes.
 
 const requests: { method: string; url: string; body: string }[] = []
+// When true, the stand-in behaves as after team_sso_revoke: the session is gone.
+let sessionDeleted = false
+let bigUser = false
 let server: Server
 let base = ""
 const ENV = { ...process.env }
@@ -21,6 +25,12 @@ beforeAll(async () => {
     req.on("end", () => {
       requests.push({ method: req.method!, url: req.url!, body })
       if (req.url?.startsWith("/auth/v1/logout")) {
+        if (sessionDeleted) {
+          res.writeHead(403, { "content-type": "application/json" }).end(
+            JSON.stringify({ code: 403, error_code: "session_not_found", msg: "Session from session_id claim in JWT does not exist" }),
+          )
+          return
+        }
         res.writeHead(204).end()
         return
       }
@@ -33,7 +43,13 @@ beforeAll(async () => {
             expires_in: 3600,
             expires_at: now + 3600,
             refresh_token: "new-refresh",
-            user: { id: USER, aud: "authenticated", role: "authenticated", email: "darbuotoja@ku.lt" },
+            user: {
+              id: USER,
+              aud: "authenticated",
+              role: "authenticated",
+              email: "darbuotoja@ku.lt",
+              ...(bigUser ? { user_metadata: { padding: "x".repeat(5000) } } : {}),
+            },
           }),
         )
         return
@@ -98,5 +114,42 @@ describe("CLASSROOM session client on a cookie jar", () => {
 
     const { data: after } = await createSessionClient(cookieJar(jar.getAll())).auth.getSession()
     expect(after.session?.user.id).toBe(USER)
+  })
+
+  it("signOutLocal clears the cookies even when Supabase says the session is already gone", async () => {
+    const old = existingSessionCookie()
+    const jar = cookieJar([old])
+    sessionDeleted = true
+    try {
+      await signOutLocal(createSessionClient(jar), jar)
+    } finally {
+      sessionDeleted = false
+    }
+    expect(jar.getAll().filter((c) => isAuthCookie(c.name))).toEqual([])
+    expect(jar.writes.some((w) => w.name === old.name && w.options.maxAge === 0)).toBe(true)
+  })
+
+  it("signOutLocal never throws and still clears the cookies when the sign-out itself throws", async () => {
+    const old = existingSessionCookie()
+    const jar = cookieJar([old, { name: `${old.name}.0`, value: "chunk" }])
+    const client = { auth: { signOut: async () => Promise.reject(new Error("network")) } }
+    await signOutLocal(client as never, jar)
+    expect(jar.getAll()).toEqual([])
+  })
+
+  it("reads the access token back from the cookies @supabase/ssr wrote, chunked or not", async () => {
+    for (const big of [false, true]) {
+      bigUser = big
+      const jar = cookieJar([])
+      await createSessionClient(jar).auth.verifyOtp({ type: "magiclink", token_hash: "hashed" })
+      const cookies = jar.getAll()
+      if (big) expect(cookies.length).toBeGreaterThan(1)
+      else expect(cookies.length).toBe(1)
+      expect(accessTokenClaims(await accessTokenFromCookies(cookies))).toEqual({ sub: USER, sessionId: CLIENT_SESSION })
+    }
+    bigUser = false
+    expect(await accessTokenFromCookies([])).toBeNull()
+    expect(await accessTokenFromCookies([{ name: existingSessionCookie().name, value: "garbage" }])).toBeNull()
+    expect(authCookieDeletions(["other", existingSessionCookie().name]).map((d) => d.name)).toEqual([existingSessionCookie().name])
   })
 })

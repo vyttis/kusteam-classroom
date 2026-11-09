@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { NextResponse } from "next/server"
+import { authCookieDeletions } from "@/lib/team-sso/auth-cookies"
 
 export interface CookieWrite {
   name: string
@@ -42,6 +43,23 @@ export function createSessionClient(jar: CookieJar): SupabaseClient {
     cookies: { getAll: () => jar.getAll(), setAll: (cookies) => jar.setAll(cookies) },
     global: { fetch: (url, options) => fetch(url, { ...options, cache: "no-store" }) },
   })
+}
+
+/**
+ * Ends this CLASSROOM session only (scope local: TEAM's session in the same
+ * project stays). It may already be gone on the server: team_sso_revoke
+ * deletes the CLASSROOM session of a revoked SSO session, and Supabase then
+ * answers the sign-out with an error or the refresh fails. Either way the
+ * session cookies leave the jar; this never throws.
+ */
+export async function signOutLocal(client: SupabaseClient, jar: CookieJar): Promise<void> {
+  try {
+    await client.auth.signOut({ scope: "local" })
+  } catch {
+    // cleared below
+  }
+  const left = authCookieDeletions(jar.getAll().map((c) => c.name))
+  if (left.length > 0) jar.setAll(left)
 }
 
 /** Puts the jar's writes on the response, last write per cookie wins. */

@@ -11,9 +11,15 @@
 /** CLASSROOM's client id at TEAM (contract section 2). Fixed, not configurable. */
 export const TEAM_SSO_CLIENT_ID = "classroom"
 
-/** Short-lived cookie that carries state, PKCE verifier and `next` between start and callback. */
+/**
+ * Short-lived cookie that carries state, PKCE verifier and `next` between
+ * start and callback. On https it is `__Host-` prefixed (contract 4): the
+ * browser then requires Secure, Path=/ and no Domain, so a sibling
+ * *.kusteam.app site can neither plant nor overwrite it. Plain http on a
+ * loopback host (local tests) uses the bare name.
+ */
 export const FLOW_COOKIE = "kusteam_team_sso_flow"
-export const FLOW_COOKIE_PATH = "/auth/team"
+export const FLOW_COOKIE_HOST = `__Host-${FLOW_COOKIE}`
 export const FLOW_TTL_SECONDS = 600
 
 /** Where a staff member lands when `next` is missing or not a safe path. */

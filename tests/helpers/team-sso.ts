@@ -1,6 +1,6 @@
 import { vi } from "vitest"
 import { NextRequest } from "next/server"
-import { FLOW_COOKIE } from "@/lib/team-sso/config"
+import { FLOW_COOKIE_HOST } from "@/lib/team-sso/config"
 import { pkceChallenge, randomToken, sealFlow } from "@/lib/team-sso/crypto"
 
 export const USER = "00000000-0000-4000-8000-0000000000d1"
@@ -58,8 +58,15 @@ export function callbackRequest(params: Record<string, string>, cookies: Record<
   return new NextRequest(url, { headers: { host: "pamokos.kusteam.app", ...(cookie ? { cookie } : {}) } })
 }
 
+/** The flow cookie as the browser sends it back on https (`__Host-` name). */
 export function withFlowCookie(cookie: string, extra: Record<string, string> = {}) {
-  return { [FLOW_COOKIE]: cookie, ...extra }
+  return { [FLOW_COOKIE_HOST]: cookie, ...extra }
+}
+
+/** The CLASSROOM Supabase session cookie as @supabase/ssr writes it (one chunk). */
+export function sessionCookie(claims: Record<string, unknown>): string {
+  const session = { access_token: fakeAccessToken(claims), token_type: "bearer", refresh_token: "r" }
+  return `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`
 }
 
 export function silenceConsole() {

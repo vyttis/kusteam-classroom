@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { FLOW_COOKIE, FLOW_COOKIE_PATH, FLOW_TTL_SECONDS, isLoopbackHost } from "@/lib/team-sso/config"
+import { FLOW_COOKIE, FLOW_COOKIE_HOST, FLOW_TTL_SECONDS, isLoopbackHost } from "@/lib/team-sso/config"
 import { hostKind } from "@/lib/hosts"
 
 /**
@@ -34,22 +34,32 @@ export function ssoHeaders<T extends NextResponse>(response: T): T {
   return response
 }
 
+/** `__Host-` name wherever the cookie is Secure, the bare name on loopback http. */
+export function flowCookieName(request: NextRequest): string {
+  return secureCookies(request) ? FLOW_COOKIE_HOST : FLOW_COOKIE
+}
+
+export function readFlowCookie(request: NextRequest): string | undefined {
+  return request.cookies.get(flowCookieName(request))?.value
+}
+
+// Path=/ and no Domain: required by the __Host- prefix.
 export function setFlowCookie(response: NextResponse, request: NextRequest, value: string): void {
-  response.cookies.set(FLOW_COOKIE, value, {
+  response.cookies.set(flowCookieName(request), value, {
     httpOnly: true,
     secure: secureCookies(request),
     sameSite: "lax",
-    path: FLOW_COOKIE_PATH,
+    path: "/",
     maxAge: FLOW_TTL_SECONDS,
   })
 }
 
 export function clearFlowCookie(response: NextResponse, request: NextRequest): void {
-  response.cookies.set(FLOW_COOKIE, "", {
+  response.cookies.set(flowCookieName(request), "", {
     httpOnly: true,
     secure: secureCookies(request),
     sameSite: "lax",
-    path: FLOW_COOKIE_PATH,
+    path: "/",
     maxAge: 0,
   })
 }

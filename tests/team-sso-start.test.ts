@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { NextRequest } from "next/server"
-import { FLOW_COOKIE, teamAppUrl } from "@/lib/team-sso/config"
+import { FLOW_COOKIE, FLOW_COOKIE_HOST, teamAppUrl } from "@/lib/team-sso/config"
 import { openFlow, pkceChallenge, sealFlow } from "@/lib/team-sso/crypto"
 import { safeNextPath } from "@/lib/team-sso/next-path"
 import { startTeamSignIn } from "@/lib/team-sso/start"
@@ -22,10 +22,11 @@ function start(path = "/auth/team/start", host = "pamokos.kusteam.app", protocol
   return startTeamSignIn(new NextRequest(`${protocol}://${host}${path}`, { headers: { host } }))
 }
 
-function flowCookie(res: Response): { header: string; value: string } {
-  const header = res.headers.getSetCookie().find((c) => c.startsWith(`${FLOW_COOKIE}=`))
+function flowCookie(res: Response): { name: string; header: string; value: string } {
+  const header = res.headers.getSetCookie().find((c) => c.startsWith(`${FLOW_COOKIE_HOST}=`) || c.startsWith(`${FLOW_COOKIE}=`))
   if (!header) throw new Error("no flow cookie")
-  return { header, value: header.slice(FLOW_COOKIE.length + 1).split(";")[0] }
+  const name = header.slice(0, header.indexOf("="))
+  return { name, header, value: header.slice(name.length + 1).split(";")[0] }
 }
 
 describe("GET /auth/team/start", () => {
@@ -56,18 +57,26 @@ describe("GET /auth/team/start", () => {
     expect(Buffer.from(flowCookie(res).value, "base64url").toString("latin1")).not.toContain(flow.verifier)
   })
 
-  it("sets the flow cookie HttpOnly, Secure, SameSite=Lax, Path=/auth/team, 10 minutes", () => {
-    const { header } = flowCookie(start())
+  it("sets a __Host- flow cookie on https: HttpOnly, Secure, SameSite=Lax, Path=/, no Domain, 10 minutes", () => {
+    const { name, header } = flowCookie(start())
+    expect(name).toBe("__Host-kusteam_team_sso_flow")
     expect(header).toMatch(/; HttpOnly/i)
     expect(header).toMatch(/; Secure/i)
     expect(header).toMatch(/; SameSite=lax/i)
-    expect(header).toMatch(/; Path=\/auth\/team(;|$)/)
+    expect(header).toMatch(/; Path=\/(;|$)/)
+    expect(header).not.toMatch(/; Domain=/i)
     expect(header).toMatch(/; Max-Age=600(;|$)/)
   })
 
-  it("drops Secure only for plain http on a loopback host (local tests)", () => {
-    expect(flowCookie(start("/auth/team/start", "127.0.0.1:3000", "http")).header).not.toMatch(/; Secure/i)
-    expect(flowCookie(start("/auth/team/start", "pamokos.kusteam.app", "http")).header).toMatch(/; Secure/i)
+  it("uses the bare name without Secure only for plain http on a loopback host (local tests)", () => {
+    const local = flowCookie(start("/auth/team/start", "127.0.0.1:3000", "http"))
+    expect(local.name).toBe("kusteam_team_sso_flow")
+    expect(local.header).not.toMatch(/; Secure/i)
+    expect(local.header).toMatch(/; Path=\/(;|$)/)
+    // Plain http on a real host (behind a TLS proxy) still gets the prefix.
+    const proxied = flowCookie(start("/auth/team/start", "pamokos.kusteam.app", "http"))
+    expect(proxied.name).toBe("__Host-kusteam_team_sso_flow")
+    expect(proxied.header).toMatch(/; Secure/i)
   })
 
   it("is never cached and sends no referrer", () => {
