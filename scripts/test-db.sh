@@ -80,6 +80,23 @@ if [[ -d "$PROPOSAL" ]]; then
   echo "CLS-011 proposal: apply, test and rollback passed"
 fi
 
+# TEAM-001 proposal (docs/migration-history.md): KU STEAM TEAM staff tables in
+# this database. Apply on the migrated schema, test, roll back and check that
+# no TEAM object is left.
+PROPOSAL="$ROOT/supabase/proposals/team-001-staff-access"
+if [[ -d "$PROPOSAL" ]]; then
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/up.sql" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/test.sql" >/dev/null
+  psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -f "$PROPOSAL/down.sql" >/dev/null
+  LEFT="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname like 'team\_%'")"
+  LEFT_FN="$(psql "$DATABASE_URL" "${PSQL_OPTS[@]}" -A -t -c "select count(*) from pg_proc where proname in ('team_issue_token', 'team_touch_updated_at', 'skip_profile_for_team_users')")"
+  if [[ "$LEFT" != "0" || "$LEFT_FN" != "0" ]]; then
+    echo "TEAM-001 down.sql left objects behind: $LEFT relations, $LEFT_FN functions" >&2
+    exit 1
+  fi
+  echo "TEAM-001 proposal: apply, test and rollback passed"
+fi
+
 if [[ "${TEST_ROLLBACK:-1}" == "1" ]]; then
   # Every rollback must apply cleanly newest first (later migrations may
   # depend on earlier ones), and the migrations must apply again on top.

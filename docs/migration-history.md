@@ -243,6 +243,30 @@ Laukiama: `active_super_admins` bent 1. Jei adreso paskyra jau yra, taisyklė ja
 4. Po taikymo: atspaudas `function` 26 `9d3d3d665d481c8ed0139cf81b8bd8f1`, kitos sritys nepakitusios; `select count(*) from backup_cls011.handle_new_user` lygu 1.
 5. Grąžinimas: rollback failas (tas pats kaip `down.sql`).
 
+## TEAM-001: KU STEAM TEAM darbuotojų lentelės (pasiūlymas, laukia patvirtinimo)
+
+Vytis 2026-11-09 nusprendė, kad KU STEAM TEAM (`vyttis/kusteam-team`, būsimas `komanda.kusteam.app`) naudos šio projekto Supabase Auth. Pasiūlymas: `supabase/proposals/team-001-staff-access/` (`up.sql`, `down.sql`, `test.sql`, `first-superadmin.sql`). Supabase CLI ir produkcija jo netaiko. Architektūra: `kusteam-team/docs/ARCHITECTURE.md`.
+
+### Ką daro `up.sql`
+
+- Trys lentelės `public.team_members`, `public.team_activity_grants`, `public.team_tokens` su RLS. Prisijungęs naudotojas skaito tik savo nario eilutę ir savo veiklas; `anon` nieko; `team_tokens` neskaito jokia kliento rolė. Rašo tik TEAM serveris su service role.
+- Vienas superadministratorius (dalinis unikalus indeksas). Programa vaidmens nekeičia.
+- `team_issue_token()`: nuorodos išdavimas vienu žingsniu su užraktu narui (riba, senų nuorodų atšaukimas). Tik service role.
+- Trigeris `skip_profile_for_team_users` prieš įrašant į `public.profiles`: auth naudotojui su `user_metadata.kusteam_app = 'team'` CLASSROOM profilis nekuriamas, todėl TEAM darbuotojas automatiškai netampa CLASSROOM vedėju. `handle_new_user()` nekeičiama (CLS-011 atskiras sprendimas). Žymė gali tik praleisti profilį, teisių nesuteikia.
+- CLASSROOM lentelių, funkcijų ir teisių nekeičia.
+
+### Patikrinta
+
+`npm run test:db` (CI su Postgres 17, lokaliai 16): `up.sql`, `test.sql`, `down.sql`, po grąžinimo neliko nė vieno TEAM objekto. `test.sql` tikrina: TEAM naudotojas negauna profilio, CLASSROOM registracija veikia kaip anksčiau; antras superadministratorius ir nežinoma veikla atmetami; nuorodų riba ir senų atšaukimas; narys mato tik savo eilutę ir veiklas, negali keisti eilučių, suteikti sau veiklos, skaityti `team_tokens` ar kviesti `team_issue_token`; TEAM naudotojas nemato CLASSROOM duomenų ir negali kurti veiklų; `anon` nieko neskaito; ištrynus auth naudotoją dingsta ir TEAM eilutės.
+
+### Taikymo planas, kai Vytis patvirtins
+
+1. Atsarginė kopija arba Supabase PITR taškas, nevykstant veikloms.
+2. SQL Editor: `up.sql` turinys. Patikra: `select count(*) from pg_class where relname like 'team\_%'` (3 lentelės ir indeksai), `select 1 from pg_trigger where tgname = 'skip_profile_for_team_users'`.
+3. Pasiūlymas tampa migracija `supabase/migrations/<laikas>_team_staff_access.sql`, `down.sql` keliauja į `supabase/rollback/`, atnaujinamas `supabase/tests/schema-fingerprint.expected`, įrašas šiame faile.
+4. `first-superadmin.sql` su Vyčio patvirtintu auth naudotojo ID (ne pagal el. paštą).
+5. Grąžinimas: `down.sql` (ištrina TEAM eilutes, nuorodas ir trigerį; CLASSROOM profiliai nekeičiami; TEAM sukurti auth naudotojai lieka, juos galima ištrinti Supabase skydelyje).
+
 ## Schemos atspaudas
 
 `supabase/tests/schema-fingerprint.sql` tik skaito sistemos katalogus. Jis apima tai, ką kuria migracijos: `public` lenteles, stulpelius, apribojimus, indeksus, RLS, politikas (`public` ir `storage.objects`), funkcijas, trigerius, realtime lenteles ir `anon`, `authenticated`, `service_role`, `PUBLIC` teises. Plėtinių objektai ir teisių suteikėjas neįtraukiami. Užklausą galima paleisti produkcijos SQL Editor ir lokaliai po migracijų. Vienos srities objektus su jų md5 grąžina detalus režimas (aprašytas failo pradžioje).

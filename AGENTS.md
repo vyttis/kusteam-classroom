@@ -38,6 +38,12 @@ Ekosistemos dokumentai yra `vyttis/kusteam-ai-lab` repozitorijoje (čia nekopiju
 - `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run test:db` (kai liečiama DB), `npm run build`.
 - Po sujungimo: Vercel produkcijos diegimas, `E2E smoke (production)` workflow žalias, Vercel runtime klaidų nėra.
 
+## Dizaino ir darbo standartai (Vytis, 2026-11-09)
+
+- Prieš kuriant ar keičiant sąsają: STEAM identitetas ir sisteminių laiškų pavyzdžiai pagal [`DESIGN-SYSTEM.md`](https://github.com/vyttis/kusteam-ai-lab/blob/main/docs/DESIGN-SYSTEM.md) skyrių „Identiteto šaltiniai“, UX sprendimams Mobbin MCP. Mobbin nekeičia STEAM identiteto. Iš kitų KU STEAM produktų perimami pasiteisinę komponentai, jų klaidos ne. Tai nėra leidimas perkurti esamas sąsajas.
+- Sisteminiai laiškai (kvietimai, slaptažodžio atkūrimas, patvirtinimai) kuriami pagal STEAM laiškų pavyzdžius: lietuviškai, tinka telefonui ir pagrindiniams pašto klientams, vienas aiškus mygtukas ir saugi nuoroda.
+- Didesniame sprinte Claude Code dirba kaip vadovaujantis inžinierius: nepriklausomus darbus deleguoja 2-4 subagentams su aiškiomis ribomis ir Done kriterijais, atskirose šakose ar worktree, pats integruoja, sprendžia konfliktus ir atlieka galutinę patikrą. Mažas užduotis atlieka tiesiogiai. Taisyklės: [`ECOSYSTEM.md`](https://github.com/vyttis/kusteam-ai-lab/blob/main/docs/ECOSYSTEM.md), „Multi-agent darbas“.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
