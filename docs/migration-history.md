@@ -819,7 +819,7 @@ Atspaudas po migracijos (CI, Postgres 17), pasikeitė 9 sritys iš 11:
 | table | 21 | `017902ef4132acc93e0c97a3e8299c17` |
 | trigger | 13 | `f5225223b411d95a17b3e6dc53ca8300` |
 
-`grant.column` ir `realtime` nepakito. Lokaliai (Postgres 16) grąžinus migraciją visos sritys vėl lygios ankstesnėms (`function` 26 `1951b8ac…`, `table` 18 `4456d03e…` ir t. t.), išskyrus `grant.table`, kuris Postgres 16 skiriasi dėl `MAINTAIN`. Produkcija patikrinta 2026-11-09 apie 14:25 UTC (tik skaitymas, `schema-fingerprint.sql` SQL Editor): 10 sričių iš 11 sutampa su lentele ir `schema-fingerprint.expected`. Skiriasi tik `function`: produkcijoje 29 `d454994ddc3688e3d4e60dcd90e49082`, nes `handle_new_user()` ranka pakeista (CLS-011), kaip ir prieš TEAM-001.
+`grant.column` ir `realtime` nepakito. Lokaliai (Postgres 16) grąžinus migraciją visos sritys vėl lygios ankstesnėms (`function` 26 `1951b8ac…`, `table` 18 `4456d03e…` ir t. t.), išskyrus `grant.table`, kuris Postgres 16 skiriasi dėl `MAINTAIN`. Produkcija patikrinta 2026-11-09 apie 14:15 UTC (tik skaitymas, `schema-fingerprint.sql` SQL Editor): 10 sričių iš 11 sutampa su lentele ir `schema-fingerprint.expected`. Skiriasi tik `function`: produkcijoje 29 `d454994ddc3688e3d4e60dcd90e49082`, nes `handle_new_user()` ranka pakeista (CLS-011), kaip ir prieš TEAM-001.
 
 ### Produkcijos patikra prieš taikymą (2026-11-09, tik skaitymas)
 
