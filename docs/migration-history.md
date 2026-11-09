@@ -266,6 +266,43 @@ Patikrinta (`npm run test:db`): klientų rolės SSO lentelių ir funkcijų nepas
 
 Grąžinimas (`down.sql`): pirmiausia ištrinamos per TEAM sukurtos CLASSROOM sesijos, `is_active_account()` ir `can_read_game()` grąžinamos į ankstesnes, SSO lentelės ir funkcijos pašalinamos, `staff` profiliai tampa užblokuotais `teacher` profiliais (jų veiklos lieka, niekas jomis nesinaudoja, kol administratorius nenuspręs).
 
+### Produkcinis taikymas (paruošta 2026-11-09, netaikyta)
+
+Tik su atskiru Vyčio leidimu. Visa paleidimo seka kartu su jungikliais ir ribotu bandymu: `kusteam-ai-lab` `docs/TEAM-SSO-LAUNCH.md`.
+
+Failai SQL Editor (kiekvienas paleidžiamas visas):
+
+- `up.sql` (SHA-256 `ef3e51103edba671ecd30313af423a7ecee3024a40117c3e0522da504b9d9d1c`): pats pakeitimas, viena transakcija. `SET LOCAL lock_timeout = '5s'`: jei kurios nors lentelės užrakto nepavyksta gauti per 5 s, visas pakeitimas nutraukiamas ir niekas nepakinta, užklausos už jo nesistato į eilę.
+- `apply-check.sql`: vykdo lygiai tas pačias `up.sql` eilutes viename bloke, patikrina rezultatą (taip pat kaip tikras šios bazės mokytojas per RLS mato savo veiklas) ir specialiai baigiasi klaida, todėl Postgres viską atšaukia. Laukiama klaida: `TEAM-006 apply dry run OK: tables 3, functions 11, exposed 0, staff rule 2, policies 16, uncovered 0, storage t, triggers 3, role check t, staff profiles 0, teacher N/N active`.
+- `verify.sql`: tos pačios patikros jau pritaikius `up.sql`. Laukiama `TEAM-006 verify OK: ...` su tais pačiais skaičiais.
+- `rollback-check.sql`: vykdo lygiai tas pačias `down.sql` eilutes ir viską atšaukia. Laukiama `TEAM-006 rollback dry run OK: tables 0, functions 0, staff rule 0, policies 0, triggers 0, role check t, staff profiles 0, TEAM-001 t, profile guard t, teacher N/N active`.
+- `fingerprint-after.expected`: schemos atspaudas po `up.sql`.
+
+Patikros failus sukuria `scripts/team-006-checks.sh` iš `up.sql` ir `down.sql`. `npm run test:db` juos perkuria ir lygina, paleidžia kiekvieną, tikrina, kad jie schemos nepakeitė, ir Postgres 17 lygina atspaudą po `up.sql` su `fingerprint-after.expected`. Patikros pagauna dingusią politiką, klientų rolei atvertą funkciją ir mokytoją, kuris nebemato savo veiklų (išbandyta vietoje).
+
+Eiga:
+
+1. Sąlygos: Vyčio leidimas šiam žingsniui; jungikliai išjungti (`TEAM_SSO_CLIENTS` TEAM, `TEAM_SSO_ENABLED` CLASSROOM ir WATER LAB); Database > Backups: paskutinė kasdienė kopija ne senesnė nei 24 h; nevyksta veiklos: `select count(*) from public.games where status in ('active', 'paused');` grąžina 0.
+2. `supabase/tests/schema-fingerprint.sql`: visos sritys kaip `schema-fingerprint.expected`, o `function` `29|d454994ddc3688e3d4e60dcd90e49082` (žinomas skirtumas, CLS-011). Kitaip sustoti.
+3. `apply-check.sql`: laukiama `... apply dry run OK ...`. `FAILED` ar kita klaida: sustoti, niekas nepakito.
+4. `up.sql`: „Success. No rows returned“. Klaida reiškia, kad niekas nepritaikyta. Dėl `lock_timeout` galima vieną kartą pakartoti po 10 min.; antrą kartą sustoti.
+5. `verify.sql`: `... verify OK ...`. Atspaudas: visos sritys kaip `fingerprint-after.expected`, o `function` turi būti `40|...` (md5 kitoks dėl CLS-011).
+6. `rollback-check.sql`: `... rollback dry run OK ...`.
+7. CLASSROOM `E2E smoke (production)` paleistas rankiniu būdu žalias, Vercel runtime klaidų nėra, Vytis prisijungia kaip mokytojas ir mato savo veiklas.
+8. Jei 5–7 nepavyksta: grąžinimas (žemiau) ir sustoti.
+9. Pasiūlymas tampa migracija `<taikymo laikas>_team_sso.sql`, `down.sql` tampa `supabase/rollback/` failu, `schema-fingerprint.expected` atnaujinamas pagal `fingerprint-after.expected`, įrašas čia.
+
+Jungikliai po šio žingsnio dar išjungti: elgsena visiems lieka tokia pati (patikrinta: mokytojai, veiklos, dalyviai, TEAM). Nuo šio momento TEAM registruoja naujai prisijungusių darbuotojų sesijas.
+
+Grąžinimas produkcijoje: pirmiausia išjungiami jungikliai (TEAM, tada veiklos), tada `rollback-check.sql`, `down.sql` ir atspaudas: visos sritys kaip `schema-fingerprint.expected`, `function` `29|d454994ddc3688e3d4e60dcd90e49082`. Darbuotojų CLASSROOM sesijos ištrinamos, `staff` profiliai tampa užblokuotais `teacher`, mokytojai, veiklos ir dalyviai nepaliečiami (patikrinta kryžminiame bandyme).
+
+Skubiai nutraukti visas darbuotojų veiklų sesijas be grąžinimo (CLASSROOM sesijos ištrinamos iš karto, WATER LAB per 30 s):
+
+```sql
+SELECT sum(public.team_sso_revoke(user_id, 'logged_out'))
+FROM (SELECT DISTINCT user_id FROM public.team_sso_sessions WHERE revoked_at IS NULL) s;
+```
+
 ## Schemos atspaudas
 
 `supabase/tests/schema-fingerprint.sql` tik skaito sistemos katalogus. Jis apima tai, ką kuria migracijos: `public` lenteles, stulpelius, apribojimus, indeksus, RLS, politikas (`public` ir `storage.objects`), funkcijas, trigerius, realtime lenteles ir `anon`, `authenticated`, `service_role`, `PUBLIC` teises. Plėtinių objektai ir teisių suteikėjas neįtraukiami. Užklausą galima paleisti produkcijos SQL Editor ir lokaliai po migracijų. Vienos srities objektus su jų md5 grąžina detalus režimas (aprašytas failo pradžioje).
