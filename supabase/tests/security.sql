@@ -102,6 +102,11 @@ SELECT public.t_denied('SELECT * FROM public.admin_audit_log');
 SELECT public.t_denied('SELECT * FROM public.request_links');
 SELECT public.t_denied('SELECT * FROM public.ai_usage');
 SELECT public.t_denied('SELECT * FROM public.platform_settings');
+-- KU STEAM TEAM tables (20261109111400): only the TEAM server writes them,
+-- invitation and reset links are not readable by any client role.
+SELECT public.t_denied('SELECT * FROM public.team_tokens');
+SELECT public.t_denied($q$INSERT INTO public.team_members (user_id, email, role, status) VALUES (auth.uid(), 'a@example.lt', 'superadmin', 'active')$q$);
+SELECT public.t_denied($q$INSERT INTO public.team_activity_grants (user_id, activity) VALUES (auth.uid(), 'classroom')$q$);
 
 -- Library: only new items in review.
 SELECT public.t_ok($q$INSERT INTO public.library_items (title, published_by, status) VALUES ('Šablonas', auth.uid(), 'pending_review')$q$);
@@ -174,6 +179,9 @@ SELECT public.t_denied($q$SELECT public.get_platform_stats()$q$);
 SELECT public.t_denied($q$UPDATE public.profiles SET role = 'super_admin'$q$);
 SELECT public.t_denied('SELECT * FROM public.access_requests');
 SELECT public.t_denied('SELECT * FROM public.ai_usage');
+SELECT public.t_denied('SELECT * FROM public.team_members');
+SELECT public.t_denied('SELECT * FROM public.team_activity_grants');
+SELECT public.t_denied('SELECT * FROM public.team_tokens');
 RESET ROLE;
 
 -- New accounts wait for approval; the service role activates them.
@@ -290,6 +298,8 @@ SELECT public.t_ok($q$UPDATE public.profiles SET role = 'teacher', status = 'act
 SELECT public.t_ok($q$INSERT INTO public.access_requests (email, first_name, last_name, school_name, source) VALUES ('x@example.lt', 'A', 'B', 'Mokykla', 'qr')$q$);
 SELECT public.t_ok($q$INSERT INTO public.ai_usage (user_id, request_id, endpoint, model, input_tokens, output_tokens, cost_usd) VALUES ('00000000-0000-0000-0000-00000000000a', gen_random_uuid(), 'di/generate', 'claude', 1000, 500, 0.01)$q$);
 SELECT public.t_rows('SELECT * FROM public.platform_settings', 1);
+SELECT public.t_ok('SELECT * FROM public.team_members');
+SELECT public.t_ok('SELECT * FROM public.team_tokens');
 RESET ROLE;
 
 

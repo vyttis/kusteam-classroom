@@ -1,9 +1,11 @@
 -- TEAM-001 rollback check for production, changes nothing: runs the DROP
--- statements of down.sql (the same lines, checked by scripts/test-db.sh)
--- inside one block, counts what is left and then raises an error on purpose,
--- so Postgres undoes everything. The expected result is the error
+-- statements of supabase/rollback/20261109111400_team_staff_access.sql (the
+-- same lines, checked by scripts/test-db.sh) inside one block, counts what is
+-- left and then raises an error on purpose, so Postgres undoes everything.
+-- The expected result is the error
 --   TEAM-001 rollback dry run OK: 0 TEAM relations, 0 TEAM functions, profile guard false
--- Any other error means down.sql would not run as it is: do not rely on it.
+-- Any other error means the rollback file would not run as it is: do not
+-- rely on it.
 -- Takes a short lock on public.profiles: run it when no activity is going on.
 DO $dry$
 DECLARE

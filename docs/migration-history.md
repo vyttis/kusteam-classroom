@@ -67,7 +67,7 @@ Repozitorijos dalis atlikta (žr. žemiau, 1 žingsnis). Į produkcijos `supabas
 
 ### Ką rašymas keičia ir ko nekeičia
 
-- Keičia: į `supabase_migrations.schema_migrations` įrašomos 35 eilutės (versija, vardas, failo sakiniai). Lentelė jau yra ir dabar tuščia.
+- Keičia: į `supabase_migrations.schema_migrations` įrašomos 37 eilutės (versija, vardas, failo sakiniai; 2026-11-07 buvo 35, vėliau pridėtos `20261108120000` ir `20261109111400`). Lentelė jau yra ir dabar tuščia.
 - Nekeičia: `public`, `auth`, `storage` schemų, duomenų, teisių, funkcijų. Jokia migracija nevykdoma.
 - Grąžinimas: lentelė vėl ištuštinama (žr. „Grąžinimas“). Kadangi prieš rašymą ji tuščia, tai tiksli ankstesnė būsena.
 
@@ -110,7 +110,7 @@ select count(*) from supabase_migrations.schema_migrations;               -- 0
 select count(*) from public.games where status in ('active', 'paused');  -- 0
 ```
 
-Paleisti `supabase/tests/schema-fingerprint.sql`. Produkcijos rezultatas turi sutapti su lentele „Schemos atspaudas“. Jei nesutampa, sustoti.
+Paleisti `supabase/tests/schema-fingerprint.sql`. Produkcijos rezultatas turi sutapti su `supabase/tests/schema-fingerprint.expected` visose srityse, išskyrus `function` (CLS-011). Jei nesutampa, sustoti.
 
 ### 3. Įrašyti istoriją (vykdo Vytis savo kompiuteryje)
 
@@ -120,11 +120,11 @@ Repozitorijos šaknyje, `main` šakoje. `link` paprašys DB slaptažodžio arba 
 npx supabase@3.0.0 login
 npx supabase@3.0.0 link --project-ref menmndjyfeuwfweubwnl
 npx supabase@3.0.0 migration repair --help        # palyginti su skyriumi „CLI 3.0.0 pagalba“
-npx supabase@3.0.0 migration list --remote        # Remote stulpelis tuščias, 35 Local eilutės
+npx supabase@3.0.0 migration list --remote        # Remote stulpelis tuščias, 37 Local eilutės
 npx supabase@3.0.0 migration repair --status applied --remote
 ```
 
-CLI parodys planą („Replace the migration history table with 35 local migrations“) ir paprašys patvirtinti. Jei skaičius ne 35, atsisakyti. Versijas galima nurodyti ir aiškiai:
+CLI parodys planą („Replace the migration history table with 37 local migrations“) ir paprašys patvirtinti. Jei skaičius ne 37 (arba ne tiek, kiek tuo metu yra `supabase/migrations/` failų), atsisakyti. Versijas galima nurodyti ir aiškiai:
 
 ```bash
 npx supabase@3.0.0 migration repair --status applied --remote \
@@ -132,17 +132,18 @@ npx supabase@3.0.0 migration repair --status applied --remote \
   00011 00012 00013 00014 00015 00016 00017 00018 00019 00020 \
   00021 00022 00023 00024 00025 \
   20261106120000 20261106130000 20261106140000 20261106145000 \
-  20261106150000 20261106160000 20261106170000 20261107100000 20261107120000
+  20261106150000 20261106160000 20261106170000 20261107100000 20261107120000 \
+  20261108120000 20261109111400
 ```
 
 ### 4. Patikra po rašymo
 
 ```bash
-npx supabase@3.0.0 migration list --remote          # Local ir Remote sutampa visose 35 eilutėse
+npx supabase@3.0.0 migration list --remote          # Local ir Remote sutampa visose 37 eilutėse
 npx supabase@3.0.0 db push --dry-run --remote       # „Remote database is up to date.“
 ```
 
-SQL Editor: `select count(*) from supabase_migrations.schema_migrations;` turi grąžinti 35. Schemos atspaudas nepasikeitęs. Claude Code gali patikrinti tik skaitydamas.
+SQL Editor: `select count(*) from supabase_migrations.schema_migrations;` turi grąžinti 37. Schemos atspaudas nepasikeitęs. Claude Code gali patikrinti tik skaitydamas.
 
 ### Grąžinimas
 
@@ -235,38 +236,13 @@ select
 
 Laukiama: `active_super_admins` bent 1. Jei adreso paskyra jau yra, taisyklė jai nebeturi įtakos, o pasiūlymas jos vaidmens nekeičia.
 
-### Produkcijos patikra prieš taikymą (2026-11-09, tik skaitymas)
+### Taikymo planas, kai Vytis patvirtins
 
-- Postgres 17.6. TEAM objektų nėra: `team_*` lentelių, funkcijų ir trigerio `skip_profile_for_team_users` nėra.
-- Schemos atspaudas (`supabase/tests/schema-fingerprint.sql`) sutampa su `schema-fingerprint.expected` visose 11 srityse, išskyrus `function` (`af321e0f4f59a6180d4df6c55e72273b`, toks pat kaip 2026-11-07). Vienintelis skirtumas yra ranka keista `handle_new_user()` (CLS-011).
-- `auth.users` turi vieną trigerį `on_auth_user_created` (AFTER INSERT, `handle_new_user()`). Ji tik įrašo profilį ir grąžina `NEW`, todėl TEAM trigeris, praleidžiantis įrašą, jos nesugadina. `public.profiles` turi tik `set_updated_at` (BEFORE UPDATE), vardų konfliktų nėra.
-- Į `profiles` rodo 11 išorinių raktų, `games` ir `lesson_plans` su `ON DELETE CASCADE`. Todėl `first-superadmin.sql` atsisako paskyros, į kurią rodo bet kuri CLASSROOM eilutė.
-- SQL Editor rolė `postgres` gali skaityti ir keisti `auth.users`, trinti `profiles` ir kurti objektus `public`.
-- Atsarginės kopijos: kasdienės fizinės, paskutinė 2026-11-08 23:41 UTC. PITR neįjungtas.
-
-Repeticija vietinėje kopijoje (migracijos ir produkcijos `handle_new_user()`, funkcijų atspaudas sutapo su produkcija): `up.sql`, `test.sql`, `first-superadmin.sql`, CLS-011 ant viršaus ir TEAM testas po jo, abiejų grąžinimas atgal iki produkcijos atspaudo, pakartotinis taikymas. Viskas praėjo.
-
-### Pirmasis superadministratorius: atskira TEAM paskyra
-
-Vytis CLASSROOM jungiasi Google paskyra, kuri neturi slaptažodžio. Jei TEAM superadministratorius būtų ta pati paskyra, TEAM slaptažodžio nustatymas ar atkūrimas jai sukurtų slaptažodį, kuriuo būtų galima jungtis ir į CLASSROOM, o TEAM slaptažodžio keitimas baigtų CLASSROOM sesijas. Todėl superadministratorius yra atskiras auth naudotojas, naudojamas tik TEAM (rekomenduojamas `vytis.radvila@ku.lt`, kurio auth naudotojų sąraše nėra; KU pašto dėžutė saugoma KU kelių veiksnių autentifikacija).
-
-`first-superadmin.sql` (perrašytas 2026-11-09): paskyra sukuriama Authentication > Users > Add user > Create new user (laikinas slaptažodis, Auto Confirm). Skriptas vienoje transakcijoje atsisako jau naudotos paskyros (prisijungusios, su naudojamu profiliu ar CLASSROOM duomenimis), pažymi naudotoją `kusteam_app = 'team'`, ištrina tuščią automatiškai sukurtą CLASSROOM profilį ir įrašo aktyvų superadministratorių su trimis veiklomis. `npm run test:db` tikrina visus tris atsisakymus ir sėkmingą atvejį.
-
-### Failai produkcijai
-
-- `state.sql`: tik skaito, rodo TEAM objektų ir narių būseną, `handle_new_user()` md5, be el. pašto adresų. Paleidžiamas prieš ir po kiekvieno žingsnio.
-- `rollback-check.sql`: vykdo tas pačias `DROP` eilutes kaip `down.sql` (tikrina `test:db`) ir pats viską atšaukia. Laukiamas rezultatas yra klaida `TEAM-001 rollback dry run OK: 0 TEAM relations, 0 TEAM functions, profile guard false`. Taip produkcijoje patikrinama, kad grąžinimas veiktų, nieko nekeičiant.
-
-### Taikymo eiga, kai Vytis patvirtins
-
-Visa seka su Vercel, domenu ir E2E: `kusteam-team/docs/LAUNCH.md`. DB dalis:
-
-1. Nevyksta veiklos. Paskutinė kasdienė kopija ne senesnė nei 24 h (Database > Backups). `state.sql`: TEAM objektų nėra, `handle_new_user_md5` užrašomas.
-2. SQL Editor: `up.sql`. `state.sql`: 10 `team_*` ryšių, 3 funkcijos, `profile_guard` true, `handle_new_user_md5` nepakitęs.
-3. `rollback-check.sql`: laukiama klaida `... dry run OK ...`, po jos `state.sql` nepakitęs.
-4. Vytis sukuria atskirą TEAM paskyrą ir patvirtina jos ID. `first-superadmin.sql` su tuo ID. `state.sql`: `team_members` `{"superadmin/active": 1}`.
-5. Pasiūlymas tampa migracija `supabase/migrations/<laikas>_team_staff_access.sql`, `down.sql` keliauja į `supabase/rollback/`, atnaujinamas `schema-fingerprint.expected`, įrašas šiame faile.
-6. Grąžinimas: `down.sql` (TEAM eilutės, nuorodos ir trigeris dingsta, CLASSROOM profiliai nekeičiami). TEAM sukurti auth naudotojai lieka be CLASSROOM profilio, juos galima ištrinti Authentication > Users. Kraštutiniu atveju kasdienė fizinė kopija, bet ji grąžina visą projektą į tos nakties būseną.
+1. PR: `up.sql` → `supabase/migrations/<laikas>_handle_new_user_without_email_role.sql`, `down.sql` → `supabase/rollback/<tas pats>.sql`, `test.sql` → `supabase/tests/`, paleidžiamas `test:db`. `schema-fingerprint.expected` eilutė `function` → `29|5ca910befaa9bd9e02e87cc93e03d058` (failų replay su TEAM-001 ir šiuo pasiūlymu; iki TEAM-001 buvo `26|9d3d3d665d481c8ed0139cf81b8bd8f1`). Proposal etapas iš `test-db.sh` pašalinamas.
+2. Prieš taikymą (tik skaitymas): aukščiau esanti užklausa, 0 vykstančių veiklų.
+3. Taikymas produkcijoje: SQL Editor, visas failas, arba `db push --remote` po CLS-005. Jei per SQL Editor ir CLS-005 jau atliktas: `migration repair --status applied --remote <laikas>`.
+4. Po taikymo: atspaudas `function` 29 `5ca910befaa9bd9e02e87cc93e03d058`, kitos sritys nepakitusios; `select count(*) from backup_cls011.handle_new_user` lygu 1.
+5. Grąžinimas: rollback failas (tas pats kaip `down.sql`).
 
 ## Schemos atspaudas
 
@@ -288,7 +264,7 @@ Produkcija 2026-11-07:
 | table | 18 | `4456d03e6c5fa3e0ee1b8a1835df268d` |
 | trigger | 11 | `6b0e207b15b5ecf28ecd7e75c9c4dbb6` |
 
-Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
+Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Vėliau jį atnaujino CLS-015 (`grant.table`, `policy`) ir TEAM-001 (9 sritys): dabartinės reikšmės yra pačiame faile, pasikeitimai nurodyti tų migracijų įrašuose. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
 
 ## 2026-11-06: atsakymų, rolių ir statistikos spragos
 
@@ -778,6 +754,108 @@ DROP POLICY IF EXISTS "Only active accounts read" ON public.library_items;
 Po jo `anon_select` `false`, `read_roles` `{authenticated}`, `active_only`
 `0` (patikrinta lokaliai). Grąžinti į pilną migraciją: vėl pritaikyti
 migracijos failą (jis pakartotinai taikomas be klaidų).
+
+## 2026-11-09: KU STEAM TEAM darbuotojų lentelės (TEAM-001)
+
+Failas `supabase/migrations/20261109111400_team_staff_access.sql`,
+grąžinimas `supabase/rollback/20261109111400_team_staff_access.sql`. Testai ir
+produkcijos skriptai `supabase/team-001/`: `test.sql`, `first-superadmin.sql`,
+`first-superadmin.test.sql`, `state.sql`, `rollback-check.sql`. Iki taikymo tai
+buvo pasiūlymas `supabase/proposals/team-001-staff-access/` (`up.sql`,
+`down.sql` ir tie patys skriptai, PR #122 ir #123). Migracijos ir grąžinimo
+turinys tiksliai toks, koks buvo pritaikytas, pakeistas tik antraštės
+komentaras.
+
+Vytis 2026-11-09 nusprendė, kad KU STEAM TEAM (`vyttis/kusteam-team`,
+`komanda.kusteam.app`, veikia nuo 2026-11-09) naudos šio projekto Supabase Auth. Architektūra:
+`kusteam-team/docs/ARCHITECTURE.md`.
+
+**Pritaikyta produkcijoje 2026-11-09 apie 11:14 UTC** (Vyčio patvirtinimas;
+SQL Editor, visas tuometinis `up.sql`, dabar šios migracijos failas). Eiga:
+
+- `state.sql` prieš taikymą ir po kiekvieno žingsnio (laukiamos reikšmės:
+  „Taikymo eiga“ žemiau).
+- `rollback-check.sql`: grąžinimo bandymas be pakeitimų, rezultatas
+  `TEAM-001 rollback dry run OK`.
+- `first-superadmin.sql` su Vyčio patvirtintu ID: superadministratorius yra
+  atskira, tik TEAM naudojama auth paskyra, ne Vyčio CLASSROOM paskyra.
+- Po to CLASSROOM `E2E smoke (production)` žalias.
+
+Šis PR repozitoriją suderina su produkcija: pasiūlymas tapo migracija,
+`schema-fingerprint.expected` atnaujintas. Produkcijos schema atitinka visas
+repozitorijos migracijas, įskaitant šią, išskyrus žinomą skirtumą: ranka
+pakeistą `handle_new_user()` (CLS-011). Kai bus atliekamas CLS-005, versija
+`20261109111400` įrašoma kartu su kitomis.
+
+### Ką daro migracija
+
+- Trys lentelės `public.team_members`, `public.team_activity_grants`, `public.team_tokens` su RLS. Prisijungęs naudotojas skaito tik savo nario eilutę ir savo veiklas; `anon` nieko; `team_tokens` neskaito jokia kliento rolė. Rašo tik TEAM serveris su service role.
+- Vienas superadministratorius (dalinis unikalus indeksas). Programa vaidmens nekeičia.
+- `team_issue_token()`: nuorodos išdavimas vienu žingsniu su užraktu narui (riba, senų nuorodų atšaukimas). Tik service role.
+- Trigeris `skip_profile_for_team_users` prieš įrašant į `public.profiles`: auth naudotojui su `user_metadata.kusteam_app = 'team'` CLASSROOM profilis nekuriamas, todėl TEAM darbuotojas automatiškai netampa CLASSROOM vedėju. `handle_new_user()` nekeičiama (CLS-011 atskiras sprendimas). Žymė gali tik praleisti profilį, teisių nesuteikia.
+- CLASSROOM lentelių, funkcijų ir teisių nekeičia.
+
+### Patikrinta
+
+`npm run test:db` (CI su Postgres 17, lokaliai 16) migraciją taiko kartu su kitomis, o grąžinimą ir pakartotinį taikymą tikrina bendras ciklas. Ant visiškai migruotos DB, nieko netaikydamas ir negrąžindamas, jis dar paleidžia:
+
+- `supabase/team-001/test.sql`: TEAM naudotojas negauna profilio, CLASSROOM registracija veikia kaip anksčiau; antras superadministratorius ir nežinoma veikla atmetami; nuorodų riba ir senų atšaukimas; narys mato tik savo eilutę ir veiklas, negali keisti eilučių, suteikti sau veiklos, skaityti `team_tokens` ar kviesti `team_issue_token`; TEAM naudotojas nemato CLASSROOM duomenų ir negali kurti veiklų; `anon` nieko neskaito; ištrynus auth naudotoją dingsta ir TEAM eilutės.
+- `first-superadmin.sql`: trys atsisakymai (prisijungusi paskyra, naudojamas profilis, CLASSROOM duomenys) ir sėkmingas atvejis (`first-superadmin.test.sql`).
+- `rollback-check.sql`: jo `DROP` eilutės turi sutapti su grąžinimo failo eilutėmis, rezultatas `dry run OK`, TEAM eilutės lieka.
+
+`supabase/tests/security.sql` papildomai tikrina, kad `anon` neskaito nė vienos `team_*` lentelės, prisijungęs CLASSROOM vedėjas neskaito `team_tokens` ir negali rašyti į `team_members` ar `team_activity_grants`, o service role jas skaito.
+
+Atspaudas po migracijos (CI, Postgres 17), pasikeitė 9 sritys iš 11:
+
+| kind | n | fp |
+| --- | --- | --- |
+| column | 206 | `f083c38098a9f4caddbcc54aefd7e30c` |
+| constraint | 101 | `0f0a734daf4e3b6fa9923aa85cfe12b0` |
+| function | 29 | `f1f7967f7f9624fc61c146d2d0af4ecb` |
+| grant.function | 56 | `887bf0760f4e90318eca6e027708167d` |
+| grant.table | 46 | `78248d5fc8404bc36e993bcb2d7b5452` |
+| index | 35 | `fdf937be806286f5b8c8ac0155e7e5bd` |
+| policy | 60 | `6e34e6be978e5366a052f980ad98751f` |
+| table | 21 | `017902ef4132acc93e0c97a3e8299c17` |
+| trigger | 13 | `f5225223b411d95a17b3e6dc53ca8300` |
+
+`grant.column` ir `realtime` nepakito. Lokaliai (Postgres 16) grąžinus migraciją visos sritys vėl lygios ankstesnėms (`function` 26 `1951b8ac…`, `table` 18 `4456d03e…` ir t. t.), išskyrus `grant.table`, kuris Postgres 16 skiriasi dėl `MAINTAIN`. Produkcija patikrinta 2026-11-09 apie 14:25 UTC (tik skaitymas, `schema-fingerprint.sql` SQL Editor): 10 sričių iš 11 sutampa su lentele ir `schema-fingerprint.expected`. Skiriasi tik `function`: produkcijoje 29 `d454994ddc3688e3d4e60dcd90e49082`, nes `handle_new_user()` ranka pakeista (CLS-011), kaip ir prieš TEAM-001.
+
+### Produkcijos patikra prieš taikymą (2026-11-09, tik skaitymas)
+
+- Postgres 17.6. TEAM objektų nėra: `team_*` lentelių, funkcijų ir trigerio `skip_profile_for_team_users` nėra.
+- Schemos atspaudas (`supabase/tests/schema-fingerprint.sql`) sutampa su tuometiniu `schema-fingerprint.expected` visose 11 srityse, išskyrus `function` (`af321e0f4f59a6180d4df6c55e72273b`, toks pat kaip 2026-11-07). Vienintelis skirtumas yra ranka keista `handle_new_user()` (CLS-011).
+- `auth.users` turi vieną trigerį `on_auth_user_created` (AFTER INSERT, `handle_new_user()`). Ji tik įrašo profilį ir grąžina `NEW`, todėl TEAM trigeris, praleidžiantis įrašą, jos nesugadina. `public.profiles` turi tik `set_updated_at` (BEFORE UPDATE), vardų konfliktų nėra.
+- Į `profiles` rodo 11 išorinių raktų, `games` ir `lesson_plans` su `ON DELETE CASCADE`. Todėl `first-superadmin.sql` atsisako paskyros, į kurią rodo bet kuri CLASSROOM eilutė.
+- SQL Editor rolė `postgres` gali skaityti ir keisti `auth.users`, trinti `profiles` ir kurti objektus `public`.
+- Atsarginės kopijos: kasdienės fizinės, paskutinė 2026-11-08 23:41 UTC. PITR neįjungtas.
+
+Repeticija vietinėje kopijoje (migracijos ir produkcijos `handle_new_user()`, funkcijų atspaudas sutapo su produkcija): `up.sql`, `test.sql`, `first-superadmin.sql`, CLS-011 ant viršaus ir TEAM testas po jo, abiejų grąžinimas atgal iki produkcijos atspaudo, pakartotinis taikymas. Viskas praėjo.
+
+### Pirmasis superadministratorius: atskira TEAM paskyra
+
+Vytis CLASSROOM jungiasi Google paskyra, kuri neturi slaptažodžio. Jei TEAM superadministratorius būtų ta pati paskyra, TEAM slaptažodžio nustatymas ar atkūrimas jai sukurtų slaptažodį, kuriuo būtų galima jungtis ir į CLASSROOM, o TEAM slaptažodžio keitimas baigtų CLASSROOM sesijas. Todėl superadministratorius yra atskiras auth naudotojas, naudojamas tik TEAM (rekomenduojamas `vytis.radvila@ku.lt`, kurio auth naudotojų sąraše nėra; KU pašto dėžutė saugoma KU kelių veiksnių autentifikacija).
+
+`supabase/team-001/first-superadmin.sql` (perrašytas 2026-11-09, produkcijoje paleistas tą pačią dieną): paskyra sukuriama Authentication > Users > Add user > Create new user (laikinas slaptažodis, Auto Confirm). Skriptas vienoje transakcijoje atsisako jau naudotos paskyros (prisijungusios, su naudojamu profiliu ar CLASSROOM duomenimis), pažymi naudotoją `kusteam_app = 'team'`, ištrina tuščią automatiškai sukurtą CLASSROOM profilį ir įrašo aktyvų superadministratorių su trimis veiklomis. Antrą kartą paleistas jis nepavyksta (`team_members_one_superadmin`). `npm run test:db` tikrina visus tris atsisakymus ir sėkmingą atvejį.
+
+### Failai produkcijai
+
+- `supabase/team-001/state.sql`: tik skaito, rodo TEAM objektų ir narių būseną, `handle_new_user()` md5, be el. pašto adresų. Paleidžiamas prieš ir po kiekvieno žingsnio.
+- `supabase/team-001/rollback-check.sql`: vykdo tas pačias `DROP` eilutes kaip `supabase/rollback/20261109111400_team_staff_access.sql` (tikrina `test:db`) ir pats viską atšaukia. Laukiamas rezultatas yra klaida `TEAM-001 rollback dry run OK: 0 TEAM relations, 0 TEAM functions, profile guard false`. Taip produkcijoje patikrinama, kad grąžinimas veiktų, nieko nekeičiant.
+
+### Taikymo eiga (atlikta 2026-11-09)
+
+Visa seka su Vercel, domenu ir E2E: `kusteam-team/docs/LAUNCH.md`. DB dalis:
+
+1. Nevyksta veiklos. Paskutinė kasdienė kopija ne senesnė nei 24 h (Database > Backups). `state.sql`: TEAM objektų nėra, `handle_new_user_md5` užrašomas.
+2. SQL Editor: migracijos failas (tada `up.sql`). `state.sql`: 10 `team_*` ryšių, 3 funkcijos, `profile_guard` true, `handle_new_user_md5` nepakitęs.
+3. `rollback-check.sql`: laukiama klaida `... dry run OK ...`, po jos `state.sql` nepakitęs.
+4. Vytis sukuria atskirą TEAM paskyrą ir patvirtina jos ID. `first-superadmin.sql` su tuo ID. `state.sql`: `team_members` `{"superadmin/active": 1}`.
+5. Pasiūlymas tampa migracija `20261109111400_team_staff_access.sql`, `down.sql` tampa grąžinimo failu, atnaujinamas `schema-fingerprint.expected`, įrašas šiame faile (šis PR).
+
+### Grąžinimas
+
+`supabase/rollback/20261109111400_team_staff_access.sql` SQL Editor, kai nevyksta veiklos; prieš tai galima paleisti `rollback-check.sql`. TEAM eilutės, nuorodos ir trigeris dingsta, CLASSROOM profiliai nekeičiami. TEAM sukurti auth naudotojai (taip pat superadministratoriaus paskyra) lieka be CLASSROOM profilio, juos galima ištrinti Authentication > Users. Po grąžinimo `state.sql`: TEAM objektų nėra, `handle_new_user_md5` nepakitęs. Kraštutiniu atveju kasdienė fizinė kopija, bet ji grąžina visą projektą į tos nakties būseną.
 
 ## Konvencija toliau
 

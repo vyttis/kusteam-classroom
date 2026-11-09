@@ -1,5 +1,5 @@
--- TEAM-001 first-superadmin.sql test, run by scripts/test-db.sh after up.sql
--- and test.sql. Fixtures (accounts made like Authentication > Add user, so
+-- TEAM-001 first-superadmin.sql test, run by scripts/test-db.sh on the fully
+-- migrated database after test.sql. Fixtures (accounts made like Authentication > Add user, so
 -- handle_new_user() gave each an empty CLASSROOM profile):
 --   ...b1 signed in before, ...b2 has an active profile, ...b3 owns a
 --   CLASSROOM activity: first-superadmin.sql refused all three;
