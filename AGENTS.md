@@ -40,6 +40,12 @@ Ekosistemos dokumentai yra `vyttis/kusteam-ai-lab` repozitorijoje (čia nekopiju
 
 <!-- BEGIN:nextjs-agent-rules -->
 
+## Dizaino ir darbo standartai (Vytis, 2026-11-09)
+
+- Prieš kuriant ar keičiant sąsają: STEAM identitetas ir sisteminių laiškų pavyzdžiai pagal [`DESIGN-SYSTEM.md`](https://github.com/vyttis/kusteam-ai-lab/blob/main/docs/DESIGN-SYSTEM.md) skyrių „Identiteto šaltiniai“, UX sprendimams Mobbin MCP. Mobbin nekeičia STEAM identiteto. Iš kitų KU STEAM produktų perimami pasiteisinę komponentai, jų klaidos ne. Tai nėra leidimas perkurti esamas sąsajas.
+- Sisteminiai laiškai (kvietimai, slaptažodžio atkūrimas, patvirtinimai) kuriami pagal STEAM laiškų pavyzdžius: lietuviškai, tinka telefonui ir pagrindiniams pašto klientams, vienas aiškus mygtukas ir saugi nuoroda.
+- Didesniame sprinte Claude Code dirba kaip vadovaujantis inžinierius: nepriklausomus darbus deleguoja 2-4 subagentams su aiškiomis ribomis ir Done kriterijais, atskirose šakose ar worktree, pats integruoja, sprendžia konfliktus ir atlieka galutinę patikrą. Mažas užduotis atlieka tiesiogiai. Taisyklės: [`ECOSYSTEM.md`](https://github.com/vyttis/kusteam-ai-lab/blob/main/docs/ECOSYSTEM.md), „Multi-agent darbas“.
+
 ## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
