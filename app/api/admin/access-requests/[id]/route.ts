@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server"
 import { z } from "zod"
 import { requireSuperAdmin } from "@/lib/access/admin-guard"
-import { grantAccount, logAdminAction, publicBaseUrl } from "@/lib/access/approve"
+import { grantAccount, logAdminAction, loginUrl } from "@/lib/access/approve"
 import { sendEmail } from "@/lib/email/send"
 import { accountActivatedEmail, requestRejectedEmail } from "@/lib/email/templates"
 
@@ -80,7 +80,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       municipality: req.municipality,
     },
     guard.userId,
-    new URL(request.url).origin,
   )
   if (!account.ok) {
     await guard.admin.from("access_requests").update({ reviewed_by: null, reviewed_at: null }).eq("id", id)
@@ -96,18 +95,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     email: req.email,
     existing_account: account.existing,
   })
-  // A new account gets Supabase's invitation email; an existing one is
-  // activated silently, so tell the teacher they can sign in.
-  if (account.existing) {
-    const loginUrl = `${publicBaseUrl(new URL(request.url).origin)}/vedejui`
-    after(() => sendEmail(accountActivatedEmail(req.email, req.first_name, loginUrl)))
-  }
+  // New or existing, the account is ready: tell the teacher where to sign in.
+  after(() => sendEmail(accountActivatedEmail(req.email, req.first_name, loginUrl(new URL(request.url).origin))))
 
   return NextResponse.json({
     ok: true,
     status: "approved",
     message: account.existing
       ? "Paskyra jau buvo, ji aktyvuota: vedėjas gali prisijungti iš karto."
-      : "Kvietimas išsiųstas el. paštu. Paspaudęs nuorodą vedėjas užbaigs registraciją.",
+      : "Kvietimas išsiųstas el. paštu. Vedėjas prisijungs per Google arba su kodu ir užbaigs registraciją.",
   })
 }

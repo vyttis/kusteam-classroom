@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server"
 import { z } from "zod"
 import { requireSuperAdmin } from "@/lib/access/admin-guard"
-import { grantAccount, logAdminAction, publicBaseUrl } from "@/lib/access/approve"
+import { grantAccount, logAdminAction, loginUrl } from "@/lib/access/approve"
 import { sendEmail } from "@/lib/email/send"
 import { accountActivatedEmail } from "@/lib/email/templates"
 import { schoolChoiceSchema } from "@/lib/access/profile-fields"
@@ -46,7 +46,6 @@ export async function POST(request: Request) {
       role: d.role,
     },
     guard.userId,
-    new URL(request.url).origin,
   )
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
@@ -55,10 +54,9 @@ export async function POST(request: Request) {
     role: d.role,
   })
 
-  if (result.existing) {
-    const loginUrl = `${publicBaseUrl(new URL(request.url).origin)}/vedejui`
-    after(() => sendEmail(accountActivatedEmail(d.email, d.first_name, loginUrl)))
-  }
+  // The email links to the sign-in page, not to a one-time link, so it does
+  // not expire. Creating the same account again sends it again.
+  after(() => sendEmail(accountActivatedEmail(d.email, d.first_name, loginUrl(new URL(request.url).origin))))
 
   const { data: profile } = await guard.admin.from("profiles").select("*").eq("id", result.userId).single()
   return NextResponse.json({
@@ -66,7 +64,7 @@ export async function POST(request: Request) {
     existing: result.existing,
     user: profile,
     message: result.existing
-      ? "Paskyra su šiuo el. paštu jau buvo. Ji aktyvuota, rolė nepakeista."
+      ? "Paskyra su šiuo el. paštu jau buvo. Ji aktyvuota, rolė nepakeista, kvietimas išsiųstas iš naujo."
       : "Kvietimas išsiųstas el. paštu.",
   })
 }

@@ -60,7 +60,6 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         municipality: pendingRequest.municipality,
       },
       guard.userId,
-      new URL(request.url).origin,
     )
     if (!account.ok) return NextResponse.json({ error: account.error }, { status: account.status })
   } else {

@@ -7,9 +7,9 @@ export function publicBaseUrl(origin: string): string {
   return host ? `https://${host}` : origin
 }
 
-/** Where invitation links land: a page that turns the link into a session. */
-export function confirmUrl(origin: string): string {
-  return `${publicBaseUrl(origin)}/auth/confirm?next=/onboarding`
+/** The facilitator sign-in page: the link in every account email. */
+export function loginUrl(origin: string): string {
+  return `${publicBaseUrl(origin)}/vedejui`
 }
 
 export async function logAdminAction(
@@ -48,15 +48,20 @@ export type AccountResult =
 /**
  * Gives a person an active facilitator account. If the email already has
  * an account (e.g. it signed in with Google and waits for approval), that
- * account is activated; otherwise an invitation email is sent. The profile
- * starts active with the request's details; the person completes the rest
- * on first sign-in (onboarding).
+ * account is activated; otherwise a new one is created. The profile starts
+ * active with the request's details; the person completes the rest on first
+ * sign-in (onboarding).
+ *
+ * The account's email is marked confirmed, so the person signs in at
+ * /vedejui with Google or an emailed code. Supabase's invitation link
+ * expired after an hour (the email OTP lifetime), and an invited account
+ * that never opened it could not get a code either. The caller sends
+ * accountActivatedEmail with the sign-in link, which does not expire.
  */
 export async function grantAccount(
   admin: SupabaseClient,
   account: NewAccount,
   actorId: string,
-  origin: string,
 ): Promise<AccountResult> {
   const email = account.email.trim().toLowerCase()
   const school = account.school_code ? findSchoolByCode(account.school_code) : null
@@ -101,26 +106,37 @@ export async function grantAccount(
     }
     const { error } = await admin.from("profiles").update(update).eq("id", existing.id)
     if (error) return { ok: false, status: 500, error: "Nepavyko aktyvuoti paskyros." }
+    // An account invited earlier that never opened its link is still
+    // unconfirmed and cannot get a sign-in code: confirm it now.
+    const { data: authUser } = await admin.auth.admin.getUserById(existing.id)
+    if (authUser?.user && !authUser.user.email_confirmed_at) {
+      const { error: confirmError } = await admin.auth.admin.updateUserById(existing.id, { email_confirm: true })
+      if (confirmError) {
+        console.error("[access] confirm failed", { status: confirmError.status })
+        return { ok: false, status: 502, error: "Nepavyko aktyvuoti paskyros. Bandykite dar kartą." }
+      }
+    }
     return { ok: true, userId: existing.id, existing: true }
   }
 
-  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: confirmUrl(origin),
-    data: { full_name: profileFields.full_name },
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: { full_name: profileFields.full_name },
   })
-  if (inviteError || !invited?.user) {
-    console.error("[access] invite failed", { status: inviteError?.status })
-    return { ok: false, status: 502, error: "Nepavyko išsiųsti kvietimo laiško. Bandykite dar kartą." }
+  if (createError || !created?.user) {
+    console.error("[access] create failed", { status: createError?.status })
+    return { ok: false, status: 502, error: "Nepavyko sukurti paskyros. Bandykite dar kartą." }
   }
 
   const { error: profileError } = await admin
     .from("profiles")
     .update({ ...profileFields, onboarding_completed: false })
-    .eq("id", invited.user.id)
+    .eq("id", created.user.id)
   if (profileError) {
     // Do not leave a half-made account behind: the next attempt starts clean.
-    await admin.auth.admin.deleteUser(invited.user.id)
+    await admin.auth.admin.deleteUser(created.user.id)
     return { ok: false, status: 500, error: "Nepavyko sukurti profilio. Bandykite dar kartą." }
   }
-  return { ok: true, userId: invited.user.id, existing: false }
+  return { ok: true, userId: created.user.id, existing: false }
 }

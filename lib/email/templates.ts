@@ -241,13 +241,13 @@ export function accountActivatedEmail(to: string, firstName: string | null, logi
   const subject = "Jūsų vedėjo paskyra patvirtinta"
   const greeting = firstName ? `Sveiki, ${firstName},` : "Sveiki,"
   const lines = [
-    "jūsų vedėjo paskyra jau aktyvi. Prisijunkite taip pat, kaip bandėte anksčiau: per Google arba su kodu, kurį atsiųsime el. paštu.",
+    "jūsų vedėjo paskyra KU STEAM pamokose jau aktyvi. Prisijunkite per Google arba su kodu, kurį atsiųsime el. paštu. Naudokite šį el. pašto adresą.",
     "Pirmą kartą prisijungę pažymėsite, kokius dalykus ir kokioms klasėms mokote. Tai užtruks minutę.",
   ]
   const display = loginUrl.replace(/^https?:\/\//, "")
   const body = render({
     subject,
-    preheader: "Prisijunkite taip pat, kaip bandėte anksčiau.",
+    preheader: "Paskyra aktyvi. Prisijunkite per Google arba su kodu.",
     title: "Paskyra patvirtinta",
     footer: REQUEST_FOOTER,
     parts: [
