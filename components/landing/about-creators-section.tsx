@@ -16,7 +16,7 @@ export function AboutCreatorsSection() {
         <div className="flex items-center gap-3 mb-5">
           <span className="inline-flex h-px w-10 bg-steam-dark/40" />
           <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/70 font-semibold">
-            §9 · Apie kūrėjus
+            §5 · Apie kūrėjus
           </span>
         </div>
         <h2

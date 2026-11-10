@@ -40,7 +40,7 @@ export function AccessSection() {
             <div className="flex items-center gap-3 mb-5">
               <span className="inline-flex h-px w-10 bg-highlight" />
               <span className="text-xs uppercase tracking-[0.22em] text-highlight-ink font-semibold">
-                §8 · Prieiga
+                §4 · Prieiga
               </span>
             </div>
             <h2 className="text-display-sm md:text-display-md text-steam-dark leading-[0.98] tracking-tight">

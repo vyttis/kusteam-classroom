@@ -69,7 +69,7 @@ export function HowItWorksSection() {
         <div className="flex items-center gap-3 mb-5">
           <span className="inline-flex h-px w-10 bg-steam-dark/40" />
           <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/70 font-semibold">
-            §1 · Eiga
+            §3 · Eiga
           </span>
         </div>
         <h2 className="text-display-sm md:text-display-md text-steam-dark leading-[0.98] tracking-tight">
