@@ -7,6 +7,11 @@ import Link from "next/link"
 export function Footer() {
   return (
     <footer className="bg-white border-t border-border/40">
+      <nav aria-label="KU STEAM AI LAB" className="container mx-auto flex max-w-[1240px] flex-wrap gap-x-6 px-5 py-5 text-sm">
+        <a href="https://kusteam.app/veiklos" className="inline-flex min-h-11 items-center underline underline-offset-4">Veiklų katalogas</a>
+        <a href="https://kusteam.app/mokytojams" className="inline-flex min-h-11 items-center underline underline-offset-4">Mokytojams</a>
+        <a href="https://komanda.kusteam.app" className="inline-flex min-h-11 items-center underline underline-offset-4">Darbuotojams: TEAM</a>
+      </nav>
       <div className="container mx-auto px-5 max-w-[1200px] py-16 md:py-20">
         {/* Top: oversized signature */}
         <div className="mb-16 md:mb-24">
@@ -84,7 +89,7 @@ export function Footer() {
             <ul className="space-y-2.5">
               <li>
                 <a
-                  href="https://www.ku.lt/steam"
+                  href="https://steam.ku.lt/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group inline-flex items-center gap-1.5 text-sm text-steam-dark hover:text-primary-ink transition-colors"

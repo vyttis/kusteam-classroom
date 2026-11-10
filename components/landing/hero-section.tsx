@@ -54,7 +54,7 @@ export function HeroSection() {
 
       <div className="relative">
         {/* Navigation */}
-        <nav className="container mx-auto px-5 max-w-[1240px] flex items-center justify-between py-5">
+        <nav className="container mx-auto px-5 max-w-[1240px] flex items-center justify-between flex-wrap gap-4 py-5">
           <Link
             href="/"
             className="flex items-center hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
@@ -62,7 +62,9 @@ export function HeroSection() {
             <SteamLogo className="[&_text]:fill-white [&_line]:opacity-90" />
           </Link>
 
-          <div className="flex items-center gap-3 sm:gap-5">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+            <a href="https://kusteam.app/veiklos" className="inline-flex min-h-11 items-center text-sm font-medium text-white/80 hover:text-white underline underline-offset-4">Veiklų katalogas</a>
+            <a href="https://komanda.kusteam.app" className="inline-flex min-h-11 items-center text-sm font-medium text-white/80 hover:text-white underline underline-offset-4">Darbuotojams: TEAM</a>
             <Link
               href="/prisijungti"
               className="hidden sm:inline text-sm font-medium text-white/80 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-sm"
@@ -123,9 +125,9 @@ export function HeroSection() {
                 style={{ animationDelay: "160ms" }}
               >
                 Vedėjas sukuria komandinę veiklą su užduotimis, dalyviai prisijungia
-                su kodu, o jų atsakymai matomi realiu laiku. Pritaikyta{" "}
-                <span className="text-white font-medium">Lietuvos bendrojo ugdymo programai</span>,
-                24 dalykams nuo 1 iki 12 klasės.
+                su kodu, o jų atsakymai matomi realiu laiku. Planavimo įrankyje
+                galima rinktis iš 24 dalykų ir 1–12 klasių. Turinį pagal bendrąsias
+                programas peržiūri ir pritaiko mokytojas.
               </p>
 
               {/* CTAs */}
@@ -155,13 +157,18 @@ export function HeroSection() {
                 </Link>
               </div>
 
+              <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/80">
+                Mokytojui reikia KU STEAM centro patvirtintos paskyros. Dalyviams
+                paskyrų nereikia. Veiklos trukmę pasirenka vedėjas.
+              </p>
+
               {/* Numerical proof strip — typographic over icons */}
               <div
                 className="rise-in grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-white/10 max-w-[560px]"
                 style={{ animationDelay: "320ms" }}
               >
                 {[
-                  { num: "24", label: "BUP dalykai" },
+                  { num: "24", label: "dalykų pasirinkimai" },
                   { num: "1–12", label: "klasės" },
                   { num: "5+", label: "veiklos tipai" },
                 ].map((stat, i) => (
@@ -312,11 +319,11 @@ export function HeroSection() {
                 {[
                   "Klaipėdos universitetas",
                   "STEAM metodinis centras",
-                  "Bendrojo ugdymo programa",
+                  "Pamokų planavimas",
                   "Mokytojų partnerystės tinklas",
                   "Klaipėdos universitetas",
                   "STEAM metodinis centras",
-                  "Bendrojo ugdymo programa",
+                  "Pamokų planavimas",
                   "Mokytojų partnerystės tinklas",
                 ].map((item, i) => (
                   <span key={`${dup}-${i}`} className="flex items-center">

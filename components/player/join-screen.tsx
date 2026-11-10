@@ -86,6 +86,7 @@ export function JoinScreen() {
           </CardContent>
         </Card>
 
+        <a href="https://kusteam.app/veiklos" className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-steam-dark underline underline-offset-4">Grįžti į veiklų katalogą</a>
         <p className="text-xs text-muted-foreground mt-6">
           STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
         </p>
