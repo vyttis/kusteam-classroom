@@ -5,7 +5,7 @@ const steps = [
     number: "01",
     title: "Pasirinkite temą",
     description:
-      "Dalykas, klasė, pamokos tipas pagal Lietuvos bendrojo ugdymo programą. Sistema pritaiko užduočių sudėtingumą amžiui.",
+      "Pasirinkite dalyką, klasę ir mokymosi tikslą. DI pasiūlymų sudėtingumą ir sąsają su bendrosiomis programomis patikrinkite patys.",
     accent: "primary",
   },
   {
@@ -26,36 +26,36 @@ const steps = [
     number: "04",
     title: "Dalyviai prisijungia",
     description:
-      "Per QR kodą arba 6 simbolių prisijungimo kodą. Dalyviams nereikia paskyrų ar elektroninio pašto, prisijungimas trunka kelias sekundes.",
+      "Per QR kodą arba 6 simbolių veiklos kodą. Dalyviams nereikia paskyrų ar elektroninio pašto.",
     accent: "accent",
   },
   {
     number: "05",
     title: "Stebėkite eigą",
     description:
-      "Komandų progresas ir dalyvių atsakymai matomi realiu laiku. Pamoką galite pristabdyti paaiškinimui arba pratęsti laiką prireikus.",
+      "Komandų pažanga ir atsakymai matomi realiu laiku. Trukmę pasirenka vedėjas, prireikus gali pridėti laiko.",
     accent: "primary",
   },
 ] as const
 
 const ACCENT_COLOR: Record<string, { numeral: string; line: string; tick: string }> = {
   primary: {
-    numeral: "text-primary/15",
+    numeral: "text-steam-dark/70",
     line: "bg-primary",
     tick: "bg-primary",
   },
   highlight: {
-    numeral: "text-highlight/20",
+    numeral: "text-steam-dark/70",
     line: "bg-highlight",
     tick: "bg-highlight",
   },
   secondary: {
-    numeral: "text-secondary/15",
+    numeral: "text-steam-dark/70",
     line: "bg-secondary",
     tick: "bg-secondary",
   },
   accent: {
-    numeral: "text-accent/15",
+    numeral: "text-steam-dark/70",
     line: "bg-accent",
     tick: "bg-accent",
   },
@@ -68,8 +68,8 @@ export function HowItWorksSection() {
       <div className="max-w-3xl mb-20 md:mb-28">
         <div className="flex items-center gap-3 mb-5">
           <span className="inline-flex h-px w-10 bg-steam-dark/40" />
-          <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/60 font-semibold">
-            §1 · Eiga
+          <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/70 font-semibold">
+            §3 · Eiga
           </span>
         </div>
         <h2 className="text-display-sm md:text-display-md text-steam-dark leading-[0.98] tracking-tight">

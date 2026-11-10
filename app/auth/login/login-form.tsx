@@ -177,6 +177,10 @@ export function LoginForm() {
           </CardHeader>
 
           <CardContent>
+            <div className="mb-5 space-y-2 rounded-xl bg-muted p-4 text-sm leading-relaxed text-steam-dark">
+              <p>Mokytojui reikia KU STEAM centro patvirtintos CLASSROOM paskyros. Prisijungimas naujos paskyros nesukuria. Dėl prieigos rašykite <a href="mailto:steam@ku.lt" className="font-semibold underline underline-offset-4">steam@ku.lt</a>.</p>
+              <p>KU STEAM darbuotojams: <a href="https://komanda.kusteam.app" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">prisijungti per TEAM</a>.</p>
+            </div>
             <AnimatePresence mode="wait">
               {step === "email" ? (
                 <motion.div
@@ -323,6 +327,7 @@ export function LoginForm() {
               Grįžti į titulinį
             </Button>
           </Link>
+          <a href="https://kusteam.app/veiklos" className="inline-flex min-h-11 items-center text-sm font-medium text-steam-dark underline underline-offset-4">Grįžti į veiklų katalogą</a>
           <p className="text-xs text-muted-foreground">
             STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
           </p>

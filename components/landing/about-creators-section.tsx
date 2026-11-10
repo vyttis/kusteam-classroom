@@ -15,8 +15,8 @@ export function AboutCreatorsSection() {
       <div className="max-w-3xl mb-14">
         <div className="flex items-center gap-3 mb-5">
           <span className="inline-flex h-px w-10 bg-steam-dark/40" />
-          <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/60 font-semibold">
-            §9 · Apie kūrėjus
+          <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/70 font-semibold">
+            §5 · Apie kūrėjus
           </span>
         </div>
         <h2
@@ -91,7 +91,7 @@ export function AboutCreatorsSection() {
           </dl>
 
           <a
-            href="https://www.ku.lt/steam"
+            href="https://steam.ku.lt/"
             target="_blank"
             rel="noopener noreferrer"
             className="group inline-flex items-center gap-2 mt-10 text-sm font-medium text-primary-ink hover:text-primary-ink/80 transition-colors"

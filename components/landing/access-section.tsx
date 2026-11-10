@@ -18,7 +18,7 @@ const steps = [
   {
     number: "03",
     title: "Asmeninė prieiga",
-    body: "Po mokymų mokytojui suteikiama asmeninė paskyra. Pamokas kuriate savarankiškai, be papildomų leidimų ar administracinių procedūrų.",
+    body: "Mokytojo paskyrą patvirtina KU STEAM centras. Gavę patvirtinimą, prisijunkite su Google arba el. pašto kodu.",
     accent: "highlight",
   },
 ] as const
@@ -40,7 +40,7 @@ export function AccessSection() {
             <div className="flex items-center gap-3 mb-5">
               <span className="inline-flex h-px w-10 bg-highlight" />
               <span className="text-xs uppercase tracking-[0.22em] text-highlight-ink font-semibold">
-                §8 · Prieiga
+                §4 · Prieiga
               </span>
             </div>
             <h2 className="text-display-sm md:text-display-md text-steam-dark leading-[0.98] tracking-tight">
@@ -50,8 +50,8 @@ export function AccessSection() {
               iki paskyros.
             </h2>
             <p className="text-base md:text-lg text-muted-foreground mt-6 max-w-xl leading-relaxed text-pretty">
-              Pradinis kelias trumpas: partnerystė, praktiniai mokymai ir asmeninės
-              prieigos suteikimas. Toliau dirbate savarankiškai.
+              Dėl prieigos ir mokymų kreipkitės į centrą. Prisijungimas su Google
+              ar el. paštu naujos mokytojo paskyros nesukuria.
             </p>
           </div>
 
@@ -103,6 +103,9 @@ export function AccessSection() {
                 poreikius ir tolesnius žingsnius.
               </p>
 
+              <p className="mb-5 text-sm leading-relaxed text-white/80">
+                KU STEAM darbuotojas? <a href="https://komanda.kusteam.app" className="inline-flex min-h-11 items-center font-semibold text-white underline underline-offset-4">Prisijunkite per TEAM</a>.
+              </p>
               <a href="mailto:steam@ku.lt" className="inline-block">
                 <Button
                   className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30 h-11 px-6"

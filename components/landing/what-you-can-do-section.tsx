@@ -16,7 +16,7 @@ const capabilities = [
   {
     label: "DI",
     title: "Dirbtinis intelektas kaip pagalbininkas",
-    body: "Dirbtinis intelektas siūlo užduočių idėjas pagal LT BUP. Galutinį turinį visada peržiūri ir patvirtina vedėjas.",
+    body: "DI siūlo užduočių idėjas pagal pasirinktą dalyką ir klasę. Atitiktį bendrosioms programoms ir atsakymus patikrina vedėjas.",
     accent: "highlight",
   },
   {
@@ -53,8 +53,8 @@ export function WhatYouCanDoSection() {
       <div className="max-w-3xl mb-16 md:mb-24">
         <div className="flex items-center gap-3 mb-5">
           <span className="inline-flex h-px w-10 bg-steam-dark/40" />
-          <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/60 font-semibold">
-            §3 · Galimybės
+          <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/70 font-semibold">
+            §2 · Galimybės
           </span>
         </div>
         <h2 className="text-display-sm md:text-display-md text-steam-dark leading-[0.98] tracking-tight">

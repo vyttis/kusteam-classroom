@@ -28,8 +28,8 @@ export function ForWhomSection() {
           <div className="mb-14">
             <div className="flex items-center gap-3 mb-5">
               <span className="inline-flex h-px w-10 bg-steam-dark/40" />
-              <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/60 font-semibold">
-                §2 · Kam
+              <span className="text-xs uppercase tracking-[0.22em] text-steam-dark/70 font-semibold">
+                §1 · Kam
               </span>
             </div>
             <h2
@@ -44,9 +44,9 @@ export function ForWhomSection() {
               className="text-base md:text-lg text-muted-foreground mt-6 max-w-xl leading-relaxed text-pretty"
             >
               Įrankis skirtas Klaipėdos universiteto STEAM metodinio centro partnerių
-              tinklo mokytojams: pradinio, pagrindinio ir vidurinio ugdymo. Atitinka
-              Lietuvos bendrąją ugdymo programą (BUP): 24 dalykai, 1–12 klasės,
-              6 bendrosios kompetencijos.
+              tinklo mokytojams. Užduotys gali padėti taikyti dalyko žinias,
+              bendradarbiauti, argumentuoti ir vertinti DI pasiūlymus. Kokias
+              kompetencijas ugdys pamoka, priklauso nuo mokytojo parinkto turinio ir aptarimo.
             </p>
           </div>
 
@@ -57,7 +57,7 @@ export function ForWhomSection() {
                 key={index}
                 className="group relative grid grid-cols-[auto_1fr] gap-5 py-6 border-t border-border/60 last:border-b last:border-b-border/60"
               >
-                <div className="numeral-display text-2xl font-medium text-steam-dark/30 pt-1.5 tabular-nums">
+                <div className="numeral-display text-2xl font-medium text-steam-dark/70 pt-1.5 tabular-nums">
                   0{index + 1}
                 </div>
                 <div>
