@@ -328,9 +328,9 @@ Vyčio sąlyginis leidimas tik A etapui (DB): taikyti, jei visos patikros žalio
 
 Liko:
 
-- Vytis prisijungia testine mokytojo paskyra ir mato juodraštį „TEAM-006 patikra“. Po to juodraštis pašalinamas.
-- 9 žingsnis (pasiūlymas tampa migracija `20261109211700_team_sso.sql`) daromas kartu su TEAM: TEAM darbas `SSO E2E (TEAM -> CLASSROOM)` paleidžia CLASSROOM migracijas ir ant jų taiko savo TEAM-006 kopiją, todėl perkėlus failą reikia pakeisti ir jį. Iki tol produkcija lyginama su `fingerprint-after.expected` (`function` `40\|1f98d3c00fb11c1193271d57751b066d`), ne su `schema-fingerprint.expected`.
-- Jungikliai išjungti. B etapas (`kusteam-ai-lab` `docs/TEAM-SSO-LAUNCH.md`) tik su atskiru Vyčio leidimu.
+- Vytis prisijungė testine mokytojo paskyra ir matė juodraštį (2026-11-10). Juodraštis „TEAM-006 patikra“ ištrintas 2026-11-11, po B1 bandymų produkcijoje (`kusteam-ai-lab` `docs/STATUS.md`).
+- 9 žingsnis (pasiūlymas tampa migracija `20261109211700_team_sso.sql`, `kusteam-ai-lab` BACKLOG TEAM-009) daromas kartu su TEAM: TEAM darbas `SSO E2E (TEAM -> CLASSROOM)` paleidžia CLASSROOM migracijas ir ant jų taiko savo TEAM-006 kopiją, todėl perkėlus failą reikia pakeisti ir jį. Iki tol produkcija lyginama su `fingerprint-after.expected` (`function` `40\|1f98d3c00fb11c1193271d57751b066d`), ne su `schema-fingerprint.expected`.
+- B1 (CLASSROOM jungikliai) įjungta 2026-11-10 ir priimta produkcijoje 2026-11-11. B2 (WATER LAB) tik su atskiru Vyčio leidimu.
 
 ## Schemos atspaudas
 
