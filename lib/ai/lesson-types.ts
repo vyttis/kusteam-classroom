@@ -6,6 +6,7 @@ export type Competency =
   | "kulturine"
   | "kurybiskumo"
   | "pilietiskumo"
+  | "skaitmenine"
   | "socialine_emocine_ir_sveikos_gyvensenos"
 
 export type BloomLevel =
@@ -22,7 +23,8 @@ export const COMPETENCY_LABELS: Record<Competency, string> = {
   kulturine: "Kultūrinė",
   kurybiskumo: "Kūrybiškumo",
   pilietiskumo: "Pilietiškumo",
-  socialine_emocine_ir_sveikos_gyvensenos: "Socialinė-emocinė ir sveikos gyvensenos",
+  skaitmenine: "Skaitmeninė",
+  socialine_emocine_ir_sveikos_gyvensenos: "Socialinė, emocinė ir sveikos gyvensenos",
 }
 
 export const BLOOM_LABELS: Record<BloomLevel, string> = {
