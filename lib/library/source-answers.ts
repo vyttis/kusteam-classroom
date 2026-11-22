@@ -66,13 +66,26 @@ export function matchSourceChallenges<T extends SourceChallenge>(snapshots: Snap
  * The published activity's tasks, matched to the snapshot. Missing source
  * activity or a failed read gives no matches (the copies then need answers),
  * never an error.
+ *
+ * Answers are read with the service role, so the source must belong to the
+ * account that published the item: any active facilitator can insert a
+ * library item with an arbitrary source_game_id, and without this check an
+ * approved item would hand out another facilitator's answers and explanations.
  */
 export async function sourceAnswers(
   admin: SupabaseClient,
   sourceGameId: string | null | undefined,
+  publishedBy: string | null | undefined,
   snapshots: SnapshotKey[],
 ): Promise<(SourceChallenge | null)[]> {
-  if (!sourceGameId) return snapshots.map(() => null)
+  if (!sourceGameId || !publishedBy) return snapshots.map(() => null)
+  const { data: owned, error: ownerError } = await admin
+    .from("games")
+    .select("id")
+    .eq("id", sourceGameId)
+    .eq("teacher_id", publishedBy)
+    .maybeSingle()
+  if (ownerError || !owned) return snapshots.map(() => null)
   const read = (columns: string) =>
     admin.from("challenges").select(columns).eq("game_id", sourceGameId) as unknown as PromiseLike<{
       data: SourceChallenge[] | null

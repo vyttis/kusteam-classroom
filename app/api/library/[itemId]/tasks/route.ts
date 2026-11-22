@@ -31,7 +31,7 @@ export async function POST(request: Request, props: { params: Promise<{ itemId: 
 
   const { data: item } = await supabase
     .from("library_items")
-    .select("id, source_game_id, challenge_data")
+    .select("id, source_game_id, published_by, challenge_data")
     .eq("id", itemId)
     .eq("status", "approved")
     .maybeSingle()
@@ -46,7 +46,7 @@ export async function POST(request: Request, props: { params: Promise<{ itemId: 
     .maybeSingle()
   if (!game) return NextResponse.json({ error: "Veikla nerasta" }, { status: 404 })
 
-  const [source] = await sourceAnswers(createAdminClient(), item.source_game_id, [snapshot])
+  const [source] = await sourceAnswers(createAdminClient(), item.source_game_id, item.published_by, [snapshot])
   // Participants would see a task nobody can solve.
   if (!source && isLiveStatus(game.status)) {
     return NextResponse.json({ error: LIVE_EDIT_BLOCKED.needsAnswer, code: "live" }, { status: 409 })

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { matchSourceChallenges, type SourceChallenge } from "@/lib/library/source-answers"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { matchSourceChallenges, sourceAnswers, type SourceChallenge } from "@/lib/library/source-answers"
 
 function source(over: Partial<SourceChallenge>): SourceChallenge {
   return {
@@ -65,5 +66,55 @@ describe("matchSourceChallenges", () => {
   it("skips source tasks that have no real answer", () => {
     const out = matchSourceChallenges([{ title: "A", type: "text", order_index: 0 }], [source({ id: "a", title: "A", needs_answer: true })])
     expect(out[0]).toBeNull()
+  })
+})
+
+/** A service-role client stand-in: one activity with one task, owned by `owner`. */
+function fakeAdmin(owner: string, tasks: SourceChallenge[]) {
+  const reads: string[] = []
+  const client = {
+    from(table: string) {
+      reads.push(table)
+      const filters: Record<string, string> = {}
+      const chain = {
+        select: () => chain,
+        eq(column: string, value: string) {
+          filters[column] = value
+          return chain
+        },
+        maybeSingle: async () => ({
+          data: table === "games" && filters.id === "game-1" && filters.teacher_id === owner ? { id: "game-1" } : null,
+          error: null,
+        }),
+        then(resolve: (v: { data: SourceChallenge[] | null; error: null }) => void) {
+          resolve({ data: table === "challenges" && filters.game_id === "game-1" ? tasks : [], error: null })
+        },
+      }
+      return chain
+    },
+  }
+  return { client: client as unknown as SupabaseClient, reads }
+}
+
+describe("sourceAnswers", () => {
+  const snapshot = [{ title: "Upė", type: "text", order_index: 0 }]
+
+  it("copies answers when the publisher owns the source activity", async () => {
+    const { client } = fakeAdmin("teacher-a", [source({})])
+    const out = await sourceAnswers(client, "game-1", "teacher-a", snapshot)
+    expect(out[0]?.answer_hash).toBe("$2b$10$hash")
+  })
+
+  it("copies nothing from an activity the publisher does not own", async () => {
+    const { client, reads } = fakeAdmin("teacher-a", [source({})])
+    const out = await sourceAnswers(client, "game-1", "teacher-b", snapshot)
+    expect(out).toEqual([null])
+    expect(reads).not.toContain("challenges")
+  })
+
+  it("copies nothing without a publisher or a source", async () => {
+    const { client } = fakeAdmin("teacher-a", [source({})])
+    expect(await sourceAnswers(client, "game-1", null, snapshot)).toEqual([null])
+    expect(await sourceAnswers(client, null, "teacher-a", snapshot)).toEqual([null])
   })
 })
