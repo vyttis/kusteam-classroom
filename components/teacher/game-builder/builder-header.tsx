@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { GameStatus } from "@/types/game"
-import type { AiTaskToReview } from "@/components/teacher/ai-review"
+import type { AiTaskToReview } from "@/lib/game/ai-review"
 import { GameStatusActions } from "@/components/teacher/game-status-actions"
 import { QRDisplay } from "@/components/teacher/qr-display"
 import { Button } from "@/components/ui/button"

@@ -58,7 +58,7 @@ import {
 import { AlertTriangle, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { isLiveStatus } from "@/lib/game/live-edit"
-import { aiTasksToReview } from "@/components/teacher/ai-review"
+import { aiTasksToReview } from "@/lib/game/ai-review"
 
 interface GameBuilderProps {
   initialGame: {

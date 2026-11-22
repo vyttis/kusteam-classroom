@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { rpcRow } from "@/lib/supabase/rpc-row"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { AI_REVIEW_REQUIRED_MESSAGE, aiTasksToReview, type AiReviewCandidate } from "@/components/teacher/ai-review"
+import { AI_REVIEW_REQUIRED_MESSAGE, aiTasksToReview, type AiReviewCandidate } from "@/lib/game/ai-review"
 
 // Safe columns to return for challenges (never include answer_hash)
 const SAFE_CHALLENGE_SELECT = "id, game_id, title, description, type, points, hints, options, order_index, image_url, maps_url, created_at, updated_at"

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { GameStatus } from "@/types/game"
 import { Checkbox } from "@/components/ui/checkbox"
-import { aiVerdictLabel, type AiTaskToReview } from "@/components/teacher/ai-review"
+import { aiVerdictLabel, type AiTaskToReview } from "@/lib/game/ai-review"
 import {
   Play,
   Pause,

@@ -6,7 +6,7 @@ import {
   aiTasksToReview,
   aiVerdictLabel,
   isUnreviewedAiTask,
-} from "@/components/teacher/ai-review"
+} from "@/lib/game/ai-review"
 import {
   NETWORK_REASON,
   SESSION_ENDED_REASON,
