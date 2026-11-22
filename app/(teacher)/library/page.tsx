@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MyLibrarySubmissions } from "@/components/teacher/my-library-submissions"
 import { LibraryItem } from "@/types/game"
-import { BookOpen, Search, Loader2, Send } from "lucide-react"
+import { ArrowRight, BookOpen, Search, Loader2, Send, Sparkles } from "lucide-react"
+import Link from "next/link"
 
 const subjects = [
   { value: "all", label: "Visi dalykai" },
@@ -87,6 +88,20 @@ export default function LibraryPage() {
           </p>
         </div>
       </div>
+
+      <Link
+        href="/paruostos-veiklos"
+        className="group mb-6 flex items-center gap-3 rounded-xl border border-secondary/30 bg-card p-4 shadow-sm transition-colors hover:border-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Sparkles className="h-5 w-5 shrink-0 text-secondary-ink" aria-hidden="true" />
+        <span className="flex-1">
+          <span className="block font-semibold text-steam-dark">Paruoštos veiklos</span>
+          <span className="block text-sm text-muted-foreground">
+            Pasirinkite pagal dalyką ir klasę: užduotys, atsakymai ir pastabos vedėjui jau parengti.
+          </span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-secondary-ink transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </Link>
 
       <Tabs defaultValue="public">
         <TabsList className="mb-6">
