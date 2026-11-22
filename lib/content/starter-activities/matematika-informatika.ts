@@ -7,12 +7,12 @@ const fractionsAndPercentages: StarterActivityInput = {
   slug: "matematika-5-6-trupmenos-procentai-muge",
   title: "Trupmenos ir procentai mokyklos mugėje",
   description:
-    "Komandos skaičiuoja mokyklos mugės pirkinius, nuolaidas ir pardavimus: randa skaičiaus dalį, procentus ir visą kiekį pagal jo dalį.",
+    "Komandos skaičiuoja mokyklos mugės pirkinius, nuolaidas ir pardavimus: randa skaičiaus dalį, procentus ir visą kiekį pagal jo dalį. Skirta klasei, kuri jau mokėsi procentų.",
   subject: "Matematika",
   grade_band: "5-6 kl.",
   duration_minutes: 30,
   curriculum:
-    "Matematikos bendroji programa (2022), 5-6 klasės. Sritis „Skaičiai ir skaičiavimai“: paprastosios ir dešimtainės trupmenos, procentai, skaičiaus dalies ir procentų radimas, skaičiaus radimas pagal jo dalį.",
+    "Matematikos bendroji programa (2022). Sritis „Skaičiai ir skaičiavimai“: paprastosios ir dešimtainės trupmenos, procentai, skaičiaus dalies ir procentų radimas, skaičiaus radimas pagal jo dalį.",
   learning_goals: [
     "Rasti skaičiaus dalį, kai dalis nurodyta trupmena arba procentais.",
     "Palyginti dalis, užrašytas paprastąja trupmena, dešimtaine trupmena ir procentais.",
@@ -20,7 +20,7 @@ const fractionsAndPercentages: StarterActivityInput = {
   ],
   teacher_notes: {
     before:
-      "Suskirstykite mokinius į komandas po 2-4. Kiekvienai komandai reikia popieriaus lapo ir pieštuko, skaičiuotuvai nenaudojami. Priminkite, kad 1 % yra šimtoji skaičiaus dalis. Susitarkite: atsakymas įvedamas tik tada, kai jam pritaria visa komanda. Pasakykite, kad užuomina kainuoja taškų, todėl pirmiausia verta pasitarti.",
+      "Suskirstykite mokinius į komandas po 2-4. Kiekvienai komandai reikia popieriaus lapo ir pieštuko, skaičiuotuvai nenaudojami. Mokiniai jau turi mokėti rasti skaičiaus dalį ir būti mokęsi procentų (paprastai tai 6 klasė). Priminkite, kad 1 % yra šimtoji skaičiaus dalis. Susitarkite: atsakymas įvedamas tik tada, kai jam pritaria visa komanda. Pasakykite, kad užuomina kainuoja taškų, todėl pirmiausia verta pasitarti.",
     during:
       "Stebėkite, ar komandos užsirašo tarpinius skaičiavimus, ar spėlioja. Užduotyje „Kas liko piniginėje?“ dalis mokinių 30 % skaičiuos nuo likučio, o ne nuo visos sumos: paprašykite dar kartą perskaityti sąlygą. Paskutinėje užduotyje paklauskite, kurią visų sausainių dalį sudaro likę 12 sausainių.",
     after:
@@ -92,11 +92,10 @@ const fractionsAndPercentages: StarterActivityInput = {
     {
       title: "Sąsiuvinis su nuolaida",
       description:
-        "Sąsiuvinis kainuoja 2,40 €. Mugės dieną jam taikoma 25 % nuolaida. Kiek eurų kainuoja sąsiuvinis su nuolaida? Atsakymą įrašykite dešimtaine trupmena, eurais (tik skaičių).",
+        "Sąsiuvinis kainuoja 2,40 €. Mugės dieną jam taikoma 25 % nuolaida. Kiek eurų kainuoja sąsiuvinis su nuolaida? Atsakymą įrašykite eurais, dešimtaine trupmena (tik skaičių, be ženklo €).",
       type: "number",
       points: 150,
       correct_answer: "1,8",
-      accepted_answers: ["1,80"],
       hints: [
         "Klausiama naujos kainos, o ne nuolaidos dydžio.",
         "25 % yra ketvirtadalis. Raskite ketvirtadalį kainos: tai nuolaida eurais.",
@@ -104,7 +103,7 @@ const fractionsAndPercentages: StarterActivityInput = {
       ],
       options: null,
       explanation:
-        "Nuolaida yra ketvirtadalis kainos: 2,40 : 4 = 0,60 €. Nauja kaina: 2,40 - 0,60 = 1,80 €. Galima ir kitaip: lieka 75 % kainos, tai yra 3 · 0,60 = 1,80 €. Dažna klaida: atsakyti 0,60, nors tai tik nuolaidos dydis.",
+        "Nuolaida yra ketvirtadalis kainos: 2,40 : 4 = 0,60 €. Nauja kaina: 2,40 − 0,60 = 1,80 €. Galima ir kitaip: lieka 75 % kainos, tai yra 3 · 0,60 = 1,80 €. Dažna klaida: atsakyti 0,60, nors tai tik nuolaidos dydis.",
       difficulty: "medium",
       cognitive_level: "apply",
     },
@@ -122,7 +121,7 @@ const fractionsAndPercentages: StarterActivityInput = {
       ],
       options: null,
       explanation:
-        "Knyga: 40 : 4 = 10 €. Užkandžiai: 10 % yra 4 €, todėl 30 % yra 12 €. Liko 40 - 10 - 12 = 18 €. Patikrinimas: išleista 25 % + 30 % = 55 %, liko 45 % nuo 40 €, tai yra 18 €. Dažna klaida: 30 % skaičiuoti nuo likusių 30 €.",
+        "Knyga: 40 : 4 = 10 €. Užkandžiai: 10 % yra 4 €, todėl 30 % yra 12 €. Liko 40 − 10 − 12 = 18 €. Patikrinimas: išleista 25 % + 30 % = 55 %, liko 45 % visos sumos, tai yra 18 €. Dažna klaida: 30 % skaičiuoti nuo likusių 30 €.",
       difficulty: "medium",
       cognitive_level: "apply",
     },
@@ -140,7 +139,7 @@ const fractionsAndPercentages: StarterActivityInput = {
       ],
       options: null,
       explanation:
-        "Liko 100 % - 80 % = 20 % sausainių, tai yra 12 vienetų. 20 % yra penktadalis, todėl iškepta 12 · 5 = 60 sausainių, parduota 60 - 12 = 48. Gauta 48 · 0,50 = 24 €. Dažna klaida: manyti, kad 12 sausainių yra 80 %, arba skaičiuoti pinigus už visus iškeptus sausainius.",
+        "Liko 100 % − 80 % = 20 % sausainių, tai yra 12 vienetų. 20 % yra penktadalis, todėl iškepta 12 · 5 = 60 sausainių, parduota 60 − 12 = 48. Gauta 48 · 0,50 = 24 €. Dažna klaida: manyti, kad 12 sausainių yra 80 %, arba skaičiuoti pinigus už visus iškeptus sausainius.",
       difficulty: "hard",
       cognitive_level: "analyse",
     },
@@ -227,9 +226,9 @@ const proportionsAndScale: StarterActivityInput = {
         "Kelias abi dienas tas pats. Pagalvokite, kaip susiję greitis ir laikas, kai kelias nesikeičia.",
         "Kelias lygus greičio ir laiko sandaugai. Jei vienas daugiklis sumažėja, kaip turi pasikeisti kitas, kad sandauga liktų ta pati?",
       ],
-      options: ["Sutrumpėja 2 kartus", "Nepasikeičia", "Pailgėja 2 kartus", "Pailgėja 2 valandomis"],
+      options: ["Sutrumpėja 2 kartus", "Nepasikeičia", "Pailgėja 2 kartus", "Pailgėja 4 kartus"],
       explanation:
-        "Kai kelias tas pats, greitis ir laikas yra atvirkščiai proporcingi: jų sandauga pastovi. Greičiui sumažėjus 2 kartus, laikas pailgėja 2 kartus. Dažna klaida: painioti „kartus“ su „valandomis“ arba manyti, kad mažėjant greičiui trumpėja ir laikas.",
+        "Kai kelias tas pats, greitis ir laikas yra atvirkščiai proporcingi: jų sandauga pastovi. Greičiui sumažėjus 2 kartus, laikas pailgėja 2 kartus. Dažna klaida: manyti, kad mažėjant greičiui trumpėja ir laikas, nes abu dydžiai „mažėja kartu“.",
       difficulty: "medium",
       cognitive_level: "understand",
     },
@@ -242,8 +241,8 @@ const proportionsAndScale: StarterActivityInput = {
       correct_answer: "15",
       hints: [
         "Kuo ilgesnis kelias, tuo daugiau degalų: dydžiai tiesiogiai proporcingi.",
-        "Sudarykite proporciją: 100 km atitinka 6 l, 250 km atitinka x l.",
-        "Galite skaičiuoti ir dalimis: kiek degalų reikia 50 km? Kiek kartų po 50 km telpa į visą maršrutą?",
+        "Sudarykite proporciją: kelių santykis lygus degalų kiekių santykiui.",
+        "Galite skaičiuoti ir dalimis: raskite, kiek degalų reikia patogiai kelio daliai, ir kiek tokių dalių sudaro visą maršrutą.",
       ],
       options: null,
       explanation:
@@ -294,12 +293,12 @@ const pythagoreanTheorem: StarterActivityInput = {
   slug: "matematika-9-10-pitagoro-teorema",
   title: "Pitagoro teorema: nuo kopėčių iki stogo",
   description:
-    "Komandos taiko Pitagoro teoremą praktinėse situacijose: randa įžambinę ir statinį, atpažįsta statųjį trikampį, skaičiuoja atstumą koordinačių plokštumoje ir plotą.",
+    "Komandos taiko Pitagoro teoremą praktinėse situacijose: randa įžambinę ir statinį, atpažįsta statųjį trikampį, skaičiuoja atstumą koordinačių plokštumoje ir plotą. Skirta teoremai pakartoti.",
   subject: "Matematika",
   grade_band: "9-10 kl.",
   duration_minutes: 35,
   curriculum:
-    "Matematikos bendroji programa (2022), 9-10 klasės. Sritis „Geometrija ir matavimai“: Pitagoro teoremos ir jai atvirkštinės teoremos kartojimas ir taikymas stačiojo trikampio, atstumo tarp taškų ir ploto uždaviniuose.",
+    "Matematikos bendroji programa (2022). Sritis „Geometrija ir matavimai“: Pitagoro teoremos ir jai atvirkštinės teoremos taikymas stačiojo trikampio, atstumo tarp taškų ir ploto uždaviniuose. Teorema įrodoma anksčiau, čia ji kartojama.",
   learning_goals: [
     "Pagal Pitagoro teoremą apskaičiuoti stačiojo trikampio įžambinę arba statinį.",
     "Patikrinti, ar trikampis su duotais kraštinių ilgiais yra statusis.",
@@ -307,7 +306,7 @@ const pythagoreanTheorem: StarterActivityInput = {
   ],
   teacher_notes: {
     before:
-      "Suskirstykite mokinius į komandas po 2-4. Reikia popieriaus (geriausia languoto), pieštuko ir liniuotės brėžiniams, skaičiuotuvai nenaudojami. Prieš pradėdami kartu prisiminkite skaičių nuo 1 iki 20 kvadratus arba leiskite komandoms pasidaryti jų lentelę. Susitarkite: kiekvienai žodinei užduočiai komanda pirmiausia nusibraižo brėžinį.",
+      "Suskirstykite mokinius į komandas po 2-4. Reikia popieriaus (geriausia languoto), pieštuko ir liniuotės brėžiniams, skaičiuotuvai nenaudojami. Mokiniai Pitagoro teoremą jau turi būti mokęsi: veikla ją kartoja, o ne pristato. Prieš pradėdami kartu prisiminkite skaičių nuo 1 iki 20 kvadratus arba leiskite komandoms pasidaryti jų lentelę. Susitarkite: kiekvienai žodinei užduočiai komanda pirmiausia nusibraižo brėžinį.",
     during:
       "Stebėkite, ar komandos braižo brėžinius ir pažymi, kuri kraštinė yra įžambinė. Užduotyje „Gaisrininkų kopėčios“ dalis mokinių kvadratus sudės, nors reikia atimti: paklauskite, kuri kraštinė ilgiausia. Paskutinėje užduotyje nesakykite, kad reikia aukštinės: užtenka klausimo „Ko trūksta plotui apskaičiuoti?“",
     after:
@@ -335,7 +334,7 @@ const pythagoreanTheorem: StarterActivityInput = {
         "Pitagoro teorema sieja kraštinių ilgių kvadratus, ne pačius ilgius.",
         "Įžambinė yra ilgiausia stačiojo trikampio kraštinė, todėl jos kvadratas lygybėje stovi vienas.",
       ],
-      options: ["a + b = c", "a² + c² = b²", "a² + b² = c²", "a² - b² = c²"],
+      options: ["a + b = c", "a² + c² = b²", "a² + b² = c²", "a² − b² = c²"],
       explanation:
         "Pitagoro teorema: stačiojo trikampio įžambinės kvadratas lygus statinių kvadratų sumai, a² + b² = c². Dažna klaida: sudėti pačius ilgius (a + b = c) arba supainioti, kuri kraštinė yra įžambinė.",
       difficulty: "easy",
@@ -351,7 +350,7 @@ const pythagoreanTheorem: StarterActivityInput = {
       hints: [
         "Įstrižainė dalija stačiakampį į du stačiuosius trikampius. Kuri trikampio kraštinė yra įstrižainė?",
         "Įžambinės kvadratas lygus statinių kvadratų sumai.",
-        "Apskaičiuokite 9² + 12² ir ištraukite kvadratinę šaknį.",
+        "Sudėję statinių kvadratus, dar nebaigėte: gavote įžambinės kvadratą, o ne ilgį.",
       ],
       options: null,
       explanation:
@@ -385,12 +384,12 @@ const pythagoreanTheorem: StarterActivityInput = {
       correct_answer: "12",
       hints: [
         "Nusibraižykite brėžinį: siena, žemė ir kopėčios sudaro statųjį trikampį. Kuri kraštinė yra įžambinė?",
-        "Kopėčios yra įžambinė, todėl ieškote statinio. Statinio kvadratas lygus įžambinės kvadrato ir kito statinio kvadrato skirtumui.",
-        "Apskaičiuokite 13² - 5² ir ištraukite kvadratinę šaknį.",
+        "Kopėčios yra ilgiausia trikampio kraštinė, todėl ieškote ne įžambinės, o statinio.",
+        "Statinio kvadratas lygus įžambinės kvadrato ir kito statinio kvadrato skirtumui. Nepamirškite ištraukti šaknies.",
       ],
       options: null,
       explanation:
-        "Kopėčios yra įžambinė, siena ir žemė yra statiniai. Aukštis: √(13² - 5²) = √(169 - 25) = √144 = 12 m. Dažna klaida: kvadratus sudėti (169 + 25), tarsi būtų ieškoma įžambinės, arba tiesiog atimti 13 - 5.",
+        "Kopėčios yra įžambinė, siena ir žemė yra statiniai. Aukštis: √(13² − 5²) = √(169 − 25) = √144 = 12 m. Dažna klaida: kvadratus sudėti (169 + 25), tarsi būtų ieškoma įžambinės, arba tiesiog atimti 13 − 5.",
       difficulty: "medium",
       cognitive_level: "apply",
     },
@@ -408,7 +407,7 @@ const pythagoreanTheorem: StarterActivityInput = {
       ],
       options: null,
       explanation:
-        "Statiniai: 15 - 3 = 12 ir 18 - 2 = 16 vienetų. Įžambinė: √(12² + 16²) = √(144 + 256) = √400 = 20 vienetų. Tikrasis atstumas: 20 · 100 = 2000 m. Dažna klaida: sudėti statinius (12 + 16 = 28) arba pamiršti vienetus paversti metrais.",
+        "Statiniai: 15 − 3 = 12 ir 18 − 2 = 16 vienetų. Įžambinė: √(12² + 16²) = √(144 + 256) = √400 = 20 vienetų. Tikrasis atstumas: 20 · 100 = 2000 m. Dažna klaida: sudėti statinius (12 + 16 = 28) arba pamiršti vienetus paversti metrais.",
       difficulty: "medium",
       cognitive_level: "apply",
     },
@@ -426,7 +425,7 @@ const pythagoreanTheorem: StarterActivityInput = {
       ],
       options: null,
       explanation:
-        "Aukštinė dalija pagrindą pusiau: 16 : 2 = 8 m. Aukštinė: √(10² - 8²) = √(100 - 64) = √36 = 6 m. Plotas: 16 · 6 : 2 = 48 m². Dažna klaida: aukštine laikyti šoninę kraštinę (16 · 10 : 2 = 80) arba pamiršti padalyti iš 2.",
+        "Aukštinė dalija pagrindą pusiau: 16 : 2 = 8 m. Aukštinė: √(10² − 8²) = √(100 − 64) = √36 = 6 m. Plotas: 16 · 6 : 2 = 48 m². Dažna klaida: aukštine laikyti šoninę kraštinę (16 · 10 : 2 = 80) arba pamiršti padalyti iš 2.",
       difficulty: "hard",
       cognitive_level: "analyse",
     },
@@ -442,7 +441,7 @@ const algorithmsAndBinary: StarterActivityInput = {
   grade_band: "7-8 kl.",
   duration_minutes: 30,
   curriculum:
-    "Informatikos bendroji programa (2022), 7-8 klasės. Sritis „Algoritmai ir programavimas“: algoritmo samprata, nuoseklūs veiksmai, šakojimas ir kartojimas, algoritmo vykdymas; duomenų kodavimas dvejetainiais skaičiais.",
+    "Informatikos bendroji programa (2022). Sritis „Algoritmai ir programavimas“: algoritmo samprata, nuoseklūs veiksmai, šakojimas ir kartojimas, algoritmo vykdymas. Papildomai: skaičių užrašymas dvejetainėje sistemoje.",
   learning_goals: [
     "Įvykdyti algoritmą su kartojimu ir šakojimu žingsnis po žingsnio ir nustatyti jo rezultatą.",
     "Paversti skaičių iš dvejetainės sistemos į dešimtainę ir atgal.",
@@ -450,7 +449,7 @@ const algorithmsAndBinary: StarterActivityInput = {
   ],
   teacher_notes: {
     before:
-      "Suskirstykite mokinius į komandas po 2-4. Kompiuterių nereikia: užtenka popieriaus ir pieštuko. Lentoje užrašykite dvejetainių skaitmenų vertes 16, 8, 4, 2, 1 ir vienu pavyzdžiu parodykite, kaip jos sudedamos (pavyzdžiui, 101 yra 4 + 1 = 5). Patarkite komandoje paskirti vykdytoją, kuris skaito žingsnius, ir tikrintoją, kuris reikšmes užrašo lentelėje.",
+      "Suskirstykite mokinius į komandas po 2-4. Kompiuterių nereikia: užtenka popieriaus ir pieštuko. Išankstinių žinių apie dvejetainę sistemą nereikia. Lentoje užrašykite dvejetainių skaitmenų vertes 16, 8, 4, 2, 1 ir vienu pavyzdžiu parodykite, kaip jos sudedamos (pavyzdžiui, 101 yra 4 + 1 = 5). Patarkite komandoje paskirti vykdytoją, kuris skaito žingsnius, ir tikrintoją, kuris reikšmes užrašo lentelėje.",
     during:
       "Stebėkite, ar komandos algoritmus vykdo raštu, žingsnis po žingsnio, ar bando atspėti mintyse. Jei užduotyje „Kiek kartų suksis ciklas?“ atsakymas skiriasi vienetu, paprašykite parodyti reikšmių seką ir paklauskite, ką komanda skaičiuoja: reikšmes ar veiksmus. Dvejetainėse užduotyse žiūrėkite, ar didžiausia vertė rašoma kairėje.",
     after:
