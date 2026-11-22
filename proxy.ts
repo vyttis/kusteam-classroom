@@ -346,6 +346,7 @@ export async function proxy(request: NextRequest) {
     url.pathname.startsWith("/admin") ||
     url.pathname.startsWith("/library") ||
     url.pathname.startsWith("/lesson-plans") ||
+    url.pathname.startsWith("/paruostos-veiklos") ||
     url.pathname === "/slaptazodis"
 
   // Always let /auth/callback and /auth/confirm through (see above)
