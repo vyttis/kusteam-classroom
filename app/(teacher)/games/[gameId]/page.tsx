@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { GameStatus, GameSettings, Challenge, LibraryItemStatus } from "@/types/game"
 import { computeDetailedStats } from "@/lib/game/detailed-stats"
+import { aiTasksToReview } from "@/components/teacher/ai-review"
 import { QRDisplay } from "@/components/teacher/qr-display"
 import { GameStatusActions } from "@/components/teacher/game-status-actions"
 import { GameStatusWatcher } from "@/components/teacher/game-status-watcher"
@@ -149,7 +150,7 @@ export default async function GameDetailPage(
               0
             )}
           </p>
-          <p className="text-xs text-muted-foreground">Viso taškų</p>
+          <p className="text-xs text-muted-foreground">Iš viso taškų</p>
         </CardContent>
       </Card>
       <Card className="border-border/50 bg-white">
@@ -250,7 +251,7 @@ export default async function GameDetailPage(
     <Card className="border-border/50 bg-white">
       <CardContent className="p-4 space-y-3 text-sm">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Sukurtas</span>
+          <span className="text-muted-foreground">Sukurta</span>
           <span className="text-steam-dark font-medium">
             {new Date(game.created_at).toLocaleDateString("lt-LT", { timeZone: "Europe/Vilnius" })}
           </span>
@@ -313,6 +314,7 @@ export default async function GameDetailPage(
             status={status}
             challengeCount={challenges.length}
             tasksNeedingAnswer={tasksNeedingAnswer}
+            aiTasksToReview={isDraft ? aiTasksToReview(challenges) : []}
           />
           {isLive && (
             <Button

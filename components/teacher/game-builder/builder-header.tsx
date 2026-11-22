@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { GameStatus } from "@/types/game"
+import type { AiTaskToReview } from "@/components/teacher/ai-review"
 import { GameStatusActions } from "@/components/teacher/game-status-actions"
 import { QRDisplay } from "@/components/teacher/qr-display"
 import { Button } from "@/components/ui/button"
@@ -27,14 +28,17 @@ interface BuilderHeaderProps {
   // Tasks still lacking a confirmed answer — the start dialog must warn about
   // them, otherwise the server rejects activation with a raw error toast
   tasksNeedingAnswer?: { id: string; title: string }[]
+  /** DI-made tasks whose answer nobody confirmed: the start dialog lists them. */
+  aiTasksToReview?: AiTaskToReview[]
+  onOpenTask?: (taskId: string) => void
   onOpenSettings: () => void
 }
 
 const statusLabels: Record<GameStatus, string> = {
   draft: "Juodraštis",
-  active: "Aktyvus",
-  paused: "Pristabdytas",
-  finished: "Baigtas",
+  active: "Vyksta",
+  paused: "Pristabdyta",
+  finished: "Baigta",
 }
 
 const statusColors: Record<GameStatus, string> = {
@@ -49,6 +53,8 @@ export function BuilderHeader({
   challengeCount,
   totalPoints,
   tasksNeedingAnswer = [],
+  aiTasksToReview = [],
+  onOpenTask,
   onOpenSettings,
 }: BuilderHeaderProps) {
   const [launchOpen, setLaunchOpen] = useState(false)
@@ -107,6 +113,8 @@ export function BuilderHeader({
               status={game.status}
               challengeCount={challengeCount}
               tasksNeedingAnswer={tasksNeedingAnswer}
+              aiTasksToReview={aiTasksToReview}
+              onOpenTask={onOpenTask}
             />
             {/* Shows the join QR and code only. It used to say "Paleisti" next
                 to "Pradėti veiklą", and facilitators took it for the start. */}
