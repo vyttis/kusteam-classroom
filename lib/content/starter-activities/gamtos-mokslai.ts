@@ -25,7 +25,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       during:
         "Stebėkite, ar komandos nespėlioja: paprašykite, kad vienas narys kitiems garsiai paaiškintų, kodėl pasirinko atsakymą. Skaičiavimo užduotyje dažna klaida: atimamas tik antros dienos kiekis. Priminkite, kad užuomina kainuoja taškų, todėl pirmiausia verta pasitarti komandoje.",
       after:
-        "Aptarkite tris dažnas klaidas. Pirma: debesis nėra vandens garai. Garai nematomi, o debesį matome, nes jį sudaro lašeliai ir ledo kristalėliai. Antra: vanduo garuoja ne tik verdamas, bet esant bet kokiai temperatūrai. Trečia: vanduo gamtoje nedingsta, tik keičia būseną ir vietą. Paprašykite komandų lentoje nupiešti apytakos ratą ir rodyklėmis pažymėti garavimą, kondensaciją, kritulius ir nuotėkį upėmis.",
+        "Aptarkite tris dažnas klaidas. Pirma: debesis nėra vandens garai. Garai nematomi, o debesį matome, nes jį sudaro lašeliai ir ledo kristalėliai. Antra: vanduo garuoja ne tik verdamas, bet ir esant bet kokiai temperatūrai. Trečia: vanduo gamtoje nedingsta, tik keičia būseną ir vietą. Paprašykite komandų lentoje nupiešti apytakos ratą ir rodyklėmis pažymėti garavimą, kondensaciją, kritulius ir nuotėkį upėmis.",
     },
     reflection_questions: [
       "Kuri užduotis sukėlė daugiausia ginčų komandoje ir kaip susitarėte dėl atsakymo?",
@@ -34,7 +34,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     ],
     sources: [
       "5 klasės gamtos mokslų vadovėlio temos apie vandens būsenas ir vandens apytakos ratą.",
-      "Visuotinė lietuvių enciklopedija (vle.lt): straipsniai „Vandens apytaka“, „Debesys“, „Neris“, „Nemunas“, „Kuršių marios“.",
+      "Visuotinė lietuvių enciklopedija (vle.lt): straipsniai apie vandens apytaką, debesis, Nerį, Nemuną ir Kuršių marias.",
       "Lietuvos hidrometeorologijos tarnybos švietėjiška informacija apie debesis ir kritulius.",
     ],
     challenges: [
@@ -62,7 +62,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         type: "text",
         points: 100,
         correct_answer: "kondensacija",
-        accepted_answers: ["kondensavimasis", "kondensavimas", "kondensuojasi", "skystėjimas"],
+        accepted_answers: ["kondensavimasis", "kondensavimas", "kondensuojasi"],
         hints: [
           "Šis reiškinys yra priešingas garavimui.",
           "Tas pats vyksta, kai po dušo aprasoja šaltas veidrodis.",
@@ -77,7 +77,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Lašo kelionė iš Vilniaus",
         description:
-          "Lietaus lašas nukrito Vilniuje į Nerį. Kuriuo keliu jis nukeliaus iki jūros? Pasirinkite teisingą vandens telkinių eilę.",
+          "Lietaus lašas nukrito Vilniuje į Nerį. Kuriuo keliu jis nukeliaus iki jūros? Pasirinkite teisingą vandens telkinių eilę. Galite naudotis Lietuvos žemėlapiu.",
         type: "multiple_choice",
         points: 150,
         correct_answer: "Neris, Nemunas, Kuršių marios, Baltijos jūra",
@@ -132,7 +132,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         ],
         options: null,
         explanation:
-          "Antrą dieną išgaravo 2 · 30 = 60 ml. Per dvi dienas išgaravo 30 + 60 = 90 ml, todėl liko 200 - 90 = 110 ml. Antrą dieną vanduo garavo greičiau, nes buvo šilčiau, o pro atvirą langą judantis oras nunešdavo garus.",
+          "Antrą dieną išgaravo 2 · 30 = 60 ml. Per dvi dienas išgaravo 30 + 60 = 90 ml, todėl liko 200 − 90 = 110 ml. Antrą dieną vanduo garavo greičiau, nes buvo šilčiau, o pro atvirą langą judantis oras nunešdavo garus.",
         difficulty: "medium",
         cognitive_level: "apply",
       },
@@ -165,12 +165,12 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     slug: "mitybos-grandines-ir-tinklai",
     title: "Kas ką ėda: mitybos grandinės ir tinklai",
     description:
-      "Komandos nagrinėja Lietuvos miško, pievos ir Baltijos jūros mitybos ryšius: atpažįsta gamintojus ir vartotojus, skaičiuoja energijos perdavimą ir numato, kas nutinka pasikeitus vienai grandžiai.",
+      "Komandos nagrinėja Lietuvos miško, pievos ir Baltijos jūros mitybos ryšius: atpažįsta gamintojus ir vartotojus, pagal duotą taisyklę skaičiuoja energijos perdavimą ir numato, kas nutinka pasikeitus vienai grandžiai.",
     subject: "Biologija",
     grade_band: "7-8 kl.",
     duration_minutes: 30,
     curriculum:
-      "Biologijos bendroji programa (2022), 7-8 klasės. Organizmų ir aplinkos ryšiai: ekosistemos, gamintojai, vartotojai ir skaidytojai, mitybos grandinės ir tinklai, energijos perdavimas mitybos lygmenimis.",
+      "Biologijos bendroji programa (2022). Organizmų ir aplinkos ryšiai: ekosistemos, gamintojai, vartotojai ir skaidytojai, mitybos grandinės ir tinklai. Energijos perdavimas skaičiuojamas pagal sąlygoje duotą taisyklę.",
     learning_goals: [
       "Atpažinti gamintojus ir skirtingų eilių vartotojus mitybos grandinėje ir tinkle.",
       "Apskaičiuoti, kiek energijos pasiekia tolesnį mitybos lygmenį, kai žinoma perduodama dalis.",
@@ -178,7 +178,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     ],
     teacher_notes: {
       before:
-        "Suskirstykite mokinius į komandas po 3 ar 4. Komandai reikia vieno telefono ir lapo, ant kurio ji galės braižyti grandines ir tinklą. Priminkite sąvokas: gamintojas, pirminis, antrinis ir tretinis vartotojas, skaidytojas. Susitarkite, kad paskutinės užduoties tinklą komanda pirmiausia nusibraižo ir tik tada atsako.",
+        "Suskirstykite mokinius į komandas po 3 ar 4. Komandai reikia vieno telefono ir lapo grandinėms ir tinklui braižyti. Priminkite sąvokas: gamintojas, vartotojas, skaidytojas. Užduotyse rašoma „pirminis, antrinis, tretinis vartotojas“: jei jūsų vadovėlyje vartojama „pirmos, antros, trečios eilės vartotojas“, pasakykite, kad tai tas pats. 10 % energijos taisyklės mokėti nereikia: ji duota sąlygoje kaip supaprastintas modelis.",
       during:
         "Stebėkite, kaip komandos braižo rodykles: dažnai jos nukreipiamos nuo plėšrūno į grobį. Energijos užduotyje žiūrėkite, ar mokiniai dalija iš 10 tiek kartų, kiek yra perėjimų, o ne lygmenų. Jei komanda ginčijasi dėl Baltijos jūros užduoties, paprašykite, kad kiekvieną grandį aptartų atskirai.",
       after:
@@ -191,10 +191,9 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       "Kodėl žmogaus veiklos poveikį vienai rūšiai sunku numatyti iš anksto?",
     ],
     sources: [
-      "7 ir 8 klasės biologijos vadovėlių temos apie ekosistemas, mitybos grandines, mitybos tinklus ir ekologines piramides.",
-      "Visuotinė lietuvių enciklopedija (vle.lt): straipsniai „Mitybos grandinė“, „Ekologinė piramidė“, „Baltasis gandras“, „Strimelė“.",
-      "Lietuvos jūrų muziejaus švietėjiška informacija apie Baltijos jūros gyvūnus: strimelę, menkę, pilkąjį ruonį.",
-      "Helsinkio komisijos (HELCOM) Baltijos jūros būklės apžvalgos: mitybos tinklo aprašymas.",
+      "Pagrindinio ugdymo biologijos vadovėlių temos apie ekosistemas, mitybos grandines, mitybos tinklus ir ekologines piramides.",
+      "Visuotinė lietuvių enciklopedija (vle.lt): straipsniai apie mitybos grandinę, ekologinę piramidę, baltąjį gandrą, strimelę ir menkę.",
+      "Baltijos jūros grandinė ir energijos kiekiai yra supaprastinti sąlygos duomenys, o ne išmatuoti dydžiai.",
     ],
     challenges: [
       {
@@ -217,14 +216,14 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Kas yra kas grandinėje?",
         description:
-          "Miško mitybos grandinė: ąžuolo lapai → vikšras → zylė → paukštvanagis. Pirminis vartotojas minta gamintojais, antrinis vartotojas minta pirminiais vartotojais. Kuris šios grandinės organizmas yra antrinis vartotojas? Įrašykite vieną žodį.",
+          "Miško mitybos grandinė: ąžuolo lapai → vikšras → zylė → paukštvanagis. Pirminis (pirmos eilės) vartotojas minta gamintojais, antrinis (antros eilės) vartotojas minta pirminiais vartotojais. Kuris šios grandinės organizmas yra antrinis vartotojas? Įrašykite vieną žodį.",
         type: "text",
         points: 100,
         correct_answer: "zylė",
         accepted_answers: ["zylės", "didžioji zylė"],
         hints: [
           "Pradėkite nuo gamintojo ir eikite rodyklių kryptimi.",
-          "Pirminis vartotojas yra tas, kuris ėda lapus. Jums reikia organizmo, kuris ėda jį.",
+          "Pirmiausia nustatykite, kuris organizmas yra pirminis vartotojas. Antrinio ieškokite iš karto po jo.",
         ],
         options: null,
         explanation:
@@ -257,7 +256,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Kiek energijos pasiekia viršūnę?",
         description:
-          "Laikoma, kad iš vieno mitybos lygmens į kitą pereina maždaug 10 % energijos. Grandinė: ąžuolo lapai → vikšras → zylė → paukštvanagis. Ąžuolo lapuose sukaupta 20 000 kJ energijos. Kiek kilodžaulių šios energijos pasieks paukštvanagį, jei kiekviename perėjime perduodama lygiai 10 %? Įrašykite sveikąjį skaičių.",
+          "Tarkime, kad iš vieno mitybos lygmens į kitą pereina lygiai 10 % energijos (tai supaprastintas modelis). Grandinė: ąžuolo lapai → vikšras → zylė → paukštvanagis. Ąžuolo lapuose sukaupta 20 000 kJ energijos. Kiek kilodžaulių šios energijos pasieks paukštvanagį? Įrašykite sveikąjį skaičių.",
         type: "number",
         points: 200,
         correct_answer: "20",
@@ -268,7 +267,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         ],
         options: null,
         explanation:
-          "Vikšrai gauna 10 % nuo 20 000 kJ, tai yra 2000 kJ. Zylės gauna 200 kJ, o paukštvanagis 20 kJ. Likusi energija nedingsta: organizmai ją sunaudoja judėti, augti ir išskiria kaip šilumą. Todėl plėšrūnų grandinės viršūnėje visada būna nedaug.",
+          "Vikšrams atitenka 10 % lapų energijos, tai yra 2000 kJ. Zylėms atitenka 200 kJ, o paukštvanagiui 20 kJ. Likusi energija nedingsta: organizmai ją sunaudoja gyvybinei veiklai ir išskiria kaip šilumą. Todėl plėšrūnų grandinės viršūnėje paprastai būna nedaug.",
         difficulty: "medium",
         cognitive_level: "apply",
       },
@@ -297,7 +296,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Pievos mitybos tinklas",
         description:
-          "Nusibraižykite pievos mitybos tinklą pagal šiuos teiginius. Žiogas minta žole. Pelėnas minta žolių sėklomis ir šaknimis. Varlė minta žiogais. Baltasis gandras minta žiogais, varlėmis ir pelėnais. Lapė minta pelėnais. Antrinis vartotojas minta augalėdžiais, tretinis vartotojas minta antriniais vartotojais. Kuris gyvūnas šiame tinkle yra ir antrinis, ir tretinis vartotojas? Įrašykite vieną žodį.",
+          "Nusibraižykite pievos mitybos tinklą pagal šiuos teiginius. Žiogas minta žole. Pelėnas minta žolių sėklomis ir šaknimis. Varlė minta žiogais. Baltasis gandras minta žiogais, varlėmis ir pelėnais. Lapė minta pelėnais. Antrinis (antros eilės) vartotojas minta augalėdžiais, tretinis (trečios eilės) vartotojas minta antriniais vartotojais. Kuris gyvūnas šiame tinkle yra ir antrinis, ir tretinis vartotojas? Įrašykite vieną žodį.",
         type: "text",
         points: 250,
         correct_answer: "gandras",
@@ -305,7 +304,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         hints: [
           "Pirmiausia suraskite visus augalėdžius ir pažymėkite juos kaip pirminius vartotojus.",
           "Ieškokite gyvūno, kurio grobis priklauso skirtingiems mitybos lygmenims.",
-          "Patikrinkite, kas šiame tinkle ėda varles ir kuo dar tas gyvūnas minta.",
+          "Tretinis vartotojas turi misti bent vienu antriniu vartotoju. Kurie šio tinklo gyvūnai yra antriniai vartotojai?",
         ],
         options: null,
         explanation:
@@ -319,12 +318,12 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     slug: "greitis-kelias-laikas",
     title: "Greitis, kelias ir laikas: nuo dviračio iki žaibo",
     description:
-      "Komandos skaičiuoja greitį, kelią ir laiką kasdienėse situacijose, keičia matavimo vienetus, skaito judėjimo grafiką ir išsiaiškina, kodėl vidutinis greitis nėra greičių vidurkis.",
+      "Komandos skaičiuoja greitį, kelią ir laiką kasdienėse situacijose, keičia matavimo vienetus, skaito judėjimo grafiką ir išsiaiškina, kodėl vidutinis greitis nėra greičių vidurkis. 9-10 klasėse tinka kartojimui.",
     subject: "Fizika",
     grade_band: "9-10 kl.",
     duration_minutes: 30,
     curriculum:
-      "Fizikos bendroji programa (2022), 9-10 (I-II gimnazijos) klasės. Judėjimas ir jėgos: tolyginis tiesiaeigis judėjimas, greitis, vidutinis greitis, kelio priklausomybės nuo laiko grafikai.",
+      "Fizikos bendroji programa (2022). Judėjimas ir jėgos: tolyginis tiesiaeigis judėjimas, greitis, vidutinis greitis, kelio priklausomybės nuo laiko grafikai. Veikla skirta šioms sąvokoms pakartoti ir įtvirtinti.",
     learning_goals: [
       "Apskaičiuoti greitį, kelią arba laiką, kai žinomi kiti du dydžiai, ir pakeisti km/h į m/s.",
       "Iš kelio priklausomybės nuo laiko grafiko aprašymo nustatyti, kada kūnas judėjo greičiausiai ir kada stovėjo.",
@@ -332,7 +331,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     ],
     teacher_notes: {
       before:
-        "Suskirstykite mokinius į komandas po 2 ar 3. Komandai reikia vieno telefono, lapo ir rašiklio. Skaičiuotuvas nebūtinas: visi skaičiai parinkti taip, kad pakaktų skaičiuoti mintinai ar stulpeliu. Priminkite formulę v = s / t ir susitarkite, kad sprendimą komanda užsirašo ant lapo: jo prireiks aptarimui.",
+        "Suskirstykite mokinius į komandas po 2 ar 3. Komandai reikia vieno telefono, lapo ir rašiklio. Skaičiuotuvas nebūtinas: visi skaičiai parinkti taip, kad pakaktų skaičiuoti mintinai ar stulpeliu. Mokiniai jau turi būti skaičiavę greitį, kelią ir laiką ir matę kelio grafiką; pagreičio čia nereikia. Formulės iš anksto nepriminkite: ją tikrina pirmoji užduotis. Susitarkite, kad sprendimą komanda užsirašo ant lapo: jo prireiks aptarimui.",
       during:
         "Stebėkite, ar mokiniai prieš skaičiuodami suvienodina vienetus: 1 h 30 min dažnai užrašoma kaip 1,3 h. Grafiko užduotyje pasiūlykite grafiką nusibraižyti ant lapo. Paskutinėje užduotyje daugelis komandų pirmiausia siūlys 45 km/h: neskubėkite taisyti, paklauskite, kiek laiko truko kiekviena kelio dalis.",
       after:
@@ -345,8 +344,8 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       "Kur kasdienybėje jums praverstų mokėjimas greitai įvertinti greitį, kelią ar laiką?",
     ],
     sources: [
-      "9 klasės fizikos vadovėlio skyrius apie mechaninį judėjimą: tolyginis tiesiaeigis judėjimas, vidutinis greitis, judėjimo grafikai.",
-      "Garso greitis ore (apie 340 m/s, kai oro temperatūra apie 15 °C): fizikos vadovėlio tema apie garso bangas arba Visuotinė lietuvių enciklopedija (vle.lt), straipsnis „Garsas“.",
+      "Pagrindinio ugdymo fizikos vadovėlių temos apie mechaninį judėjimą: tolyginis tiesiaeigis judėjimas, vidutinis greitis, judėjimo grafikai.",
+      "Garso greitis ore (apie 340 m/s, kai oro temperatūra apie 15 °C): fizikos vadovėlio tema apie garso bangas arba Visuotinė lietuvių enciklopedija (vle.lt), straipsnis apie garsą.",
       "Atstumai ir trukmės uždaviniuose yra sąlygos duomenys, o ne išmatuoti tikrų maršrutų dydžiai.",
     ],
     challenges: [
@@ -356,14 +355,14 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
           "Kūnas juda tolygiai. Jo greitis v, nueitas kelias s, judėjimo laikas t. Kuri formulė teisingai sieja šiuos tris dydžius?",
         type: "multiple_choice",
         points: 100,
-        correct_answer: "v = s / t",
+        correct_answer: "v = s : t",
         hints: [
           "Greitis rodo, kokį kelią kūnas nueina per laiko vienetą.",
           "Pažiūrėkite į greičio vienetą m/s: jis parodo, kurį dydį iš kurio reikia dalyti.",
         ],
-        options: ["v = s · t", "v = t / s", "v = s / t", "v = s + t"],
+        options: ["v = s · t", "v = t : s", "v = s : t", "v = s + t"],
         explanation:
-          "Greitis rodo, kokį kelią kūnas nueina per laiko vienetą, todėl kelią dalijame iš laiko: v = s / t. Tai matyti ir iš vieneto: metrai, padalyti iš sekundžių, yra m/s. Iš tos pačios formulės gauname s = v · t ir t = s / v.",
+          "Greitis rodo, kokį kelią kūnas nueina per laiko vienetą, todėl kelią dalijame iš laiko: v = s : t. Tai matyti ir iš vieneto: metrai, padalyti iš sekundžių, yra m/s. Iš tos pačios formulės gauname s = v · t ir t = s : v.",
         difficulty: "easy",
         cognitive_level: "remember",
       },
@@ -380,7 +379,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         ],
         options: null,
         explanation:
-          "72 km yra 72 000 m, o 1 h yra 3600 s. 72 000 m : 3600 s = 20 m/s. Trumpiau: greitį km/h dalijame iš 3,6. Dažna klaida yra dauginti iš 3,6: tuomet gautųsi, kad automobilis per sekundę nuvažiuoja daugiau nei ketvirtį kilometro.",
+          "72 km yra 72 000 m, o 1 h yra 3600 s. 72 000 m : 3600 s = 20 m/s. Trumpiau: greitį km/h dalijame iš 3,6. Dažna klaida yra dauginti iš 3,6: tuomet išeitų, kad automobilis per sekundę nuvažiuoja daugiau nei ketvirtį kilometro.",
         difficulty: "easy",
         cognitive_level: "understand",
       },
@@ -393,7 +392,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         correct_answer: "18",
         hints: [
           "Laiką pirmiausia išreikškite vien valandomis.",
-          "30 min yra pusė valandos, o ne 0,3 h.",
+          "Valandoje yra 60 minučių. Kurią valandos dalį sudaro 30 min?",
           "Visą kelią padalykite iš viso laiko valandomis.",
         ],
         options: null,
@@ -405,7 +404,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Kaip toli trenkė žaibas?",
         description:
-          "Žaibo blyksnį pamatėte, o griaustinį išgirdote po 6 s. Garso greitis ore yra apie 340 m/s. Laikykite, kad šviesa jus pasiekia akimirksniu. Kokiu atstumu nuo jūsų trenkė žaibas? Atsakymą įrašykite metrais, sveikuoju skaičiumi.",
+          "Žaibo blyksnį pamatėte, o griaustinį išgirdote po 6 s. Skaičiuokite, kad garso greitis ore yra 340 m/s, o šviesa jus pasiekia akimirksniu. Kokiu atstumu nuo jūsų trenkė žaibas? Atsakymą įrašykite metrais, sveikuoju skaičiumi.",
         type: "number",
         points: 200,
         correct_answer: "2040",
@@ -466,12 +465,12 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     slug: "chemines-formules-ir-skaiciavimai",
     title: "Ką pasako cheminė formulė?",
     description:
-      "Komandos skaito chemines formules: skiria vienines ir sudėtines medžiagas, skaičiuoja atomus, santykinę molekulinę masę ir elemento masės dalį, o pabaigoje palygina keturias azoto trąšas.",
+      "Komandos skaito chemines formules: skiria vienines ir sudėtines medžiagas, skaičiuoja atomus, santykinę molekulinę masę ir elemento masės dalį, o pabaigoje palygina keturias azoto trąšas. 9-10 klasėse tinka kartojimui.",
     subject: "Chemija",
     grade_band: "9-10 kl.",
     duration_minutes: 35,
     curriculum:
-      "Chemijos bendroji programa (2022), 9-10 (I-II gimnazijos) klasės. Medžiagų sudėtis ir cheminiai skaičiavimai: cheminės formulės, vieninės ir sudėtinės medžiagos, santykinė molekulinė masė, elemento masės dalis junginyje.",
+      "Chemijos bendroji programa (2022). Medžiagų sudėtis ir cheminiai skaičiavimai: cheminės formulės, vieninės ir sudėtinės medžiagos, santykinė molekulinė masė, elemento masės dalis junginyje. Veikla skirta kartojimui.",
     learning_goals: [
       "Iš cheminės formulės nustatyti medžiagos sudėtį ir atomų skaičių.",
       "Apskaičiuoti santykinę molekulinę masę ir elemento masės dalį junginyje.",
@@ -479,7 +478,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
     ],
     teacher_notes: {
       before:
-        "Suskirstykite mokinius į komandas po 3 ar 4. Komandai reikia vieno telefono, lapo ir skaičiuotuvo (tinka ir telefono). Visos reikalingos santykinės atominės masės pateiktos užduotyse, bet periodinė elementų lentelė ant sienos ar vadovėlyje pravers pasitikrinti. Priminkite, ką formulėje reiškia indeksas ir skliaustai.",
+        "Suskirstykite mokinius į komandas po 3 ar 4. Komandai reikia vieno telefono, lapo ir skaičiuotuvo (tinka ir telefono). Visos santykinės atominės masės ir jonų krūviai pateikti užduotyse. Mokiniai jau turi mokėti skaičiuoti santykinę molekulinę masę ir masės dalį. Jei formules iki šiol sudarėte pagal valentingumą, pasakykite, kad jono krūvio dydis čia sutampa su valentingumu. Priminkite, ką formulėje reiškia indeksas ir skliaustai.",
       during:
         "Stebėkite, ar komandos indeksą po skliaustų pritaiko visiems skliaustuose esantiems atomams. Paskutinėje užduotyje paskatinkite pasidalyti darbą: kiekvienas narys skaičiuoja vieną junginį, tada rezultatai palyginami. Jei komanda renkasi atsakymą vien pagal azoto atomų skaičių, paklauskite, kokia yra visos formulės masė.",
       after:
@@ -492,9 +491,9 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       "Kam ūkininkui ar sodininkui naudinga žinoti azoto masės dalį trąšoje?",
     ],
     sources: [
-      "8 ir 9 klasės chemijos vadovėlių temos: cheminės formulės, vieninės ir sudėtinės medžiagos, santykinė molekulinė masė, elemento masės dalis junginyje, jonai ir joninių junginių formulės.",
+      "Pagrindinio ugdymo chemijos vadovėlių temos: cheminės formulės, vieninės ir sudėtinės medžiagos, santykinė molekulinė masė, elemento masės dalis junginyje, jonai ir joninių junginių formulės.",
       "Periodinė elementų lentelė: santykinės atominės masės, suapvalintos iki sveikųjų skaičių (H 1, C 12, N 14, O 16, S 32, K 39, Ca 40, Fe 56).",
-      "Visuotinė lietuvių enciklopedija (vle.lt): straipsniai „Klintis“, „Hematitas“, „Karbamidas“, „Amonio nitratas“, „Azoto trąšos“.",
+      "Visuotinė lietuvių enciklopedija (vle.lt): straipsniai apie klintį, hematitą, karbamidą ir azoto trąšas.",
     ],
     challenges: [
       {
@@ -533,16 +532,16 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         cognitive_level: "understand",
       },
       {
-        title: "Klintis iš Akmenės",
+        title: "Klinties formulė",
         description:
-          "Šiaurės Lietuvoje, Akmenės rajone, kasama klintis, iš kurios gaminamas cementas. Pagrindinė klinties medžiaga yra kalcio karbonatas CaCO₃. Apskaičiuokite kalcio karbonato santykinę molekulinę (formulinę) masę. Santykinės atominės masės: Ca 40, C 12, O 16. Įrašykite sveikąjį skaičių.",
+          "Klintis yra uoliena, iš kurios gaminamas cementas. Pagrindinė klinties medžiaga yra kalcio karbonatas CaCO₃. Apskaičiuokite kalcio karbonato santykinę molekulinę (formulinę) masę. Santykinės atominės masės: Ca 40, C 12, O 16. Įrašykite sveikąjį skaičių.",
         type: "number",
         points: 150,
         correct_answer: "100",
         hints: [
           "Santykinė molekulinė masė yra visų formulėje esančių atomų santykinių atominių masių suma.",
           "Atkreipkite dėmesį į indeksą prie deguonies.",
-          "Deguonies atominę masę padauginkite iš indekso ir pridėkite kalcio bei anglies mases.",
+          "Kiekvieno elemento atominę masę imkite tiek kartų, kiek jo atomų yra formulėje.",
         ],
         options: null,
         explanation:
@@ -553,7 +552,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Krūvių pusiausvyra",
         description:
-          "Aliuminio oksidas sudarytas iš aliuminio ir oksido jonų. Aliuminio jono krūvis yra 3+, oksido jono krūvis 2-. Junginys turi būti elektriškai neutralus. Kuri aliuminio oksido formulė teisinga?",
+          "Aliuminio oksidas sudarytas iš aliuminio ir oksido jonų. Aliuminio jono krūvis yra 3+, oksido jono krūvis 2−. Junginys turi būti elektriškai neutralus. Kuri aliuminio oksido formulė teisinga?",
         type: "multiple_choice",
         points: 150,
         correct_answer: "Al₂O₃",
@@ -564,7 +563,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
         ],
         options: ["AlO", "Al₃O₂", "AlO₃", "Al₂O₃"],
         explanation:
-          "Du aliuminio jonai turi krūvį 2 · (3+) = 6+, trys oksido jonai 3 · (2-) = 6-. Krūviai išsilygina, todėl formulė yra Al₂O₃. Dažna klaida yra indeksus rašyti prie to paties jono, kurio krūvis toks: taip gaunama Al₃O₂, kur krūviai 9+ ir 4- neišsilygina.",
+          "Du aliuminio jonai turi krūvį 2 · (3+) = 6+, trys oksido jonai 3 · (2−) = 6−. Krūviai išsilygina, todėl formulė yra Al₂O₃. Dažna klaida yra jono krūvio skaičių rašyti kaip to paties jono indeksą: taip gaunama Al₃O₂, kur krūviai 9+ ir 4− neišsilygina.",
         difficulty: "medium",
         cognitive_level: "apply",
       },
@@ -589,7 +588,7 @@ export const GAMTOS_MOKSLAI: StarterActivityInput[] = [
       {
         title: "Kuri trąša turi daugiausia azoto?",
         description:
-          "Jonavoje gaminamos azoto trąšos. Augalams svarbu, kokią trąšos masės dalį sudaro azotas. Palyginkite keturis junginius ir nustatykite, kuriame azoto masės dalis didžiausia. Santykinės atominės masės: H 1, C 12, N 14, O 16, S 32, K 39. Patarimas: pasidalykite skaičiavimus komandoje.",
+          "Augalams reikia azoto, todėl svarbu, kokią trąšos masės dalį jis sudaro. Palyginkite keturis junginius ir nustatykite, kuriame azoto masės dalis didžiausia. Santykinės atominės masės: H 1, C 12, N 14, O 16, S 32, K 39. Patarimas: pasidalykite skaičiavimus komandoje.",
         type: "multiple_choice",
         points: 250,
         correct_answer: "Karbamidas CO(NH₂)₂",
