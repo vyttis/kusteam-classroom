@@ -69,7 +69,7 @@ export async function POST(_request: Request, props: { params: Promise<{ itemId:
       // copied on the server from the activity the item was published from;
       // a task that cannot be matched there gets a random unguessable hash
       // and needs_answer, which blocks activation until an answer is set.
-      const sources = await sourceAnswers(createAdminClient(), item.source_game_id, challengeData)
+      const sources = await sourceAnswers(createAdminClient(), item.source_game_id, item.published_by, challengeData)
       needsAnswers = sources.filter((s) => !s).length
       const buildChallenges = async (withNeedsAnswer: boolean) =>
         Promise.all(
