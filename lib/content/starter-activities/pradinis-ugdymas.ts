@@ -13,7 +13,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
     grade_band: "1-4 kl.",
     duration_minutes: 25,
     curriculum:
-      "Pradinio ugdymo bendrosios programos (2022), gamtos mokslai: metų laikų kaita ir jos požymiai, augalų ir gyvūnų prisitaikymas prie sezoninių pokyčių, gamtos stebėjimas. Sąsaja su matematika: skaičiavimas.",
+      "Pradinis ugdymas, gamtos mokslai: metų laikų kaita ir jos požymiai, augalų ir gyvūnų prisitaikymas prie metų laikų, gamtos stebėjimas. Sąsaja su matematika: dalyba ir atimtis.",
     learning_goals: [
       "Įvardyti metų laikus ir kiekvieno jų požymius Lietuvos gamtoje.",
       "Paaiškinti, kaip gyvūnai prisitaiko prie žiemos.",
@@ -21,7 +21,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
     ],
     teacher_notes: {
       before:
-        "Veikla skirta 3-4 klasei, kai mokiniai jau skaito sklandžiai. Suskirstykite mokinius į komandas po 2-3, kiekvienai komandai užtenka vieno telefono ar planšetės. Susitarkite, kas komandoje skaito užduotį garsiai ir kas įrašo atsakymą. Šiuos vaidmenis keiskite po kiekvienos užduoties. Priminkite, kad užuomina kainuoja taškų, bet ja naudotis nėra gėda.",
+        "Veikla skirta 3-4 klasei, kai mokiniai jau skaito sklandžiai. Suskirstykite mokinius į komandas po 2-3, kiekvienai komandai užtenka vieno telefono ar planšetės. Susitarkite, kas komandoje skaito užduotį garsiai ir kas įrašo atsakymą. Šiuos vaidmenis keiskite po kiekvienos užduoties. Pasakykite, kad atvėrus užuominą taškų gaunama mažiau, bet naudotis ja nėra gėda.",
       during:
         "Vaikščiokite tarp komandų ir klausykite, kaip jos tariasi. Jei komanda užstrigo, neatsakykite už ją. Paprašykite dar kartą garsiai perskaityti užduotį ir paklauskite: „Ką jau žinote? Ko klausiama?“ Pasiūlykite atverti užuominą. Jei matote, kad daugumai trūksta laiko, galite jį pratęsti. Pagirkite komandas, kuriose kalba visi nariai.",
       after:
@@ -36,7 +36,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
     sources: [
       "Pradinio ugdymo bendrosios programos (2022): gamtos mokslų ir matematikos programos 1-4 klasėms.",
       "Gamtos mokslų vadovėliai 3-4 klasei: temos apie metų laikus, gyvūnų žiemojimą ir paukščių sugrįžimą.",
-      "Dienos ilgumas Lietuvoje per žiemos ir vasaros saulėgrįžas (apie 7 ir apie 17 valandų): astronominio kalendoriaus duomenys.",
+      "Dienos ilgumas užduotyje (7 ir 17 valandų) yra suapvalinta sąlyga skaičiavimui: tikslus ilgumas priklauso nuo vietovės.",
     ],
     challenges: [
       {
@@ -59,7 +59,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       {
         title: "Metų laikų mėnesiai",
         description:
-          "Metai turi 12 mėnesių ir 4 metų laikus. Visi metų laikai trunka vienodai. Kiek mėnesių trunka vienas metų laikas? Įrašykite tik skaičių.",
+          "Metai turi 12 mėnesių ir 4 vienodo ilgio metų laikus. Kiek mėnesių trunka vienas metų laikas? Įrašykite tik skaičių.",
         type: "number",
         points: 100,
         correct_answer: "3",
@@ -80,32 +80,32 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         points: 150,
         correct_answer: "Miega žiemos miegu",
         hints: [
-          "Žiemą ežys neranda vabalų ir sliekų, kuriais minta.",
+          "Žiemą nėra vabalų ir sliekų, kuriais ežys minta.",
           "Rudenį ežys daug ėda ir susisuka šiltą guolį iš lapų.",
           "Pagalvokite, kaip gyvūnas gali ištverti kelis mėnesius be maisto.",
         ],
         options: [
           "Ieško maisto po sniegu",
           "Miega žiemos miegu",
-          "Minta rudenį sukauptomis atsargomis",
+          "Ėda rudenį į guolį susineštus obuolius",
           "Persikelia gyventi į šiltus kraštus",
         ],
         explanation:
-          "Žiemą ežys neranda maisto, todėl įminga iki pavasario. Miegodamas jis naudoja riebalus, kuriuos sukaupė rudenį. Maisto atsargų ežys nekaupia.",
+          "Žiemą ežys neranda maisto, todėl įminga iki pavasario. Miegodamas jis naudoja riebalus, kuriuos sukaupė rudenį. Maisto atsargų ežys nekaupia ir obuolių nenešioja.",
         difficulty: "medium",
         cognitive_level: "understand",
       },
       {
         title: "Gamtos dienoraštis",
         description:
-          "Rasa užrašė gamtos dienoraštyje: „Tirpsta sniegas. Parskrido vieversys. Pražydo žibuoklės.“ Kurį mėnesį Rasa galėjo tai užrašyti?",
+          "Rasa gamtos dienoraštyje užrašė: „Tirpsta sniegas, parskrido vieversys, pražydo žibuoklės.“ Kurį mėnesį ji galėjo tai užrašyti?",
         type: "multiple_choice",
         points: 150,
         correct_answer: "Kovą",
         hints: [
           "Pagalvokite, kuriuo metų laiku tirpsta sniegas.",
           "Vieversys yra vienas pirmųjų paukščių, sugrįžtančių į Lietuvą.",
-          "Išrinkite mėnesį, kuris priklauso pavasariui.",
+          "Prisiminkite, kurie mėnesiai yra pavasario mėnesiai.",
         ],
         options: ["Gruodį", "Kovą", "Liepą", "Spalį"],
         explanation:
@@ -116,7 +116,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       {
         title: "Ilga ir trumpa diena",
         description:
-          "Trumpiausią žiemos dieną Lietuvoje šviesu būna apie 7 valandas. Ilgiausią vasaros dieną šviesu būna apie 17 valandų. Keliomis valandomis vasaros diena ilgesnė? Įrašykite tik skaičių.",
+          "Tarkime, kad trumpiausią žiemos dieną šviesu būna 7 valandas, o ilgiausią vasaros dieną 17 valandų. Keliomis valandomis ši vasaros diena ilgesnė? Įrašykite tik skaičių.",
         type: "number",
         points: 200,
         correct_answer: "10",
@@ -127,7 +127,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         ],
         options: null,
         explanation:
-          "17 − 7 = 10. Vasarą Saulė danguje būna daug ilgiau, todėl šviesu net 10 valandų ilgiau nei žiemą.",
+          "17 − 7 = 10. Ilgiausią vasaros dieną Saulė danguje būna daug ilgiau, todėl šviesu net 10 valandų ilgiau nei trumpiausią žiemos dieną.",
         difficulty: "hard",
         cognitive_level: "apply",
       },
@@ -142,7 +142,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
     grade_band: "1-4 kl.",
     duration_minutes: 25,
     curriculum:
-      "Pradinio ugdymo bendrosios programos (2022), matematika: skaičiai ir skaičiavimai (sudėtis ir atimtis iki 1000, daugyba), matavimai (laikas, pinigai: eurai ir centai), žodinių uždavinių ir problemų sprendimas.",
+      "Pradinis ugdymas, matematika: sudėtis ir atimtis iki 1000, daugyba, laiko ir pinigų (eurų ir centų) skaičiavimas, žodinių uždavinių sprendimas.",
     learning_goals: [
       "Paversti eurus centais ir apskaičiuoti grąžą.",
       "Apskaičiuoti, kada baigiasi veikla, kai žinoma jos pradžia ir trukmė.",
@@ -175,7 +175,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         correct_answer: "100 centų",
         hints: [
           "Prisiminkite monetas, kurias matote parduotuvėje.",
-          "Dvi 50 centų monetos kartu vertos vieno euro.",
+          "Vienas euras vertas daugiau nei 50 centų moneta.",
         ],
         options: ["10 centų", "50 centų", "100 centų", "1000 centų"],
         explanation:
@@ -221,7 +221,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       {
         title: "Grąža",
         description:
-          "Tomas turi 5 eurus. Jis perka pieštukų rinkinį už 3 eurus 20 centų. Kiek centų grąžos gaus Tomas? Įrašykite tik skaičių.",
+          "Tomas turi 5 eurus ir perka pieštukų rinkinį už 3 eurus 20 centų. Kiek centų grąžos jis gaus? Įrašykite tik skaičių.",
         type: "number",
         points: 150,
         correct_answer: "180",
@@ -239,13 +239,13 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       {
         title: "Knygos bibliotekoje",
         description:
-          "Mokyklos bibliotekoje yra 460 pasakų knygų ir 380 knygų apie gamtą. Šiandien mokiniai pasiskolino 40 knygų. Kiek knygų liko bibliotekoje? Įrašykite tik skaičių.",
+          "Bibliotekos lentynose buvo 460 pasakų knygų ir 380 knygų apie gamtą. Mokiniai pasiskolino 40 iš šių knygų. Parašykite skaičiumi, kiek knygų liko lentynose.",
         type: "number",
         points: 200,
         correct_answer: "800",
         hints: [
           "Šiam uždaviniui reikia dviejų veiksmų.",
-          "Pirmiausia sužinokite, kiek knygų bibliotekoje buvo iš viso.",
+          "Pirmiausia sužinokite, kiek knygų lentynose buvo iš viso.",
           "Tada atimkite knygas, kurias mokiniai pasiskolino.",
         ],
         options: null,
@@ -265,11 +265,11 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
     grade_band: "1-4 kl.",
     duration_minutes: 25,
     curriculum:
-      "Pradinio ugdymo bendrosios programos (2022), integruota veikla. Gamtos mokslai: vandens būsenos, garavimas, tausus vandens naudojimas. Matematika: daugyba, talpos matavimas. Lietuvių kalba: giminiški žodžiai.",
+      "Pradinis ugdymas, integruota veikla. Gamtos mokslai: vandens būsenos, garavimas, vandens taupymas. Matematika: daugyba, talpos matavimas. Lietuvių kalba: giminiški žodžiai.",
     learning_goals: [
       "Paaiškinti, kad lietus, sniegas, rūkas ir ledas yra vanduo, ir kur dingsta išgaravęs vanduo.",
       "Atpažinti žodžiui „vanduo“ giminišką žodį.",
-      "Apskaičiuoti talpą ir sutaupyto vandens kiekį, taikant daugybą.",
+      "Palyginti talpą mililitrais ir litrais, daugybos veiksmais apskaičiuoti sutaupyto vandens kiekį.",
     ],
     teacher_notes: {
       before:
@@ -289,7 +289,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       "Pradinio ugdymo bendrosios programos (2022): gamtos mokslų, matematikos ir lietuvių kalbos ir literatūros programos 1-4 klasėms.",
       "Gamtos mokslų vadovėliai 3-4 klasei: temos apie vandens būsenas, vandens apytakos ratą ir vandens taupymą.",
       "Lietuvių kalbos vadovėliai 3-4 klasei: tema apie giminiškus žodžius ir žodžio šaknį.",
-      "Vandens sąnaudos iš atsukto čiaupo (apie 6 litrus per minutę): vandens tiekimo įmonių patarimai gyventojams.",
+      "Sutaupomo vandens kiekis užduotyje (6 litrai per vieną dantų valymą) yra sąlyga skaičiavimui: tikrasis kiekis priklauso nuo čiaupo.",
     ],
     challenges: [
       {
@@ -299,7 +299,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         type: "text",
         points: 100,
         correct_answer: "vanduo",
-        accepted_answers: ["vandens", "vandenį", "vandenys", "iš vandens"],
+        accepted_answers: ["vandens", "vandenį", "iš vandens", "H2O"],
         hints: [
           "Pagalvokite, kas lieka delne, kai ištirpsta snaigė.",
           "Šią medžiagą geriame kasdien ir ja prausiamės.",
@@ -319,8 +319,8 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         correct_answer: "Išgaravo į orą",
         hints: [
           "Pagalvokite, kas nutinka šlapiems drabužiams, kai jie džiūsta saulėje.",
-          "Saulės šiluma paverčia vandenį nematomais garais.",
-          "Garai yra lengvi, todėl kyla aukštyn.",
+          "Asfaltas vandens nesugeria, o diena buvo šilta.",
+          "Pagalvokite, ką vandeniui daro saulės šiluma.",
         ],
         options: [
           "Virto ledu",
@@ -340,9 +340,9 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         points: 150,
         correct_answer: "Vandenynas",
         hints: [
-          "Giminiški žodžiai turi tą pačią šaknį ir panašią reikšmę.",
-          "Žodžio „vanduo“ šaknis yra „vand“.",
-          "Patikrinkite du dalykus: ar sutampa žodžio pradžia ir ar reikšmė susijusi.",
+          "Giminiški žodžiai turi tą pačią šaknį ir susijusią reikšmę.",
+          "Vien susijusios reikšmės neužtenka: žodžiai „jūra“ ir „banga“ nėra giminiški.",
+          "Raskite žodžio „vanduo“ šaknį ir ieškokite jos kituose žodžiuose.",
         ],
         options: ["Upė", "Valtis", "Vanagas", "Vandenynas"],
         explanation:
@@ -353,7 +353,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       {
         title: "Stiklinės ir ąsotis",
         description:
-          "Į vieną stiklinę telpa 200 mililitrų vandens. Į ąsotį telpa 1 litras. Kiek pilnų stiklinių vandens reikia, kad pripildytumėte ąsotį? Įrašykite tik skaičių.",
+          "Į stiklinę telpa 200 mililitrų vandens, o į ąsotį 1 litras. Kiek pilnų stiklinių vandens reikia ąsočiui pripildyti? Įrašykite tik skaičių.",
         type: "number",
         points: 150,
         correct_answer: "5",
@@ -371,7 +371,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
       {
         title: "Taupome vandenį",
         description:
-          "Valydamasi dantis Miglė užsuka čiaupą ir kaskart sutaupo 6 litrus vandens. Dantis ji valosi 2 kartus per dieną. Kiek litrų vandens Miglė sutaupo per 5 dienas? Įrašykite tik skaičių.",
+          "Tarkime, kad valydamasi dantis Miglė užsuka čiaupą ir kaskart sutaupo 6 litrus vandens. Dantis ji valosi 2 kartus per dieną. Parašykite skaičiumi, kiek litrų vandens ji sutaupo per 5 dienas.",
         type: "number",
         points: 200,
         correct_answer: "60",
@@ -382,7 +382,7 @@ export const PRADINIS_UGDYMAS: StarterActivityInput[] = [
         ],
         options: null,
         explanation:
-          "Per dieną Miglė sutaupo 6 × 2 = 12 litrų. Per 5 dienas: 12 × 5 = 60 litrų. Mažas įprotis sutaupo labai daug vandens.",
+          "Per dieną Miglė sutaupo 6 × 2 = 12 litrų. Per 5 dienas: 12 × 5 = 60 litrų. Mažas įprotis padeda sutaupyti daug vandens.",
         difficulty: "hard",
         cognitive_level: "analyse",
       },
