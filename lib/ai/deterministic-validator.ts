@@ -1,4 +1,6 @@
 import type { AiSuggestion, VerificationResult } from "./types"
+import { canonicalNumber } from "@/lib/game/number-answer"
+import { findHintLeaks, hintLeakIssue } from "./hint-leak"
 
 /**
  * Attempts deterministic validation for task types that can be
@@ -36,14 +38,27 @@ export function validateDeterministic(
 
   // Rule 2: number type — verify answer is numeric and try math eval
   if (suggestion.type === "number") {
-    const parsed = parseFloat(suggestion.correct_answer)
-    if (isNaN(parsed)) {
+    if (numberValue(suggestion.correct_answer) === null) {
       issues.push(
         `Tipas "number", bet atsakymas "${suggestion.correct_answer}" nėra skaičius`
       )
       return { verdict: "fail", issues, confidence: 1.0 }
     }
+  }
 
+  // Rule 3: a hint must not give the answer away. Exact, so it does not wait
+  // for (or depend on) the model check.
+  const leaks = findHintLeaks(suggestion)
+  if (leaks.length > 0) {
+    return {
+      verdict: "fail",
+      issues: leaks.map(hintLeakIssue),
+      confidence: leaks.every((l) => l.reason === "inflected") ? 0.8 : 1.0,
+    }
+  }
+
+  if (suggestion.type === "number") {
+    const parsed = numberValue(suggestion.correct_answer) as number
     // Try evaluating math expression from description
     const mathResult = tryEvaluateMathFromDescription(suggestion.description)
     if (mathResult !== null) {
@@ -60,7 +75,7 @@ export function validateDeterministic(
     }
   }
 
-  // Rule 3: basic sanity checks
+  // Rule 4: basic sanity checks
   if (suggestion.title.trim().length < 3) {
     issues.push("Pavadinimas per trumpas")
   }
@@ -74,6 +89,15 @@ export function validateDeterministic(
 
   // Cannot fully validate deterministically
   return null
+}
+
+/**
+ * The value of a number answer as participants' answers are read (decimal
+ * comma, spaces between thousands), or null when it is not a number.
+ */
+function numberValue(answer: string): number | null {
+  const canonical = canonicalNumber(answer)
+  return canonical === null ? null : Number(canonical)
 }
 
 /**
