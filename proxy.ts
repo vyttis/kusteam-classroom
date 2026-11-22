@@ -151,7 +151,14 @@ function staffMessageUrl(base: URL, reason: string): URL | string {
 // (play, teams, submissions, reflections, health, schools, access
 // requests) do not: a signed-in teacher may also play in someone's class.
 const FACILITATOR_API =
-  /^\/api\/(admin|ai|challenges|di|games|import|lesson-plans|lessons|library|upload|onboarding)(\/|$)/
+  /^\/api\/(account|admin|ai|challenges|di|games|import|lesson-plans|lessons|library|upload|onboarding)(\/|$)/
+
+// An approved facilitator finishes onboarding (profile, privacy notice,
+// password) before any other facilitator API answers: the pages already send
+// them to /onboarding, and the API must not be a way around it.
+const ONBOARDING_API = /^\/api\/onboarding(\/|$)/
+const ONBOARDING_REQUIRED = "Pirmiausia užbaikite registraciją."
+
 
 /** Where an account that may not use the facilitator area goes. */
 function gateRedirect(gate: AccountGate, pathname: string): string | null {
@@ -313,6 +320,9 @@ export async function proxy(request: NextRequest) {
       if (FACILITATOR_API.test(url.pathname) && gate.status !== "active") {
         return NextResponse.json({ error: "Paskyra dar nepatvirtinta." }, { status: 403 })
       }
+      if (FACILITATOR_API.test(url.pathname) && !gate.onboarded && !ONBOARDING_API.test(url.pathname)) {
+        return NextResponse.json({ error: ONBOARDING_REQUIRED }, { status: 403 })
+      }
       if (!url.pathname.startsWith("/api/")) {
         const target = gateRedirect(gate, url.pathname)
         if (target) {
@@ -335,7 +345,8 @@ export async function proxy(request: NextRequest) {
     url.pathname.startsWith("/games") ||
     url.pathname.startsWith("/admin") ||
     url.pathname.startsWith("/library") ||
-    url.pathname.startsWith("/lesson-plans")
+    url.pathname.startsWith("/lesson-plans") ||
+    url.pathname === "/slaptazodis"
 
   // Always let /auth/callback and /auth/confirm through (see above)
   if (isAuthCallback || url.pathname === "/auth/confirm") {
@@ -387,6 +398,9 @@ export async function proxy(request: NextRequest) {
     if (gate.staff) return (await staffGate(supabase, request, user.id, gate, sessionCookieNames, () => response)) ?? response
     if (gate.status !== "active") {
       return NextResponse.json({ error: "Paskyra dar nepatvirtinta." }, { status: 403 })
+    }
+    if (!gate.onboarded && !ONBOARDING_API.test(url.pathname)) {
+      return NextResponse.json({ error: ONBOARDING_REQUIRED }, { status: 403 })
     }
   }
 

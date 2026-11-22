@@ -12,6 +12,24 @@ export function loginUrl(origin: string): string {
   return `${publicBaseUrl(origin)}/vedejui`
 }
 
+/**
+ * A one-time link for a newly created account: it signs the facilitator in
+ * and opens onboarding, where they check their details and create a password.
+ * Valid as long as the project's email link (Supabase Auth setting); after
+ * that, or if anything fails here, the plain sign-in address is the fallback
+ * (the facilitator asks for a code there).
+ */
+export async function inviteUrl(admin: SupabaseClient, email: string, origin: string): Promise<string | null> {
+  const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email })
+  const tokenHash = data?.properties?.hashed_token
+  if (error || !tokenHash) {
+    console.error("[access] invite link failed", { status: error?.status })
+    return null
+  }
+  const params = new URLSearchParams({ token_hash: tokenHash, type: "magiclink", next: "/onboarding" })
+  return `${publicBaseUrl(origin)}/auth/confirm?${params.toString()}`
+}
+
 export async function logAdminAction(
   admin: SupabaseClient,
   actorId: string,

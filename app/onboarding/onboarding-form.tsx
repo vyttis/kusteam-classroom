@@ -11,6 +11,8 @@ import { ChipGroup } from "@/components/access/chip-group"
 import { GRADE_BANDS, PRIVACY_ACK_TEXT, PROFILE_PRIVACY_NOTE, SUBJECTS } from "@/lib/access/profile-fields"
 import { ArrowRight, Loader2 } from "lucide-react"
 import { PrivacyLink } from "@/components/privacy-link"
+import { PasswordFields } from "@/components/access/password-fields"
+import { passwordIssue } from "@/lib/access/password"
 
 type Subject = (typeof SUBJECTS)[number]
 type GradeBand = (typeof GRADE_BANDS)[number]
@@ -22,6 +24,8 @@ export interface OnboardingInitial {
   school: SchoolValue | null
   subjects: string[]
   grades: string[]
+  /** Signed in with Google: a password is optional. */
+  hasGoogle: boolean
 }
 
 export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
@@ -35,6 +39,8 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
   const [grades, setGrades] = useState<GradeBand[]>(
     initial.grades.filter((g): g is GradeBand => (GRADE_BANDS as readonly string[]).includes(g)),
   )
+  const [password, setPassword] = useState("")
+  const [repeat, setRepeat] = useState("")
   const [consent, setConsent] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,12 +50,21 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
   const ready =
     firstName.trim() && lastName.trim() && !missingSchool && subjects.length > 0 && grades.length > 0 && consent
 
+  // A Google account may skip the password; everyone else creates one, so
+  // the next sign-in needs no code from the mailbox.
+  const wantsPassword = !initial.hasGoogle || password.length > 0 || repeat.length > 0
+  const passwordProblem = wantsPassword ? passwordIssue(password, repeat, initial.email) : null
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setTried(true)
     setError(null)
     if (!ready || !school) {
       setError("Užpildykite visus laukus ir pažymėkite sutikimą.")
+      return
+    }
+    if (passwordProblem) {
+      setError(passwordProblem)
       return
     }
     setSaving(true)
@@ -66,6 +81,7 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
           subjects,
           grades,
           consent: true,
+          ...(wantsPassword ? { password } : {}),
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string }
@@ -121,6 +137,25 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
         <Label htmlFor="ob-school">Mokykla</Label>
         <SchoolPicker id="ob-school" value={school} onChange={setSchool} invalid={tried && missingSchool} />
       </div>
+
+      <fieldset className="space-y-3 rounded-xl border border-border/60 p-4">
+        <legend className="px-1 text-sm font-semibold text-steam-dark">
+          {initial.hasGoogle ? "Slaptažodis (neprivaloma)" : "Susikurkite slaptažodį"}
+        </legend>
+        <p className="text-xs text-muted-foreground">
+          {initial.hasGoogle
+            ? "Jungiatės per Google, todėl slaptažodžio nereikia. Jei norite jungtis ir el. paštu, susikurkite jį čia."
+            : "Kitą kartą jungsitės savo el. paštu ir šiuo slaptažodžiu. Jei jį pamiršite, atsiųsime kodą el. paštu."}
+        </p>
+        <PasswordFields
+          idPrefix="ob"
+          password={password}
+          repeat={repeat}
+          onPassword={setPassword}
+          onRepeat={setRepeat}
+          issue={tried ? passwordProblem : null}
+        />
+      </fieldset>
 
       <ChipGroup
         legend="Ką mokote?"

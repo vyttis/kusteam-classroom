@@ -53,6 +53,7 @@ export default async function OnboardingPage() {
               school,
               subjects: profile?.subjects ?? [],
               grades: profile?.grades ?? [],
+              hasGoogle: (user.app_metadata?.providers as string[] | undefined)?.includes("google") ?? false,
             }}
           />
         </div>
