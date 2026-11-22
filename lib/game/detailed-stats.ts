@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { allRowsById } from "@/lib/supabase/all-pages"
+import { interpretTask, type TaskInsight } from "@/lib/game/formative-insights"
+import {
+  choiceDistribution,
+  groupWrongAnswers,
+  type ChoiceStat,
+  type WrongAnswer,
+} from "@/lib/game/wrong-answers"
 
 // Detailed post-game statistics shared by the analytics API route, the
 // finished game detail page, and the printable report (server components
@@ -18,6 +25,22 @@ export interface DetailedChallengeStat {
   completion_rate: number
   avg_attempts_to_solve: number
   auto_difficulty: "easy" | "medium" | "hard" | "unknown"
+  /** Answers that were right (a team has at most one per task). */
+  correct_attempts: number
+  /** Teams that answered the task at least once. */
+  attempted_teams: number
+  /** Teams whose first answer was right. */
+  first_try_solves: number
+  /** first_try_solves of attempted_teams in percent; null when nobody tried. */
+  first_try_rate: number | null
+  /** Teams that had a hint open when answering. */
+  hint_teams: number
+  /** Top wrong answers of a text or number task; empty without the answers. */
+  wrong_answers: WrongAnswer[]
+  /** Teams per option of a multiple-choice task; null for other types or without the answers. */
+  choice_stats: ChoiceStat[] | null
+  /** What the numbers suggest for the next lesson. */
+  insight: TaskInsight
 }
 
 export interface TeamResultStat {
@@ -35,16 +58,44 @@ export interface DetailedStats {
   challenge_stats: DetailedChallengeStat[]
   team_stats: TeamResultStat[]
   total_teams: number
+  /** The answer texts were read, so wrong_answers and choice_stats are filled. */
+  answers_included: boolean
 }
+
+export interface DetailedStatsOptions {
+  /**
+   * A service-role client to read submissions.answer with (no browser role
+   * may read that column). Pass it ONLY after checking that the signed-in
+   * user owns the activity. The tasks and teams are still read through
+   * `supabase` under the caller's RLS, and the answers only for those tasks:
+   * a caller who cannot read the activity gets no answers either.
+   */
+  answerReader?: SupabaseClient
+}
+
+interface SubmissionRow {
+  id: string
+  challenge_id: string
+  is_correct: boolean
+  points_awarded: number
+  team_id: string
+  hints_used: number
+  attempted_at: string
+  answer?: string | null
+}
+
+const SUBMISSION_FIELDS = "id, challenge_id, is_correct, points_awarded, team_id, hints_used, attempted_at"
 
 export async function computeDetailedStats(
   supabase: SupabaseClient,
-  gameId: string
+  gameId: string,
+  options: DetailedStatsOptions = {}
 ): Promise<DetailedStats> {
+  const answersIncluded = !!options.answerReader
   const [{ data: challenges }, { data: teams }] = await Promise.all([
     supabase
       .from("challenges")
-      .select("id, title, points, order_index, difficulty, type")
+      .select("id, title, points, order_index, difficulty, type, options")
       .eq("game_id", gameId)
       .order("order_index", { ascending: true }),
     supabase
@@ -55,25 +106,16 @@ export async function computeDetailedStats(
   ])
 
   if (!challenges || challenges.length === 0) {
-    return { challenge_stats: [], team_stats: [], total_teams: teams?.length || 0 }
+    return { challenge_stats: [], team_stats: [], total_teams: teams?.length || 0, answers_included: answersIncluded }
   }
 
   const challengeIds = challenges.map((c) => c.id)
   // All answers, past the 1000-row page limit. A failed read throws: the
   // report must not show part of the answers as if they were all.
-  const { data: submissions, error: submissionsError } = await allRowsById<{
-    id: string
-    challenge_id: string
-    is_correct: boolean
-    points_awarded: number
-    team_id: string
-    hints_used: number
-    attempted_at: string
-  }>(() =>
-    supabase
-      .from("submissions")
-      .select("id, challenge_id, is_correct, points_awarded, team_id, hints_used, attempted_at")
-      .in("challenge_id", challengeIds)
+  const reader = options.answerReader ?? supabase
+  const fields = answersIncluded ? `${SUBMISSION_FIELDS}, answer` : SUBMISSION_FIELDS
+  const { data: submissions, error: submissionsError } = await allRowsById<SubmissionRow>(() =>
+    reader.from("submissions").select(fields).in("challenge_id", challengeIds)
   )
   if (!submissions) throw submissionsError
 
@@ -82,9 +124,12 @@ export async function computeDetailedStats(
     (a, b) => Date.parse(a.attempted_at) - Date.parse(b.attempted_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   )
   const teamCount = teams?.length || 0
+  // Answers of teams that are no longer in the activity (removed by the
+  // facilitator) would otherwise count toward tasks but not toward teams.
+  const teamIds = new Set((teams || []).map((t) => t.id))
 
   const challengeStats: DetailedChallengeStat[] = challenges.map((challenge) => {
-    const challengeSubs = subs.filter((s) => s.challenge_id === challenge.id)
+    const challengeSubs = subs.filter((s) => s.challenge_id === challenge.id && teamIds.has(s.team_id))
     const totalAttempts = challengeSubs.length
     const correctSubs = challengeSubs.filter((s) => s.is_correct)
 
@@ -124,7 +169,39 @@ export async function computeDetailedStats(
       avgAttemptsToSolve = totalAttemptsForSolvers / uniqueSolves
     }
 
+    // First answer and most hints per team (challengeSubs are in time order).
+    const firstCorrect = new Map<string, boolean>()
+    const hintsByTeam = new Map<string, number>()
+    for (const sub of challengeSubs) {
+      if (!firstCorrect.has(sub.team_id)) firstCorrect.set(sub.team_id, sub.is_correct)
+      hintsByTeam.set(sub.team_id, Math.max(hintsByTeam.get(sub.team_id) ?? 0, sub.hints_used || 0))
+    }
+    const attemptedTeams = firstCorrect.size
+    const firstTrySolves = [...firstCorrect.values()].filter(Boolean).length
+    const hintTeams = [...hintsByTeam.values()].filter((n) => n > 0).length
+
+    const answerRows = answersIncluded
+      ? challengeSubs.map((s) => ({ team_id: s.team_id, answer: s.answer ?? null, is_correct: s.is_correct }))
+      : []
+    const choiceOptions = Array.isArray(challenge.options) ? (challenge.options as string[]) : null
+
     return {
+      correct_attempts: correctSubs.length,
+      attempted_teams: attemptedTeams,
+      first_try_solves: firstTrySolves,
+      first_try_rate: attemptedTeams > 0 ? Math.round((firstTrySolves / attemptedTeams) * 100) : null,
+      hint_teams: hintTeams,
+      wrong_answers: groupWrongAnswers(answerRows, challenge.type),
+      choice_stats:
+        answersIncluded && challenge.type === "multiple_choice" ? choiceDistribution(answerRows, choiceOptions) : null,
+      insight: interpretTask({
+        total_teams: teamCount,
+        attempted_teams: attemptedTeams,
+        solved_teams: uniqueSolves,
+        first_try_solves: firstTrySolves,
+        hint_teams: hintTeams,
+        avg_attempts_to_solve: avgAttemptsToSolve,
+      }),
       challenge_id: challenge.id,
       title: challenge.title,
       order_index: challenge.order_index,
@@ -171,5 +248,6 @@ export async function computeDetailedStats(
     challenge_stats: challengeStats,
     team_stats: teamStats,
     total_teams: teamCount,
+    answers_included: answersIncluded,
   }
 }

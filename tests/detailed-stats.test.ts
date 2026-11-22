@@ -178,4 +178,64 @@ describe("computeDetailedStats", () => {
     const supabase = mockSupabase({ challenges, teams, submissions: [] }, ["submissions"])
     await expect(computeDetailedStats(supabase, "game-1")).rejects.toBeTruthy()
   })
+
+  it("computes first-try solves, teams that tried and teams that used hints", async () => {
+    const supabase = mockSupabase({ challenges, teams, submissions })
+    const stats = await computeDetailedStats(supabase, "game-1")
+
+    const a = stats.challenge_stats.find((c) => c.challenge_id === CHALLENGE_A)!
+    expect(a.attempted_teams).toBe(2)
+    expect(a.first_try_solves).toBe(1) // team 1 only
+    expect(a.first_try_rate).toBe(50)
+    expect(a.hint_teams).toBe(1) // team 2
+    expect(a.correct_attempts).toBe(2)
+
+    const b = stats.challenge_stats.find((c) => c.challenge_id === CHALLENGE_B)!
+    expect(b.first_try_solves).toBe(0)
+    expect(b.insight.kind).toBe("hints") // team 1 of 2 had a hint open
+  })
+
+  it("leaves the answer texts out unless an answer reader is given", async () => {
+    const withAnswers = submissions.map((s, i) => ({ ...s, answer: s.is_correct ? "teisingai" : i % 2 ? "Septyni" : " septyni " }))
+    const supabase = mockSupabase({ challenges, teams, submissions: withAnswers })
+
+    const plain = await computeDetailedStats(supabase, "game-1")
+    expect(plain.answers_included).toBe(false)
+    expect(plain.challenge_stats.every((c) => c.wrong_answers.length === 0 && c.choice_stats === null)).toBe(true)
+
+    const owner = await computeDetailedStats(supabase, "game-1", { answerReader: supabase })
+    expect(owner.answers_included).toBe(true)
+    const b = owner.challenge_stats.find((c) => c.challenge_id === CHALLENGE_B)!
+    expect(b.wrong_answers).toHaveLength(1)
+    expect(b.wrong_answers[0].teams).toBe(2)
+    expect(b.wrong_answers[0].attempts).toBe(3)
+  })
+
+  it("reads the answers only for the tasks the caller can read", async () => {
+    // The caller's own client returns no tasks (not their activity): the
+    // answer reader must not be asked for anything.
+    const caller = mockSupabase({ challenges: [], teams: [] })
+    const reader = { from: () => { throw new Error("must not read answers") } } as unknown as SupabaseClient
+    const stats = await computeDetailedStats(caller, "game-1", { answerReader: reader })
+    expect(stats.challenge_stats).toEqual([])
+  })
+
+  it("counts picks per option of a choice task", async () => {
+    const choice = { id: CHALLENGE_A, title: "Pasirink", points: 50, order_index: 0, difficulty: null, type: "multiple_choice", options: ["A", "B"] }
+    const supabase = mockSupabase({
+      challenges: [choice],
+      teams,
+      submissions: [
+        { challenge_id: CHALLENGE_A, is_correct: false, points_awarded: 0, team_id: TEAM_1, hints_used: 0, attempted_at: "2026-07-07T09:10:00Z", answer: "A" },
+        { challenge_id: CHALLENGE_A, is_correct: true, points_awarded: 50, team_id: TEAM_1, hints_used: 0, attempted_at: "2026-07-07T09:11:00Z", answer: "B" },
+        { challenge_id: CHALLENGE_A, is_correct: true, points_awarded: 50, team_id: TEAM_2, hints_used: 0, attempted_at: "2026-07-07T09:12:00Z", answer: "B" },
+      ],
+    })
+    const stats = await computeDetailedStats(supabase, "game-1", { answerReader: supabase })
+    expect(stats.challenge_stats[0].wrong_answers).toEqual([])
+    expect(stats.challenge_stats[0].choice_stats).toEqual([
+      { option: "A", teams: 1, correct: false },
+      { option: "B", teams: 2, correct: true },
+    ])
+  })
 })
