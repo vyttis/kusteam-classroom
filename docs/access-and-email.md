@@ -74,3 +74,17 @@ adreso).
 4. Supabase → Authentication → Emails → Templates: „Invite user“ ir „Magic
    link or OTP“ turinys iš `supabase/templates/` (temos nurodytos failų
    pradžioje).
+
+## Prisijungimo būdai (nuo 2026-11-22)
+
+Vedėjas jungiasi vienu iš trijų būdų:
+
+1. **El. paštu ir slaptažodžiu.** Slaptažodį susikuria pirmą kartą prisijungęs, registracijos užbaigimo formoje (`/onboarding`). Taisyklės: `lib/access/password.ts` (bent 10 ženklų).
+2. **Per Google**, jei Google paskyros adresas sutampa su vedėjo paskyros adresu. Tokiam vedėjui slaptažodis neprivalomas.
+3. **Kodu iš laiško.** Atsarginis būdas ir kartu „Pamiršau slaptažodį“: patvirtinęs kodą vedėjas nukreipiamas į `/slaptazodis` ir susikuria naują slaptažodį. Slaptažodį bet kada galima pakeisti tame pačiame puslapyje.
+
+Naujai sukurtai paskyrai siunčiamas kvietimas (`accountInviteEmail`) su vienkartine nuoroda į `/auth/confirm`. Nuoroda panaudojama tik paspaudus „Tęsti“, kad jos nesunaudotų pašto saugos skeneriai. Jos galiojimo laiką nustato Supabase Auth (el. laiško nuorodos galiojimas). Jei nuoroda nebegalioja, vedėjas prisijungimo puslapyje spaudžia „Pamiršau slaptažodį“. Jau buvusiai paskyrai siunčiamas laiškas be žetono (`accountActivatedEmail`).
+
+KU STEAM darbuotojų (`staff`) slaptažodis priklauso KU STEAM TEAM: `/api/account/password` ir proxy jų neįleidžia, o prisijungimas slaptažodžiu ne per TEAM duomenų neatveria (`team_staff_access_ok()`).
+
+Supabase skydelyje (tikrina Vytis): Authentication → Providers → Email įjungtas „Email + Password“; mažiausias slaptažodžio ilgis ne mažesnis nei 10; jei planas leidžia, įjungta nutekėjusių slaptažodžių patikra; „Allow new users to sign up“ lieka išjungta.
