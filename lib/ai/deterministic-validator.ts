@@ -29,7 +29,7 @@ export function validateDeterministic(
       return {
         verdict: "fail",
         issues: [
-          `Teisingas atsakymas "${suggestion.correct_answer}" nėra tarp pateiktų variantų`,
+          `Teisingo atsakymo „${suggestion.correct_answer}“ nėra tarp pateiktų variantų`,
         ],
         confidence: 1.0,
       }
@@ -40,7 +40,7 @@ export function validateDeterministic(
   if (suggestion.type === "number") {
     if (numberValue(suggestion.correct_answer) === null) {
       issues.push(
-        `Tipas "number", bet atsakymas "${suggestion.correct_answer}" nėra skaičius`
+        `Skaičiaus užduoties atsakymas „${suggestion.correct_answer}“ nėra skaičius`
       )
       return { verdict: "fail", issues, confidence: 1.0 }
     }
@@ -80,7 +80,7 @@ export function validateDeterministic(
     issues.push("Pavadinimas per trumpas")
   }
   if (suggestion.points < 50 || suggestion.points > 500) {
-    issues.push(`Taškai (${suggestion.points}) ne 50-500 intervale`)
+    issues.push(`Taškai (${suggestion.points}) turi būti nuo 50 iki 500`)
   }
 
   if (issues.length > 0) {

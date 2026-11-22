@@ -12,7 +12,7 @@ const steps = [
   {
     number: "02",
     title: "Praktiniai mokymai",
-    body: "Prieš pradedant naudoti įrankį, mokytojai dalyvauja praktiniuose mokymuose ir dirbtuvėse kartu su STEAM centro komanda.",
+    body: "Prieš pradėdami naudoti įrankį, mokytojai dalyvauja praktiniuose mokymuose ir dirbtuvėse kartu su STEAM centro komanda.",
     accent: "primary",
   },
   {
