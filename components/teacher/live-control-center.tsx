@@ -45,7 +45,7 @@ export function LiveControlCenter({
         </h2>
         {gameStatus === "paused" && (
           <span className="inline-flex items-center rounded-md bg-highlight/15 px-2.5 py-0.5 text-xs font-semibold text-highlight-ink border border-highlight/30">
-            Pristabdytas
+            Pristabdyta
           </span>
         )}
       </div>

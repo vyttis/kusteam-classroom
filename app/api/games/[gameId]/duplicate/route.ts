@@ -9,6 +9,13 @@ function acceptedHashes(task: object): string[] {
   return Array.isArray(hashes) ? hashes.filter((h): h is string => typeof h === "string") : []
 }
 
+// What the facilitator reads when the copy is only partly made. Database
+// messages never go to the browser: they are logged with their code only.
+const PARTIAL_NO_TASKS =
+  "Veiklos kopija sukurta, bet užduočių nukopijuoti nepavyko, todėl kopijoje jų nėra. Ištrinkite kopiją ir kopijuokite dar kartą arba pridėkite užduotis patys."
+const PARTIAL_NO_PREREQUISITES =
+  "Veikla nukopijuota, bet kai kurių užduočių atrakinimo sąlygų perkelti nepavyko. Patikrinkite jas kopijoje prieš vesdami veiklą."
+
 const duplicateSchema = z.object({
   title: z.string().min(3, "Pavadinimas turi būti bent 3 simbolių").optional(),
 })
@@ -55,7 +62,7 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
 
     if (gameError || !sourceGame) {
       return NextResponse.json(
-        { error: "Veikla nerasta arba neturite teisės jos dubliuoti" },
+        { error: "Veikla nerasta arba neturite teisės jos kopijuoti" },
         { status: 404 }
       )
     }
@@ -69,8 +76,9 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
       .order("order_index", { ascending: true })
 
     if (challengesError) {
+      console.error("[duplicate] reading source tasks failed", { code: challengesError.code })
       return NextResponse.json(
-        { error: "Nepavyko gauti užduočių: " + challengesError.message },
+        { error: "Nepavyko nuskaityti veiklos užduočių. Bandykite dar kartą." },
         { status: 500 }
       )
     }
@@ -94,11 +102,15 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
       .single()
 
     if (newGameError || !newGame) {
+      console.error("[duplicate] creating the copy failed", { code: newGameError?.code })
       return NextResponse.json(
-        { error: newGameError?.message || "Nepavyko sukurti veiklos kopijos" },
+        { error: "Nepavyko sukurti veiklos kopijos. Bandykite dar kartą." },
         { status: 500 }
       )
     }
+
+    // Set when the copy exists but is not complete.
+    let partialMessage: string | null = null
 
     // Bulk insert challenges, then remap prerequisite UUIDs to new IDs
     if (sourceChallenges && sourceChallenges.length > 0) {
@@ -155,9 +167,9 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
       }
 
       if (insertError) {
-        console.error("Challenge duplication error:", insertError)
+        console.error("[duplicate] copying tasks failed", { code: insertError.code })
         return NextResponse.json(
-          { error: "Veikla sukurta, bet nepavyko nukopijuoti užduočių: " + insertError.message, game_id: newGame.id },
+          { error: PARTIAL_NO_TASKS, partial: true, game_id: newGame.id, game_code: newGame.game_code },
           { status: 207 }
         )
       } else if (newChallenges) {
@@ -188,10 +200,20 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
           )
           const prereqErrors = prereqResults.filter((r) => r?.error)
           if (prereqErrors.length > 0) {
-            console.error("Prerequisite remapping errors:", prereqErrors)
+            console.error("[duplicate] remapping unlock rules failed", {
+              codes: prereqErrors.map((r) => r?.error?.code),
+            })
+            partialMessage = PARTIAL_NO_PREREQUISITES
           }
         }
       }
+    }
+
+    if (partialMessage) {
+      return NextResponse.json(
+        { error: partialMessage, partial: true, game_id: newGame.id, game_code: newGame.game_code },
+        { status: 207 }
+      )
     }
 
     return NextResponse.json(
@@ -199,12 +221,7 @@ export async function POST(request: Request, props: { params: Promise<{ gameId: 
       { status: 201 }
     )
   } catch (error: unknown) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Vidinė serverio klaida",
-      },
-      { status: 500 }
-    )
+    console.error("[duplicate] unexpected failure", error instanceof Error ? error.name : "unknown")
+    return NextResponse.json({ error: "Vidinė serverio klaida. Bandykite dar kartą." }, { status: 500 })
   }
 }
