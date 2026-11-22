@@ -1,12 +1,16 @@
 import { z } from "zod"
 
-// LT BUP — 6 bendrosios kompetencijos. Canonical IDs (ASCII, no diacritics).
+// The seven competences of the updated Lithuanian general curricula
+// (Bendrosios programos, 2022): pažinimo, kūrybiškumo, komunikavimo,
+// skaitmeninė, pilietiškumo, kultūrinė, socialinė, emocinė ir sveikos
+// gyvensenos. Canonical IDs (ASCII, no diacritics).
 export const COMPETENCIES = [
   "komunikavimo",
   "pazinimo",
   "kulturine",
   "kurybiskumo",
   "pilietiskumo",
+  "skaitmenine",
   "socialine_emocine_ir_sveikos_gyvensenos",
 ] as const
 
@@ -29,9 +33,9 @@ function normalizeCompetency(raw: unknown): typeof COMPETENCIES[number] | null {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/\s+kompetencija\s*$/, "")
-    .replace(/\s+/g, "_")
     .trim()
+    .replace(/\s+kompetencij[a-z]*$/, "")
+    .replace(/[\s,-]+/g, "_")
   if ((COMPETENCIES as readonly string[]).includes(stripped)) {
     return stripped as typeof COMPETENCIES[number]
   }
@@ -51,6 +55,10 @@ function normalizeCompetency(raw: unknown): typeof COMPETENCIES[number] | null {
     socialine: "socialine_emocine_ir_sveikos_gyvensenos",
     socialiniu_emociniu_kompetencija: "socialine_emocine_ir_sveikos_gyvensenos",
     sveikos_gyvensenos: "socialine_emocine_ir_sveikos_gyvensenos",
+    skaitmeninis: "skaitmenine",
+    skaitmeninio_rastingumo: "skaitmenine",
+    skaitmeninis_rastingumas: "skaitmenine",
+    informacine: "skaitmenine",
   }
   return aliases[stripped] ?? null
 }
@@ -100,12 +108,30 @@ export const bloomLevelSchema = z.preprocess(
   z.enum(BLOOM_LEVELS).optional(),
 )
 
+// Other spellings of a text answer the model considers correct. The
+// facilitator confirms them like the answer itself; anything that is not a
+// short string is dropped instead of failing the whole response.
+const acceptedAnswersFromAiSchema = z
+  .preprocess(
+    (val) =>
+      Array.isArray(val)
+        ? val
+            .filter((a): a is string => typeof a === "string")
+            .map((a) => a.trim())
+            .filter((a) => a.length > 0 && a.length <= 200)
+            .slice(0, 5)
+        : [],
+    z.array(z.string()),
+  )
+  .default([])
+
 export const aiSuggestionSchema = z.object({
   title: z.string(),
   description: z.string(),
   type: z.enum(["text", "number", "multiple_choice"]),
   points: z.number(),
   correct_answer: z.union([z.string(), z.number()]).transform(String),
+  accepted_answers: acceptedAnswersFromAiSchema,
   hints: z.array(z.string()),
   options: z.array(z.string()).nullable().default(null),
   explanation: z.string().optional(),

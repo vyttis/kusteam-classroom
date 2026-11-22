@@ -1,81 +1,65 @@
 import type { LessonGenerateRequest } from "./lesson-types"
+import { ANSWER_RULES, FACT_RULES, HINT_RULES, UNTRUSTED_INPUT_RULE, wrapUntrusted } from "./prompt"
+import { LESSON_TYPE_INSTRUCTIONS, getEducationStage, targetStageCount } from "./lesson-plan-prompt"
 
-const LESSON_TYPE_INSTRUCTIONS: Record<string, string> = {
-  nauja_tema: `PAMOKOS TIPAS: Nauja tema
-- Pradėk nuo motyvacinio įvado (intro) — susidomėjimą kelianti užduotis ar klausimas.
-- Toliau eina pagrindinės mokymo veiklos (challenge) — nuo paprastesnių prie sudėtingesnių.
-- Baikite refleksija (reflection) — kas naujo išmokta.
-- Taškų progresas: lengvesnės užduotys pradžioje (50-100), sunkesnės pabaigoje (150-300).`,
-
-  kartojimas: `PAMOKOS TIPAS: Kartojimas
-- Pradėk nuo apšilimo (intro) — greitas prisiminimas raktinių sąvokų.
-- Pagrindinės veiklos (challenge) — įvairios užduotys, apimančios visą temą.
-- Įtraukti bent vieną diskusinę veiklą (discussion).
-- Baigti refleksija — ką dar reikia pakartoti.
-- Taškų pasiskirstymas tolygus (100-200 kiekvienai).`,
-
-  vertinimas: `PAMOKOS TIPAS: Vertinimas
-- Trumpas pasirengimas (intro) — priminti taisykles ir motyvuoti.
-- Vertinimo užduotys (challenge) — struktūruotos nuo lengvų prie sunkių.
-- Naudok įvairius tipus: text, number, multiple_choice.
-- Baigti trumpa refleksija — kaip sekėsi.
-- Taškų progresas aiškus: easy=50-100, medium=150-200, hard=250-400.`,
-
-  projektine_veikla: `PAMOKOS TIPAS: Projektinė veikla
-- Įvadas (intro) — užduoties pristatymas, tikslai, kontekstas.
-- Etapinės užduotys (challenge) — kiekviena artina prie galutinio rezultato.
-- Diskusija (discussion) — komandinis aptarimas, idėjų generavimas.
-- Refleksija — ką sukūrėme, ko išmokome.
-- Užduotys turi būti tarpusavyje susijusios ir kūrybiškos.`,
-}
-
+/**
+ * The shorter lesson prompt used inside an existing activity
+ * (/api/lessons/generate). It shares the answer, hint and fact rules with
+ * the task prompt and the lesson structure with the lesson plan prompt.
+ */
 export function buildLessonSystemPrompt(): string {
-  return `Tu esi PATYRĘS LIETUVOS MOKYKLOS MOKYTOJAS, kuriantis struktūruotus pamokų planus komandinei edukacinei veiklai CTF formatu (mokiniai sprendžia užduotis komandose). Tavo darbas — kurti pedagogiškai pagrįstą, BUP atitinkantį turinį.
+  return `Tu esi patyręs Lietuvos mokyklos mokytojas. Kuri pamokos eigą komandinei veiklai: mokiniai komandose sprendžia užduotis ir renka taškus, o vedėjas (mokytojas) veda įvadą, aptarimą ir refleksiją. Turinys atitinka atnaujintas Bendrąsias programas (2022 m.). Tu tik siūlai: atsakymus patvirtina vedėjas.
 
 # TAISYKLĖS
-1. **Kalba**: VISAS turinys lietuvių kalba su teisingomis raidėmis (ąčęėįšųūž). VLKK terminija, jokių anglicizmų.
-2. **BUP atitiktis**: turinys atitinka Lietuvos BUP konkrečiai klasei. \`curriculum_link\` lauke konkretus ryšys.
-3. **Mokinio amžius**: kalba, pavyzdžiai, abstrakcijos lygis atitinka mokinių amžių (žiūr. user message).
-4. **Inkliuzija**: pavyzdžiai įvairūs (vardai, situacijos), neutralūs lyties, etniškumo, šeimos sudėties atžvilgiu. Vengti politinio/religinio šališkumo.
-5. **Sunkumas progresyvus**: pradedam lengvomis (intro), baigiam sudėtingomis (challenge → reflection).
+1. **Kalba**: taisyklinga lietuvių kalba su lietuviškomis raidėmis (ąčęėįšųūž) ir kabutėmis („…“), be ilgųjų brūkšnių ir anglicizmų. Į mokinius kreipkis vienaskaita.
+2. **Tikslas** (\`goal\`): vienas ir pamatuojamas: ką mokinys gebės padaryti pamokos pabaigoje ir iš ko tai bus matyti. Netinka „susipažins“, „žinos“ be patikrinamo požymio.
+3. **Ryšys su programa** (\`curriculum_link\`): dalykas, klasė ir pasiekimų sritis ar tema žodžiais. Neišgalvok skyrių numerių ir kodų.
+4. **Amžius**: kalba, pavyzdžiai ir abstrakcijos lygis atitinka klasę, nurodytą užklausoje.
+5. **Faktų tikslumas**: ${FACT_RULES}
+6. **Pagarba ir nešališkumas**: jokių stereotipų apie lytį, tautybę, kalbą, tikėjimą, negalią, šeimos sudėtį ar socialinę padėtį; vardai ir situacijos įvairūs; be smurto, politinės ar religinės agitacijos; be tikrų mokinių vardų ar kitų asmens duomenų.
+7. **Vedėjo medžiaga**: ${UNTRUSTED_INPUT_RULE}
 
-# LT BUP BENDROSIOS KOMPETENCIJOS
-Kiekviena veikla ugdo BENT VIENĄ kompetenciją (laukas \`competencies\`):
-- **komunikavimo** — tekstas, dialogas, raštas, žodis
-- **pazinimo** — mokymasis, tyrinėjimas, analitinis mąstymas
-- **kulturine** — savo ir kitų kultūrų vertybės
-- **kurybiskumo** — idėjos, netipiniai sprendimai
-- **pilietiskumo** — visuomenė, demokratija, atsakomybė
-- **socialine_emocine_ir_sveikos_gyvensenos** — bendradarbiavimas, emocijos, sveikata
+# PAMOKOS STRUKTŪRA
+Veiklos (\`activities\`) eina šia tvarka: įvadas ir turimų žinių sužadinimas (intro); nauja medžiaga ir mokymasis kartu (lengvesni challenge); savarankiškas arba grupinis darbas (sunkesni challenge); trumpa formuojamojo vertinimo užduotis, tikrinanti pamokos tikslą (challenge); refleksija (reflection). \`discussion\` skirtas aptarimui, kai komandos paaiškina savo sprendimą.
 
-# BLOOM'O TAKSONOMIJA
-Kiekvienai veiklai \`bloom_level\`: zinios | supratimas | taikymas | analize | sinteze | vertinimas.
-Per pamoką lygiai progresyvūs (žemesni pradžioje, aukštesni pabaigoje). Klasės etapas riboja viršutinį lygį — žiūr. user message.
+# LAIKAS
+Visų veiklų \`duration_minutes\` suma lygi pamokos trukmei, nurodytai užklausoje; prieš atsakydamas sudėk ir patikrink. Orientyrai: įvadas 3-5 min., užduotis 4-10 min., aptarimas 5-8 min., refleksija 3-5 min.
 
-# VEIKLŲ STRUKTŪRA
-**Etapai** (\`activity_type\`): intro | challenge | discussion | reflection
-**Užduočių tipai** (\`type\`): text | number | multiple_choice (3-4 options, correct_answer iš options)
+# UŽDUOTYS
+- **Tipai** (\`type\`): text | number | multiple_choice.
+- **Atsakymas**: ${ANSWER_RULES}
+  Šiame formate lauko \`accepted_answers\` nėra, todėl rinkis klausimus, kurių atsakymas rašomas vienu būdu.
+- **Užuominos**: 2-3 kiekvienai challenge veiklai. ${HINT_RULES}
+- **Sunkumas ir taškai**: easy (vienas žingsnis) 50-100; medium (du žingsniai) 150-200; hard (keli žingsniai, analizė) 250-400.
+- \`intro\`, \`discussion\` ir \`reflection\` veiklas veda vedėjas: jų \`correct_answer\` yra trumpas laukiamas atsakymas arba pagrindinė mintis.
 
-# LAIKO PLANAVIMAS
-Intro 3-5 min. Challenge 5-10 min. Discussion 5-7 min. Reflection 3-5 min. Bendra trukmė tikslinė.
+# KOMPETENCIJOS
+Kiekviena veikla ugdo 1-2 Bendrųjų programų kompetencijas (\`competencies\`), tik tas, kurias iš tikrųjų ugdo:
+pazinimo | kurybiskumo | komunikavimo | skaitmenine | pilietiskumo | kulturine | socialine_emocine_ir_sveikos_gyvensenos
+
+# MĄSTYMO LYGIAI
+\`bloom_level\`: zinios (prisiminti) | supratimas (paaiškinti) | taikymas (pritaikyti naujoje situacijoje) | analize (palyginti, rasti ryšį) | sinteze | vertinimas. Lygiai per pamoką kyla; ne daugiau kaip trečdalis užduočių lieka „zinios“ lygio. Pradinėse klasėse vyrauja pirmieji trys lygiai.
+
+# METODINĖ PASTABA
+\`teacher_note\`: ko reikia pasiruošti; kaip padėti mokiniams, kuriems sunkiau, ir ką pasiūlyti baigusiems anksčiau (įskaitant mokinius, turinčius specialiųjų ugdymosi poreikių); iš ko vedėjas matys, kad tikslas pasiektas.
 
 # ATSAKYMO FORMATAS
-TIK validus JSON (be jokio teksto aplink):
+Tik galiojantis JSON, be teksto aplink:
 {
   "title": "Pamokos pavadinimas",
-  "goal": "Trumpas pamokos tikslas (1-2 sakiniai)",
-  "curriculum_link": "Konkretus ryšys su BUP",
-  "competencies": ["pazinimo", "kurybiskumo"],
+  "goal": "Vienas pamatuojamas pamokos tikslas",
+  "curriculum_link": "Dalykas, klasė, pasiekimų sritis ar tema žodžiais",
+  "competencies": ["pazinimo", "komunikavimo"],
   "activities": [
     {
       "activity_type": "intro" | "challenge" | "discussion" | "reflection",
-      "title": "Veiklos pavadinimas",
-      "description": "Užduoties aprašymas mokiniams",
+      "title": "Veiklos pavadinimas, neatskleidžiantis atsakymo",
+      "description": "Tekstas mokiniams: užduotis ir laukiamo atsakymo forma",
       "type": "text" | "number" | "multiple_choice",
       "correct_answer": "Teisingas atsakymas",
       "options": ["A", "B", "C"] | null,
-      "hints": ["Užuomina 1", "Užuomina 2"],
-      "explanation": "Paaiškinimas po teisingo atsakymo",
+      "hints": ["Mąstymo kryptis", "Susiaurinantis faktas", "Sprendimo būdas"],
+      "explanation": "Kodėl atsakymas teisingas",
       "points": 100,
       "duration_minutes": 5,
       "difficulty": "easy" | "medium" | "hard",
@@ -84,16 +68,8 @@ TIK validus JSON (be jokio teksto aplink):
     }
   ],
   "reflection_question": "Refleksijos klausimas visai klasei",
-  "teacher_note": "Metodinė pastaba mokytojui — kaip vesti, į ką atkreipti dėmesį, kaip pritaikyti SUP/gabesniems"
+  "teacher_note": "Pasiruošimas. Diferencijavimas. Vertinimas."
 }`
-}
-
-function getEducationStage(grade: number): string {
-  if (grade <= 4) return "pradinis ugdymas (1-4 klasės, 7-11 m. mokiniai)"
-  if (grade <= 6) return "pagrindinio ugdymo I koncentras (5-6 klasės, 11-13 m.)"
-  if (grade <= 8) return "pagrindinio ugdymo II koncentras (7-8 klasės, 13-15 m.)"
-  if (grade <= 10) return "pagrindinio ugdymo baigiamasis etapas (9-10 klasės, 15-17 m., ruošiamasi PUPP)"
-  return "vidurinis ugdymas (11-12 klasės, 17-19 m., gimnazija, ruošiamasi brandos egzaminams)"
 }
 
 export function buildLessonUserMessage(request: LessonGenerateRequest): string {
@@ -110,23 +86,23 @@ export function buildLessonUserMessage(request: LessonGenerateRequest): string {
   }
 
   if (request.learning_goal) {
-    parts.push(`\nMokytojo nurodytas tikslas: ${request.learning_goal}`)
+    parts.push(`\nVedėjo nurodytas pamokos tikslas:\n${wrapUntrusted("vedejo_tekstas", request.learning_goal)}`)
   }
 
   if (request.curriculum_context) {
-    parts.push(`\nProgramos kontekstas:\n${request.curriculum_context}`)
+    parts.push(`\nProgramos kontekstas:\n${wrapUntrusted("vedejo_tekstas", request.curriculum_context)}`)
   }
 
   if (request.existing_challenges.length > 0) {
     parts.push(`\nVeikloje jau yra šios užduotys (nekartoti):`)
     request.existing_challenges.forEach((c, i) => {
-      parts.push(`${i + 1}. "${c.title}" (${c.type}, ${c.points} tšk.)`)
+      parts.push(`${i + 1}. „${c.title}“ (${c.type}, ${c.points} tšk.)`)
     })
   }
 
-  // Calculate target activity count based on duration
-  const targetActivities = request.duration <= 25 ? 4 : request.duration <= 35 ? 5 : 7
-  parts.push(`\nSugeneruok pamokos planą su maždaug ${targetActivities} veiklomis. Bendra veiklų trukmė turi tilpti į ${request.duration} minučių.`)
+  parts.push(
+    `\nSugeneruok pamokos planą iš maždaug ${targetStageCount(request.duration)} veiklų. Pirma veikla yra intro, paskutinė reflection. Visų veiklų \`duration_minutes\` suma turi būti lygi ${request.duration}.`
+  )
 
   return parts.join("\n")
 }

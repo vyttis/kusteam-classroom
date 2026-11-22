@@ -1,6 +1,7 @@
 import { MAX_ANSWER_LENGTH } from "@/lib/game/answer-hasher"
 import { canonicalNumber } from "@/lib/game/number-answer"
 import type { VerificationResult } from "@/lib/ai/types"
+import { dropLeakingHints } from "@/lib/ai/hint-leak"
 
 /** The stage fields conversion reads; old plans may miss some of them. */
 export interface PlanStage {
@@ -33,6 +34,8 @@ export interface StageTask {
   answer: string | null
   /** Why the answer cannot be used as it is. Never contains the answer. */
   problem: string | null
+  /** Hints removed because they gave the answer away. */
+  droppedHints?: number
 }
 
 const fold = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase()
@@ -101,10 +104,29 @@ export function stageToTask(stage: PlanStage): StageTask {
     // The stored answer takes the exact spelling of its choice.
     const match = options.find((o) => fold(o) === fold(answer))
     if (!match) return { ...task, problem: "Teisingo atsakymo nėra tarp variantų." }
-    return { ...task, answer: match }
+    return withoutLeakingHints({ ...task, answer: match })
   }
-  return { ...task, answer }
+  return withoutLeakingHints({ ...task, answer })
 }
+
+/**
+ * Participants open hints one by one, so a hint that states the answer (the
+ * word, the number, the right choice) is removed here and the task is marked
+ * for the facilitator to look at.
+ */
+function withoutLeakingHints(task: StageTask): StageTask {
+  if (task.answer === null) return task
+  const { hints, dropped } = dropLeakingHints({
+    type: task.type,
+    correct_answer: task.answer,
+    hints: task.hints,
+    options: task.options,
+    description: task.description,
+  })
+  return dropped > 0 ? { ...task, hints, droppedHints: dropped } : task
+}
+
+const DROPPED_HINT_NOTE = "Pašalinta užuomina, kuri atskleidė atsakymą. Peržiūrėkite likusias užuominas."
 
 /**
  * Verification notes as stored on the task. Participants of a running
@@ -147,10 +169,18 @@ export function reviewTask(task: StageTask, verification: VerificationResult | n
   if (task.answer === null) {
     return { keepAnswer: false, verdict: "fail", issues: [task.problem ?? "Trūksta atsakymo."], confidence: 1 }
   }
+  const droppedNote = task.droppedHints ? [DROPPED_HINT_NOTE] : []
   if (!verification) {
-    return { keepAnswer: true, verdict: "uncertain", issues: ["DI patikra neatlikta."], confidence: null }
+    return {
+      keepAnswer: true,
+      verdict: "uncertain",
+      issues: ["DI patikra neatlikta.", ...droppedNote],
+      confidence: null,
+    }
   }
-  const issues = safeIssues(verification.issues, task.answer)
+  const issues = [...droppedNote, ...safeIssues(verification.issues, task.answer)].slice(0, 5)
   if (verification.verdict === "fail" && issues.length === 0) issues.push("DI patikra rado galimą klaidą.")
-  return { keepAnswer: true, verdict: verification.verdict, issues, confidence: verification.confidence }
+  // A removed hint is worth a look even when the answer itself checks out.
+  const verdict = task.droppedHints && verification.verdict === "pass" ? "uncertain" : verification.verdict
+  return { keepAnswer: true, verdict, issues, confidence: verification.confidence }
 }

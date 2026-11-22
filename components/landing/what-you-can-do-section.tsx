@@ -22,7 +22,7 @@ const capabilities = [
   {
     label: "Gyvai",
     title: "Pamokos eiga realiu laiku",
-    body: "Komandų progresas, dalyvių atsakymai ir sudėtingos vietos matomi iškart. Galite reaguoti per pamoką, o ne po jos.",
+    body: "Komandų pažanga, dalyvių atsakymai ir sudėtingos vietos matomi iškart. Galite reaguoti per pamoką, o ne po jos.",
     accent: "accent",
   },
   {
