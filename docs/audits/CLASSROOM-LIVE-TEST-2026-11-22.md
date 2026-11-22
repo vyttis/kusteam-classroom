@@ -7,7 +7,7 @@ Paskyra: `vytis.radvila+cls-t1@ku.lt`, vaidmuo `teacher`, sukurta Vyčio per adm
 
 ## Rezultatas
 
-Visas mokytojo ir pamokos kelias nuo prisijungimo iki CSV praėjo. Naujų P0 ar P1 nerasta. Patvirtinti keli audito P2 radiniai ir rasti keturi nauji smulkesni.
+Visas mokytojo ir pamokos kelias nuo prisijungimo iki CSV praėjo. Naujų P0 ar P1 nerasta. Patvirtinti keli audito P2 radiniai ir rasti penki nauji smulkesni.
 
 ## Kas praėjo (PASS, faktiškai paleista)
 
@@ -45,7 +45,7 @@ Visas mokytojo ir pamokos kelias nuo prisijungimo iki CSV praėjo. Naujų P0 ar 
 | G-30 | Klasės ekranas 1920×1080 | laikmatis, lentelė, QR, kodas, pranešimas; taškai 36 px, pavadinimai 30 px |
 | G-31 | Atsijungimas | nukreipia į `/vedejui`; skydelis nebepasiekiamas |
 
-Apkrova šio bandymo metu: 30 lygiagrečių lentelės užklausų per 0,7 s, visos 200, pusė iš CDN talpyklos. Vercel runtime klaidų nebuvo.
+Apkrova šio bandymo metu: 30 lygiagrečių lentelės užklausų per 0,7 s, visos 200, pusė iš CDN talpyklos. Vercel po bandymo rodo dvi runtime klaidų grupes, abi sukeltos mano neigiamų testų, ne gedimų (žr. N-5).
 
 ## Patvirtinti audito radiniai
 
@@ -71,6 +71,8 @@ Pataisymai ataskaitai:
 **N-3 (P3). DI pasiūlymai dingsta perkrovus puslapį.** Sugeneruoti, bet dar nepridėti pasiūlymai po perkrovimo neatkuriami, nors užklausa jau nuskaičiuota. Likučio eilutė iki perkrovimo rodė seną skaičių (40 vietoj 39).
 
 **N-4 (P3). DI užuomina gali atskleisti atsakymą.** Vienoje iš trijų sugeneruotų užduočių trečia užuomina buvo „Tikslus skaičius artimas 1584 km²“, kai atsakymas 1584. Tikrintojas pažymėjo „DI patikrino“. Tai pedagoginės kokybės, ne saugumo klausimas; mokytojo peržiūra būtina.
+
+**N-5 (P3). Laukiami atmetimai registruojami kaip serverio klaidos.** Vercel runtime klaidose po bandymo atsirado `Game lookup failed: Cannot coerce the result to a single JSON object` (`/api/teams` su nežinomu, pristabdytos ar baigtos veiklos kodu; naudotojui teisingai grąžinta 404) ir `Prieiga uždrausta. Reikalinga rolė: admin arba super_admin` (`/admin/veiklos`, kai jį atveria mokytojas; naudotojas teisingai nukreiptas). Kai bus įspėjimai (R-04), tokie įrašai juos triukšmins: kiekvienas mokinio klaidingai įvestas kodas atrodys kaip klaida.
 
 ## Prisijungimas be slaptažodžio
 
