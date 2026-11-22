@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { MapPin, ExternalLink } from "lucide-react"
 
 interface MapsEmbedProps {
@@ -54,7 +55,14 @@ function isValidMapsUrl(url: string): boolean {
   )
 }
 
+/**
+ * A task's map. Nothing is requested from Google until the person asks for
+ * the map: an embedded map sends the device's address to Google and lets it
+ * set cookies, which the privacy notice does not promise for participants.
+ */
 export function MapsEmbed({ url, className = "" }: MapsEmbedProps) {
+  const [shown, setShown] = useState(false)
+
   if (!url || !isValidMapsUrl(url)) {
     return null
   }
@@ -81,16 +89,32 @@ export function MapsEmbed({ url, className = "" }: MapsEmbedProps) {
 
   return (
     <div className={`rounded-xl overflow-hidden border border-border/50 ${className}`}>
-      <iframe
-        src={embedUrl}
-        width="100%"
-        height="250"
-        style={{ border: 0 }}
-        allowFullScreen
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-        title="Google Maps"
-      />
+      {shown ? (
+        <iframe
+          src={embedUrl}
+          width="100%"
+          height="250"
+          style={{ border: 0 }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          title="Google žemėlapis"
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-2 bg-muted/30 px-4 py-6 text-center">
+          <button
+            type="button"
+            onClick={() => setShown(true)}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-steam-dark hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <MapPin className="h-4 w-4" aria-hidden="true" />
+            Rodyti žemėlapį
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Žemėlapį pateikia Google. Jį atvėrus, Google gauna jūsų įrenginio interneto adresą.
+          </p>
+        </div>
+      )}
       <a
         href={url}
         target="_blank"
