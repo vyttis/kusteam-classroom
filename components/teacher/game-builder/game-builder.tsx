@@ -14,6 +14,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
+  type UniqueIdentifier,
 } from "@dnd-kit/core"
 import {
   arrayMove,
@@ -32,6 +33,21 @@ import { AiSuggestionCard } from "../ai-suggestion-card"
 import { useToast } from "@/hooks/use-toast"
 import { useIsDesktop } from "@/hooks/use-is-desktop"
 import { confirmDiscardTask } from "@/hooks/use-leave-warning"
+import { useSessionExpired } from "@/hooks/use-session-expired"
+import { SessionExpiredNotice } from "@/components/teacher/session-expired-notice"
+import { notifyAiUsageChanged } from "@/components/teacher/ai-quota-note"
+import {
+  addFailureReason,
+  failureLines,
+  partialAddSummary,
+  type AddFailure,
+} from "@/components/teacher/task-add-result"
+import { DND_INSTRUCTIONS_LT, dndAnnouncementsLt, stepTarget } from "./dnd-a11y"
+import {
+  pendingSuggestionsKey,
+  readPendingSuggestions,
+  writePendingSuggestions,
+} from "./pending-suggestions"
 import {
   Sheet,
   SheetContent,
@@ -40,7 +56,9 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import { AlertTriangle, Sparkles } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { isLiveStatus } from "@/lib/game/live-edit"
+import { aiTasksToReview } from "@/components/teacher/ai-review"
 
 interface GameBuilderProps {
   initialGame: {
@@ -114,35 +132,49 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
     setMobileSheetOpen(true)
   }, [initialTask, isDesktop])
 
-  // DI suggestions survive a reload of this tab: generating them took a
-  // minute of DI work. Kept per activity, for this tab only.
-  const suggestionsKey = `ks-di-suggestions:${game.id}`
-  const suggestionsRestored = useRef(false)
+  // Generated suggestions were already counted against the monthly DI
+  // allowance: until they are added or dismissed they are kept in this
+  // browser per activity (7 days), so a reload does not lose them.
+  const suggestionsKey = pendingSuggestionsKey(game.id)
+  const [suggestionsStoreReady, setSuggestionsStoreReady] = useState(false)
+  // When the suggestions on screen were generated (kept across a restore).
+  const [suggestionsSavedAt, setSuggestionsSavedAt] = useState<number | null>(null)
+  // Set when suggestions were restored from this browser: shows the notice.
+  const [restoredSuggestions, setRestoredSuggestions] = useState<{ count: number; savedAt: number } | null>(null)
   useEffect(() => {
+    let saved = null
     try {
-      const raw = sessionStorage.getItem(suggestionsKey)
-      const saved = raw ? (JSON.parse(raw) as { suggestions?: unknown; added?: unknown }) : null
-      if (saved && Array.isArray(saved.suggestions) && saved.suggestions.length > 0) {
-        setSuggestions(saved.suggestions as AiSuggestion[])
-        setAddedIds(new Set(Array.isArray(saved.added) ? (saved.added as number[]) : []))
-      }
+      saved = readPendingSuggestions(window.localStorage, suggestionsKey)
     } catch {
-      // Storage blocked or unreadable: start without saved suggestions.
+      // Storage blocked: start without saved suggestions.
     }
-    suggestionsRestored.current = true
+    if (saved) {
+      setSuggestions(saved.suggestions)
+      setAddedIds(new Set())
+      setSuggestionsSavedAt(saved.savedAt)
+      setRestoredSuggestions({ count: saved.suggestions.length, savedAt: saved.savedAt })
+    }
+    setSuggestionsStoreReady(true)
   }, [suggestionsKey])
   useEffect(() => {
-    if (!suggestionsRestored.current) return
+    // Not before the stored ones were read: an empty first render would
+    // erase them.
+    if (!suggestionsStoreReady) return
     try {
-      if (suggestions.length > 0) {
-        sessionStorage.setItem(suggestionsKey, JSON.stringify({ suggestions, added: [...addedIds] }))
-      } else {
-        sessionStorage.removeItem(suggestionsKey)
-      }
+      writePendingSuggestions(
+        window.localStorage,
+        suggestionsKey,
+        suggestions,
+        addedIds,
+        suggestionsSavedAt ?? Date.now()
+      )
     } catch {
-      // Storage full or blocked: the suggestions stay for this visit.
+      // Storage blocked: the suggestions stay for this visit.
     }
-  }, [suggestions, addedIds, suggestionsKey])
+  }, [suggestions, addedIds, suggestionsKey, suggestionsStoreReady, suggestionsSavedAt])
+
+  // A session that ended mid-work: one notice for the whole builder.
+  const session = useSessionExpired()
 
   // Leaving a task with unsaved changes asks first.
   const confirmDiscard = confirmDiscardTask
@@ -214,6 +246,9 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
             scenario: selectedScenario || undefined,
           }),
         })
+        if (session.check(res)) {
+          throw new Error("Sesija baigėsi. Prisijunkite naujame skirtuke ir generuokite dar kartą.")
+        }
         if (!res.ok) {
           const err = await readJson<{ error?: unknown }>(res)
           throw new Error(err.error || "Nepavyko sugeneruoti pasiūlymų")
@@ -221,8 +256,11 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         const data: DiGenerateResponse = await res.json()
         if (append) {
           setSuggestions((prev) => [...prev, ...data.suggestions])
+          setSuggestionsSavedAt((at) => at ?? Date.now())
         } else {
           setSuggestions(data.suggestions)
+          setSuggestionsSavedAt(Date.now())
+          setRestoredSuggestions(null)
         }
         // Show success banner
         if (successTimerRef.current) clearTimeout(successTimerRef.current)
@@ -232,9 +270,12 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         setDiError(err instanceof Error ? err.message : "Nežinoma klaida")
       } finally {
         setDiLoading(false)
+        // The request was counted (or refused) by now: the "liko N DI
+        // užklausų" line reads the allowance again.
+        notifyAiUsageChanged()
       }
     },
-    [game.id, game.title, game.description, challenges, teacherPrompt, selectedScenario]
+    [game.id, game.title, game.description, challenges, teacherPrompt, selectedScenario, session]
   )
 
   // Document import produces the same AiSuggestion shape as DI generation —
@@ -242,6 +283,8 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
   function handleImported(imported: AiSuggestion[]) {
     if (imported.length === 0) return
     setSuggestions((prev) => [...prev, ...imported])
+    setSuggestionsSavedAt((at) => at ?? Date.now())
+    notifyAiUsageChanged()
     if (successTimerRef.current) clearTimeout(successTimerRef.current)
     setGenerationSuccess(imported.length)
     successTimerRef.current = setTimeout(() => setGenerationSuccess(null), 3000)
@@ -314,6 +357,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
           verification_confidence: suggestion.verification?.confidence ?? null,
         }),
       })
+      session.check(res)
       if (res.ok) {
         setAddedIds((prev) => new Set(prev).add(index))
         setSelectedIds((prev) => {
@@ -323,13 +367,13 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         })
         return null
       }
-      const errBody = await res.json().catch(() => null)
-      const msg = errBody?.error || `HTTP ${res.status}`
+      const errBody = (await res.json().catch(() => null)) as { error?: unknown } | null
+      const msg = addFailureReason(res.status, errBody?.error)
       console.error("addSuggestion failed:", msg, { status: res.status, suggestion: suggestion.title })
       return msg
     } catch (err) {
       console.error("addSuggestion network error:", err)
-      return "Tinklo klaida"
+      return addFailureReason(null)
     }
   }
 
@@ -353,19 +397,26 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
 
     setAdding(true)
     let count = 0
-    let lastError: string | null = null
+    const failures: (AddFailure & { index: number })[] = []
     for (const i of toAdd) {
       const error = await addSuggestion(i)
       if (!error) count++
-      else lastError = error
+      else failures.push({ index: i, title: suggestions[i]?.title ?? "", reason: error })
     }
-    setSelectedIds(new Set())
-    if (count > 0) {
+    // What failed stays selected, so "Pridėti" tries exactly those again.
+    setSelectedIds(new Set(failures.map((f) => f.index)))
+    if (failures.length === 0) {
       toast({ title: `Pridėta užduočių: ${count}` })
-      refreshChallenges()
     } else {
-      toast({ title: "Nepavyko pridėti užduočių", description: lastError || undefined, variant: "destructive" })
+      // Never a plain success when something was left out: say how many
+      // were added, which were not and why.
+      toast({
+        title: count > 0 ? "Pridėtos ne visos užduotys" : "Nepavyko pridėti užduočių",
+        description: `${partialAddSummary(count, failures.length)} ${failureLines(failures).join(" ")} Nepridėti pasiūlymai liko sąraše pažymėti, galite bandyti dar kartą.`,
+        variant: "destructive",
+      })
     }
+    if (count > 0) refreshChallenges()
     setAdding(false)
   }
 
@@ -380,6 +431,18 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
     setSelectedChallengeId(null)
     setPreviewChallenge(null)
     setActiveTab("manual")
+  }
+
+  // Brings the DI tab with the restored suggestions into view.
+  function showRestoredSuggestions() {
+    if (editingChallenge || isCreatingNew) {
+      if (!confirmDiscard()) return
+      handleEditorCancel()
+    }
+    setPreviewChallenge(null)
+    setActiveTab("di")
+    if (!isDesktop) setMobileSheetOpen(true)
+    setRestoredSuggestions(null)
   }
 
   // ========== Challenge actions ==========
@@ -420,6 +483,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
       const res = await fetch(`/api/challenges/${challenge.id}`, {
         method: "DELETE",
       })
+      if (session.check(res)) throw new Error(addFailureReason(401))
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(body.error ?? "")
@@ -463,6 +527,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
           hint_penalty: challenge.hint_penalty,
         }),
       })
+      if (session.check(res)) throw new Error(addFailureReason(401))
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(body.error ?? "")
@@ -507,6 +572,67 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
     setPrefillData(null)
   }
 
+  // ========== Reorder (drag and the move buttons share this) ==========
+  // Spoken to screen readers after a move made with the buttons.
+  const [moveAnnouncement, setMoveAnnouncement] = useState("")
+
+  async function saveOrder(reordered: Challenge[], previous: Challenge[]): Promise<boolean> {
+    setChallenges(reordered)
+    // Roll back the optimistic reorder if the server rejects it — otherwise
+    // the list looks reordered but silently reverts on the next load
+    try {
+      const res = await fetch("/api/challenges/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          game_id: game.id,
+          order: reordered.map((c, i) => ({ id: c.id, order_index: i })),
+        }),
+      })
+      session.check(res)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return true
+    } catch {
+      setChallenges(previous)
+      toast({
+        title: "Nepavyko išsaugoti tvarkos",
+        description: "Patikrinkite ryšį ir bandykite dar kartą.",
+        variant: "destructive",
+      })
+      return false
+    }
+  }
+
+  // The single-pointer alternative to dragging (WCAG 2.5.7): one step up or
+  // down per press.
+  async function handleMoveChallenge(challenge: Challenge, direction: -1 | 1) {
+    if (live) return
+    const index = challenges.findIndex((c) => c.id === challenge.id)
+    const target = stepTarget(index, direction, challenges.length)
+    if (target === null) return
+    const saved = await saveOrder(arrayMove(challenges, index, target), challenges)
+    setMoveAnnouncement(
+      saved
+        ? `Užduotis „${challenge.title}“ perkelta į ${target + 1} vietą iš ${challenges.length}.`
+        : `Užduoties „${challenge.title}“ perkelti nepavyko.`
+    )
+  }
+
+  // What a drag id means, for the screen reader announcements.
+  function describeDragId(id: UniqueIdentifier): string | null {
+    const key = String(id)
+    if (key === "challenge-list-drop") return "užduočių sąrašas"
+    if (key.startsWith("challenge-")) {
+      const index = challenges.findIndex((c) => `challenge-${c.id}` === key)
+      return index >= 0 ? `${index + 1} užduotis „${challenges[index].title}“` : null
+    }
+    if (key.startsWith("suggestion-")) {
+      const suggestion = suggestions[parseInt(key.replace("suggestion-", ""), 10)]
+      return suggestion ? `DI pasiūlymas „${suggestion.title}“` : null
+    }
+    return null
+  }
+
   // ========== DnD handlers ==========
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id))
@@ -543,30 +669,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
       const newIdx = challenges.findIndex((c) => `challenge-${c.id}` === overStr)
       if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return
 
-      const previous = challenges
-      const reordered = arrayMove(challenges, oldIdx, newIdx)
-      setChallenges(reordered)
-
-      // Roll back the optimistic reorder if the server rejects it — otherwise
-      // the list looks reordered but silently reverts on the next load
-      try {
-        const res = await fetch("/api/challenges/reorder", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            game_id: game.id,
-            order: reordered.map((c, i) => ({ id: c.id, order_index: i })),
-          }),
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      } catch {
-        setChallenges(previous)
-        toast({
-          title: "Nepavyko išsaugoti tvarkos",
-          description: "Patikrinkite ryšį ir bandykite dar kartą.",
-          variant: "destructive",
-        })
-      }
+      await saveOrder(arrayMove(challenges, oldIdx, newIdx), challenges)
     }
 
     // Drop suggestion into challenge list
@@ -613,8 +716,42 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         tasksNeedingAnswer={challenges
           .filter((c) => c.needs_answer)
           .map((c) => ({ id: c.id, title: c.title }))}
+        aiTasksToReview={aiTasksToReview(challenges)}
+        onOpenTask={(taskId) => {
+          const task = challenges.find((c) => c.id === taskId)
+          if (task) handleSelectChallenge(task)
+        }}
         onOpenSettings={() => setSettingsOpen(true)}
       />
+
+      {session.expired && <SessionExpiredNotice className="mx-4 sm:mx-6 lg:mx-8 mt-4" />}
+
+      {restoredSuggestions && suggestions.length > 0 && (
+        <div
+          role="status"
+          className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-highlight/40 bg-highlight/10 px-4 py-3 text-sm text-steam-dark"
+        >
+          <Sparkles className="h-4 w-4 shrink-0 text-highlight-ink" aria-hidden="true" />
+          <p className="min-w-0 flex-1 basis-64">
+            <span className="font-semibold">Atkurti dar nepridėti DI pasiūlymai: {restoredSuggestions.count}.</span>{" "}
+            Sugeneruoti{" "}
+            {new Date(restoredSuggestions.savedAt).toLocaleString("lt-LT", {
+              timeZone: "Europe/Vilnius",
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+            , saugomi šioje naršyklėje 7 dienas. Naujos DI užklausos jiems nereikia.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={showRestoredSuggestions}>
+              Rodyti pasiūlymus
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setRestoredSuggestions(null)}>
+              Gerai
+            </Button>
+          </div>
+        </div>
+      )}
 
       {live && (
         <div
@@ -654,9 +791,17 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         onConfirm={confirmDeleteChallenge}
       />
 
+      <p className="sr-only" role="status" aria-live="polite">
+        {moveAnnouncement}
+      </p>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        accessibility={{
+          screenReaderInstructions: DND_INSTRUCTIONS_LT,
+          announcements: dndAnnouncementsLt(describeDragId),
+        }}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -671,6 +816,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
                 onSelect={handleSelectChallenge}
                 onDelete={handleDeleteChallenge}
                 onDuplicate={handleDuplicateChallenge}
+                onMove={handleMoveChallenge}
                 onAddNew={handleAddNew}
                 locked={live}
                 isOverPanel={

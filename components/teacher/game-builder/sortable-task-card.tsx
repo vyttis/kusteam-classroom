@@ -6,7 +6,7 @@ import { Challenge } from "@/types/game"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { GripVertical, Edit3, Trash2, Copy, Sparkles, AlertTriangle } from "lucide-react"
+import { GripVertical, Edit3, Trash2, Copy, Sparkles, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react"
 
 interface SortableTaskCardProps {
   challenge: Challenge
@@ -15,6 +15,10 @@ interface SortableTaskCardProps {
   onSelect: (challenge: Challenge) => void
   onDelete: (challenge: Challenge) => void
   onDuplicate: (challenge: Challenge) => void
+  /** Moves the task one step up (-1) or down (1) without dragging. */
+  onMove?: (challenge: Challenge, direction: -1 | 1) => void
+  isFirst?: boolean
+  isLast?: boolean
   /** The activity is running or paused: no dragging, removing or copying. */
   locked?: boolean
 }
@@ -26,6 +30,9 @@ export function SortableTaskCard({
   onSelect,
   onDelete,
   onDuplicate,
+  onMove,
+  isFirst = false,
+  isLast = false,
   locked = false,
 }: SortableTaskCardProps) {
   const {
@@ -75,8 +82,8 @@ export function SortableTaskCard({
             ) : (
               <button
                 type="button"
-                aria-label={`Perkelti užduotį ${index + 1}`}
-                className="flex flex-col items-center gap-0.5 pt-0.5 cursor-grab active:cursor-grabbing touch-none shrink-0"
+                aria-label={`Vilkti užduotį ${index + 1} „${challenge.title}“ į kitą vietą`}
+                className="flex flex-col items-center gap-0.5 pt-0.5 cursor-grab active:cursor-grabbing touch-none shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 {...attributes}
                 {...listeners}
                 onClick={(e) => e.stopPropagation()}
@@ -149,7 +156,37 @@ export function SortableTaskCard({
               </div>
             </div>
 
-            <div className="flex gap-0.5 shrink-0">
+            <div className="flex max-w-[5.5rem] flex-wrap justify-end gap-0.5 shrink-0">
+              {!locked && onMove && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Perkelti „${challenge.title}“ aukštyn`}
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-secondary-ink"
+                    disabled={isFirst}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onMove(challenge, -1)
+                    }}
+                  >
+                    <ArrowUp className="h-3 w-3" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Perkelti „${challenge.title}“ žemyn`}
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-secondary-ink"
+                    disabled={isLast}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onMove(challenge, 1)
+                    }}
+                  >
+                    <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                  </Button>
+                </>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

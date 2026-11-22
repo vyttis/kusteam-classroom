@@ -46,11 +46,12 @@ export function DraggableSuggestionCard({
       {canDrag && (
         <button
           type="button"
-          className="absolute left-1 top-4 z-10 p-1 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-muted/50 opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label={`Vilkti pasiūlymą „${suggestion.title}“ į užduočių sąrašą`}
+          className="absolute left-1 top-4 z-10 p-1 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-muted/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-opacity"
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <GripVertical className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         </button>
       )}
       <AiSuggestionCard
