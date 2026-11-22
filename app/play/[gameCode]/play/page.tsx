@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import type { PlayerSession, GameSettings, AchievementType } from "@/types/game"
-import { getPlayerSession, clearPlayerSession, savePlayerSession } from "@/lib/game/session"
+import { getPlayerSession, clearPlayerSession, readStored, savePlayerSession } from "@/lib/game/session"
+import { ConnectionBanner, loadRetryDelayMs, useConnection } from "@/components/player/connection"
 import { type GameClock, secondsLeft } from "@/lib/game/clock"
 import { remapTaskIndex } from "@/lib/game/tasks-version"
 import { normalizeNumericAnswer, openedHintCount, sheetKey } from "@/lib/game/play-format"
@@ -81,6 +82,11 @@ export default function PlayPage() {
   const tasksLoadedRef = useRef(false)
   const [endedByTeacher, setEndedByTeacher] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  // Automatic retries of a failed load made so far (components/player/connection.tsx).
+  const [loadRetries, setLoadRetries] = useState(0)
+  // "No connection" notice: two failed status polls in a row, or the browser
+  // says it is offline; the first poll that gets through removes it.
+  const { offline, report: reportPoll } = useConnection()
   // Distinguishes "still loading" from "loaded, but the game has no challenges"
   const [stateLoaded, setStateLoaded] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState(true)
@@ -106,8 +112,7 @@ export default function PlayPage() {
 
   // Check if reflection already done
   useEffect(() => {
-    const stored = localStorage.getItem(`ctf_reflection_${gameCode}`)
-    if (stored) setReflectionDone(true)
+    if (readStored(`ctf_reflection_${gameCode}`)) setReflectionDone(true)
   }, [gameCode])
 
   // Timer state. The clock follows lib/game/clock.ts: pauses stop it, and
@@ -232,10 +237,12 @@ export default function PlayPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [awaitingStart, gameStarted, session, gameCode])
 
-  async function loadChallenges(s: PlayerSession) {
+  // quiet: an automatic retry from the error screen, which stays up until
+  // the load succeeds instead of flashing the spinner.
+  async function loadChallenges(s: PlayerSession, quiet = false) {
     // Single round-trip via /api/play/state (game + challenges + solved submissions)
-    setLoadError(false)
-    let state: {
+    if (!quiet) setLoadError(false)
+    type PlayState = {
       game: { id: string; status?: string; settings: GameSettings | null } | null
       challenges: PlayerChallenge[]
       team: { id: string; name: string } | null
@@ -246,19 +253,21 @@ export default function PlayPage() {
       team_started_at?: string | null
       team_pause_offset_ms?: number
     }
-    try {
-      const res = await fetch(
-        `/api/play/state?game_code=${encodeURIComponent(gameCode)}`,
-        { headers: { "x-session-token": s.session_token } }
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      state = await res.json()
-    } catch {
-      setLoadError(true)
-      return
+    const fetchState = async (): Promise<PlayState | null> => {
+      try {
+        const res = await fetch(
+          `/api/play/state?game_code=${encodeURIComponent(gameCode)}`,
+          { headers: { "x-session-token": s.session_token }, cache: "no-store" }
+        )
+        if (!res.ok) return null
+        return (await res.json()) as PlayState
+      } catch {
+        return null
+      }
     }
 
-    if (!state.game) {
+    let state = await fetchState()
+    if (!state || !state.game) {
       setLoadError(true)
       return
     }
@@ -266,22 +275,32 @@ export default function PlayPage() {
     // Session token no longer matches a team in this game (team deleted,
     // token from another game/device) — without this check every submit 401s
     // with no way out, because the join page redirects back here while any
-    // stored session exists.
+    // stored session exists. Dropping the session locks the team out of its
+    // name, so the server is asked a second time first: one answer without
+    // the team may be a failed read, not a missing team.
     if (state.team === null && state.game.status !== "draft") {
-      clearPlayerSession(gameCode)
-      router.replace(`/play/${gameCode}`)
-      return
+      const again = await fetchState()
+      if (!again || !again.game) {
+        setLoadError(true)
+        return
+      }
+      if (again.team === null && again.game.status !== "draft") {
+        clearPlayerSession(gameCode)
+        router.replace(`/play/${gameCode}`)
+        return
+      }
+      state = again
     }
+    if (!state.game) return // always set here; narrows the type
+    setLoadError(false)
+    setLoadRetries(0)
 
     // The facilitator may have renamed the team: show the current name.
     if (state.team && state.team.name && state.team.name !== s.team_name) {
       const renamed = { ...s, team_name: state.team.name }
       setSession(renamed)
-      try {
-        savePlayerSession(gameCode, renamed)
-      } catch {
-        // Storage blocked: the name still shows for this visit.
-      }
+      // If storage is blocked, the name still shows for this visit.
+      savePlayerSession(gameCode, renamed)
     }
 
     setGameId(state.game.id)
@@ -346,6 +365,30 @@ export default function PlayPage() {
     setStateLoaded(true)
     tasksLoadedRef.current = true
   }
+
+  // The load-error screen retries by itself a few times, further and further
+  // apart, and at once when the browser says the network is back. The
+  // session is never dropped here: a Wi-Fi blip must not cost the team its
+  // place (its name would then be "already taken").
+  const retriesLeft = loadError && loadRetryDelayMs(loadRetries) !== null
+  useEffect(() => {
+    if (!loadError || !session) return
+    const delay = loadRetryDelayMs(loadRetries)
+    const retry = () => void loadChallenges(session, true)
+    window.addEventListener("online", retry)
+    const timer =
+      delay === null
+        ? null
+        : setTimeout(() => {
+            setLoadRetries((n) => n + 1)
+            retry()
+          }, delay)
+    return () => {
+      window.removeEventListener("online", retry)
+      if (timer) clearTimeout(timer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadError, loadRetries, session])
 
   // Open a hint: the server records it (the penalty counts from that row) and
   // returns its text, which stays with the task until the page is closed and
@@ -517,7 +560,10 @@ export default function PlayPage() {
             signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined,
           }
         )
-        if (!res.ok) return
+        if (!res.ok) {
+          if (!disposed) reportPoll(false)
+          return
+        }
         const data = (await res.json()) as {
           status: string | null
           allow_access_requests?: boolean
@@ -528,7 +574,9 @@ export default function PlayPage() {
           tasks_version?: string | null
           announcement?: AnnouncementItem | null
         }
-        if (disposed || !data.status) return
+        if (disposed) return
+        reportPoll(true)
+        if (!data.status) return
         // Clock correction: the server's time is compared with the middle of
         // the round trip, and only from a quick one, so network delay or a
         // suspended tab is not mistaken for this device's clock being off.
@@ -554,7 +602,9 @@ export default function PlayPage() {
           void reloadTasks(data.tasks_version)
         }
       } catch {
-        // Network hiccup or timeout: the next poll retries
+        // Network hiccup or timeout: the next poll retries; two in a row
+        // show the "no connection" notice.
+        if (!disposed) reportPoll(false)
       } finally {
         inFlight = false
       }
@@ -565,14 +615,18 @@ export default function PlayPage() {
     const onVisible = () => {
       if (document.visibilityState === "visible") void checkStatus()
     }
+    // The network is back: ask at once, so the notice goes away.
+    const onOnline = () => void checkStatus()
     document.addEventListener("visibilitychange", onVisible)
+    window.addEventListener("online", onOnline)
 
     return () => {
       disposed = true
       clearInterval(interval)
       document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("online", onOnline)
     }
-  }, [gameCode, endedByTeacher, applyClock, reloadTasks])
+  }, [gameCode, endedByTeacher, applyClock, reloadTasks, reportPoll])
 
   function handleStart() {
     const storageKey = `ctf_start_${gameCode}`
@@ -616,14 +670,14 @@ export default function PlayPage() {
       // empty red feedback box; a dead session gets a way out.
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null
-        if (res.status === 401) {
-          clearPlayerSession(gameCode)
-          router.replace(`/play/${gameCode}`)
-        }
+        // 401: the server did not find the team. The reload asks again and
+        // drops the session only when the team is really gone.
+        if (res.status === 401) void loadChallenges(session, true)
         return {
           is_correct: false,
           points_awarded: 0,
-          message: err?.error || "Nepavyko pateikti atsakymo. Bandykite dar kartą.",
+          message:
+            (res.status !== 401 && err?.error) || "Nepavyko pateikti atsakymo. Bandykite dar kartą.",
         }
       }
 
@@ -702,14 +756,12 @@ export default function PlayPage() {
       // them as feedback rendered an empty red box with no message.
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null
-        if (res.status === 401) {
-          clearPlayerSession(gameCode)
-          router.replace(`/play/${gameCode}`)
-          return
-        }
+        // 401: the server did not find the team. The reload asks again and
+        // drops the session only when the team is really gone.
+        if (res.status === 401) void loadChallenges(session, true)
         toast({
           title: "Nepavyko pateikti atsakymo",
-          description: err?.error || "Bandykite dar kartą.",
+          description: (res.status !== 401 && err?.error) || "Bandykite dar kartą.",
           variant: "destructive",
         })
         setLoading(false)
@@ -763,8 +815,8 @@ export default function PlayPage() {
       }
     } catch {
       toast({
-        title: "Klaida",
-        description: "Nepavyko pateikti atsakymo",
+        title: "Nepavyko pateikti atsakymo",
+        description: "Patikrinkite interneto ryšį ir bandykite dar kartą.",
         variant: "destructive",
       })
     } finally {
@@ -772,36 +824,61 @@ export default function PlayPage() {
     }
   }
 
-  const rejoin = () => {
+  // Only from "Išeiti" in the footer, which asks first (LeaveTeamButton):
+  // leaving drops the team's session on this device.
+  const leaveTeam = () => {
     clearPlayerSession(gameCode)
     router.replace(`/play/${gameCode}`)
   }
 
-  // Load error state (network failure or game unavailable)
+  // Load error state (network failure or game unavailable). The screen says
+  // what is wrong itself, so no connection notice on top of it.
   if (loadError) {
-    return <PlayLoadError onRetry={() => session && loadChallenges(session)} onRejoin={rejoin} />
+    return (
+      <PlayLoadError
+        retrying={retriesLeft}
+        onRetry={() => {
+          if (!session) return
+          setLoadRetries(0)
+          void loadChallenges(session)
+        }}
+      />
+    )
   }
+
+  // Every other state carries the "no connection" notice. It sits in the
+  // same place of each return, so its live region stays mounted.
+  const withConnection = (screen: React.ReactNode) => (
+    <>
+      {screen}
+      <ConnectionBanner offline={offline} />
+    </>
+  )
 
   // Loading state
   if (!session || !stateLoaded) {
-    return <PlayLoading />
+    return withConnection(<PlayLoading />)
   }
 
   // "Pradėti" pressed, the tasks are on their way (they follow the server's
   // start; the page keeps asking until it has it).
   if (awaitingStart && gameStarted && gameStatus !== "draft") {
-    return <PlayPreparing />
+    return withConnection(<PlayPreparing />)
   }
 
   // The game was reverted to draft, or has no challenges (e.g. the teacher
   // deleted them mid-game) — an explicit message instead of a forever-spinner.
   if (gameStatus === "draft" || (challenges.length === 0 && !gameFinished && !awaitingStart)) {
-    return <PlayNotReady draft={gameStatus === "draft"} onRefresh={() => session && loadChallenges(session)} />
+    return withConnection(
+      <PlayNotReady draft={gameStatus === "draft"} onRefresh={() => session && loadChallenges(session)} />
+    )
   }
 
   // Paused by the teacher — full-screen overlay until the game resumes
   if (gameStatus === "paused" && !gameFinished) {
-    return <PlayPaused gameId={gameId} announcement={announcement} totalPoints={totalPoints} teamName={session.team_name} />
+    return withConnection(
+      <PlayPaused gameId={gameId} announcement={announcement} totalPoints={totalPoints} teamName={session.team_name} />
+    )
   }
 
   const endProps = {
@@ -823,12 +900,12 @@ export default function PlayPage() {
 
   // Time expired screen
   if (timeExpired && !gameFinished) {
-    return <PlayEnd reason="time_up" {...endProps} />
+    return withConnection(<PlayEnd reason="time_up" {...endProps} />)
   }
 
   // "Ready to start?" screen (only when time limit exists and not yet started)
   if (timeLimitMinutes && !gameStarted) {
-    return (
+    return withConnection(
       <PlayReadyToStart
         minutes={timeLimitMinutes}
         taskCount={taskCount}
@@ -841,7 +918,7 @@ export default function PlayPage() {
   // Game finished screen
   if (gameFinished) {
     const reason = endedByTeacher && solvedIds.size < challenges.length ? "ended_by_facilitator" : "all_solved"
-    return <PlayEnd reason={reason} {...endProps} />
+    return withConnection(<PlayEnd reason={reason} {...endProps} />)
   }
 
   const header = (
@@ -871,7 +948,7 @@ export default function PlayPage() {
   // Free mode: show challenge grid
   if (pathMode === "free") {
     const selected = selectedChallengeIndex !== null ? challenges[selectedChallengeIndex] : undefined
-    return (
+    return withConnection(
       <div className="min-h-screen p-4 pb-8">
         <div className="max-w-2xl mx-auto">
           {banners}
@@ -893,7 +970,7 @@ export default function PlayPage() {
             onRevealHint={(idx) => (selected ? revealHint(selected.id, idx) : Promise.resolve(false))}
           />
 
-          <TeamFooter teamName={session.team_name} onLeave={rejoin} className="mt-4" />
+          <TeamFooter teamName={session.team_name} onLeave={leaveTeam} className="mt-4" />
         </div>
       </div>
     )
@@ -902,7 +979,7 @@ export default function PlayPage() {
   const currentChallenge = challenges[currentIndex]
   const progressValue = (solvedIds.size / challenges.length) * 100
 
-  return (
+  return withConnection(
     <div className="min-h-screen p-4 pb-8">
       <div className="max-w-lg mx-auto">
         {banners}
@@ -935,7 +1012,7 @@ export default function PlayPage() {
           }}
         />
 
-        <TeamFooter teamName={session.team_name} onLeave={rejoin} />
+        <TeamFooter teamName={session.team_name} onLeave={leaveTeam} />
       </div>
     </div>
   )
