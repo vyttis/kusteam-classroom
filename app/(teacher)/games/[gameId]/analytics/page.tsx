@@ -6,6 +6,9 @@ import { AnalyticsCards } from "@/components/teacher/analytics-cards"
 import { ChallengeStatsTable } from "@/components/teacher/challenge-stats-table"
 import { TeamResultsTable } from "@/components/teacher/team-results-table"
 import { ReflectionsTable } from "@/components/teacher/reflections-table"
+import { ClassDigest } from "@/components/teacher/class-digest"
+import { TaskInsights } from "@/components/teacher/task-insights"
+import { buildDigest } from "@/lib/game/formative-insights"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GameStats } from "@/types/game"
@@ -44,8 +47,8 @@ export default function GameAnalyticsPage() {
       setError("")
       try {
         const [basicRes, detailedRes] = await Promise.all([
-          fetch(`/api/games/${gameId}/analytics`),
-          fetch(`/api/games/${gameId}/analytics/detailed`),
+          fetch(`/api/games/${gameId}/analytics`, { cache: "no-store" }),
+          fetch(`/api/games/${gameId}/analytics/detailed`, { cache: "no-store" }),
         ])
         if (!basicRes.ok) {
           throw new Error("Nepavyko gauti statistikos")
@@ -141,7 +144,7 @@ export default function GameAnalyticsPage() {
             Veiklos analitika
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Komandų rezultatai, užduočių statistika ir refleksijos
+            Ką aptarti su klase, komandų rezultatai, užduočių statistika ir refleksijos
           </p>
         </div>
         <Button
@@ -179,6 +182,9 @@ export default function GameAnalyticsPage() {
         <TabsContent value="stats">
           {stats && (
             <div className="space-y-6">
+              {detailed && (
+                <ClassDigest lines={buildDigest(detailed.challenge_stats, detailed.answers_included)} />
+              )}
               <AnalyticsCards stats={stats} />
               {detailed && detailed.team_stats.length > 0 && (
                 <TeamResultsTable
@@ -195,6 +201,12 @@ export default function GameAnalyticsPage() {
                 stats={stats.challenge_stats || []}
                 detailedStats={detailed?.challenge_stats}
               />
+              {detailed && (
+                <TaskInsights
+                  stats={detailed.challenge_stats}
+                  answersIncluded={detailed.answers_included}
+                />
+              )}
             </div>
           )}
         </TabsContent>

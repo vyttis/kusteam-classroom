@@ -31,7 +31,7 @@ export function TeamResultsTable({
         "Bandymai",
         "Panaudota užuominų",
         "Prisijungė",
-        "Paskutinis aktyvumas",
+        "Paskutinis atsakymas",
       ],
       teamStats.map((t, i) => [
         i + 1,
@@ -77,15 +77,16 @@ export function TeamResultsTable({
       <CardContent>
         <div className="overflow-x-auto rounded-lg border border-border/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} role="region" aria-label="Komandų rezultatai">
           <table className="w-full text-sm">
+            <caption className="sr-only">Komandų rezultatai pagal taškus</caption>
             <thead>
               <tr className="border-b bg-muted/30">
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground">#</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground">Komanda</th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground">Taškai</th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground whitespace-nowrap">Išspręsta</th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground">Bandymai</th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground">Užuominos</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground whitespace-nowrap">Paskutinis aktyvumas</th>
+                <th scope="col" className="text-left py-2.5 px-3 font-medium text-muted-foreground">#</th>
+                <th scope="col" className="text-left py-2.5 px-3 font-medium text-muted-foreground">Komanda</th>
+                <th scope="col" className="text-right py-2.5 px-3 font-medium text-muted-foreground">Taškai</th>
+                <th scope="col" className="text-right py-2.5 px-3 font-medium text-muted-foreground whitespace-nowrap">Išspręsta</th>
+                <th scope="col" className="text-right py-2.5 px-3 font-medium text-muted-foreground">Bandymai</th>
+                <th scope="col" className="text-right py-2.5 px-3 font-medium text-muted-foreground">Užuominos</th>
+                <th scope="col" className="text-left py-2.5 px-3 font-medium text-muted-foreground whitespace-nowrap">Paskutinis atsakymas</th>
               </tr>
             </thead>
             <tbody>
