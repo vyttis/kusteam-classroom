@@ -80,11 +80,11 @@ export function TeacherNav({
       ? [{ href: "/admin", label: "Administravimas", icon: Shield, badge: pendingRequests }]
       : []),
   ] as { href: string; label: string; icon: typeof Shield; badge?: number }[]
-  // Activities (/games/...) belong to "Mano veiklos".
+  // Activities (/games/...) and the ready-made ones belong to "Mano veiklos".
   const isCurrent = (href: string) =>
     pathname === href ||
     pathname.startsWith(`${href}/`) ||
-    (href === "/dashboard" && pathname.startsWith("/games"))
+    (href === "/dashboard" && (pathname.startsWith("/games") || pathname.startsWith("/paruostos-veiklos")))
 
   return (
     <nav aria-label="Pagrindinis meniu" className="bg-white border-b border-border/50 sticky top-0 z-50 backdrop-blur-xl bg-white/80 print:hidden">

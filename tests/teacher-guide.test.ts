@@ -17,11 +17,6 @@ const FIRST_RUN_FILES = [
   "app/slaptazodis/password-form.tsx",
 ]
 
-// Routes that another branch adds (the catalogue of ready-made activities).
-// Remove an entry once its page is in this repository: the test then checks
-// the route like any other.
-const ROUTES_FROM_OTHER_BRANCHES = ["/paruostos-veiklos"]
-
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)
@@ -56,17 +51,8 @@ describe("facilitator guide", () => {
     const routes = pageRoutes()
     const links = internalLinks(guide)
     expect(links.length).toBeGreaterThan(0)
-    const missing = links.filter(
-      (link) => !ROUTES_FROM_OTHER_BRANCHES.includes(link) && !routes.some((r) => r.test(link)),
-    )
-    expect(missing).toEqual([])
-  })
-
-  it("does not keep a finished route in the list of routes still to come", () => {
-    const routes = pageRoutes()
-    // Fails on purpose once the catalogue lands, so the exception is removed.
-    const landed = ROUTES_FROM_OTHER_BRANCHES.filter((r) => routes.some((p) => p.test(r)))
-    expect(landed).toEqual([])
+    expect(links).toContain("/paruostos-veiklos")
+    expect(links.filter((link) => !routes.some((r) => r.test(link)))).toEqual([])
   })
 
   it("has the seven parts, each reachable from the table of contents", () => {
@@ -138,6 +124,17 @@ describe("first-run texts", () => {
       const offenders = strings.filter((l) => !/^\s*(\/\/|\*|\{\/\*)/.test(l) && /\b(mokytoj|mokini|mokinių|žaidim|žaidėj)/i.test(l))
       expect(offenders, file).toEqual([])
     }
+  })
+})
+
+describe("dashboard", () => {
+  it("links only to pages that exist", () => {
+    const routes = pageRoutes()
+    const dashboard = readFileSync("app/(teacher)/dashboard/page.tsx", "utf8")
+    const catalogue = readFileSync("lib/teacher/dashboard.ts", "utf8").match(/CATALOGUE_PATH = "([^"]+)"/)?.[1]
+    expect(dashboard).toContain("href={CATALOGUE_PATH}")
+    const links = [...internalLinks(dashboard), catalogue ?? "(no catalogue path)"]
+    expect(links.filter((link) => !routes.some((r) => r.test(link)))).toEqual([])
   })
 })
 
