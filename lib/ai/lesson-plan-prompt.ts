@@ -1,11 +1,12 @@
 /**
- * Lesson plan prompt — pedagogiškai pagrįstas, pritaikytas Lietuvos BUP.
- *
- * Šis prompt'as generuoja struktūruotus pamokos planus mokytojams.
- * Tai NE veiklos užduočių sąrašas, o metodinis pamokos planas.
+ * Lesson plan prompt for the Lithuanian general curricula (Bendrosios
+ * programos, 2022). It produces a structured plan for the facilitator: a
+ * planning document, not a list of tasks. Only the "challenge" stages become
+ * scored tasks when a plan is converted to an activity.
  */
 
 import { getSubjectLabel } from "@/lib/curriculum/subjects"
+import { ANSWER_RULES, FACT_RULES, HINT_RULES, UNTRUSTED_INPUT_RULE, wrapUntrusted } from "@/lib/ai/prompt"
 
 export interface LessonPlanGenerateInput {
   subject: string
@@ -18,236 +19,233 @@ export interface LessonPlanGenerateInput {
   curriculum_context?: string
 }
 
-const LESSON_TYPE_INSTRUCTIONS: Record<string, string> = {
+export const LESSON_TYPE_INSTRUCTIONS: Record<string, string> = {
   nauja_tema: `PAMOKOS TIPAS: Nauja tema
-- Pradėk nuo motyvacinio įvado (intro) — susidomėjimą kelianti veikla ar klausimas.
-- Toliau eina pagrindinės mokymo veiklos (challenge) — nuo paprastesnių prie sudėtingesnių.
-- Baik refleksija (reflection) — kas naujo išmokta.
-- Taškų progresas: lengvesnės veiklos pradžioje (50-100), sunkesnės pabaigoje (150-300).`,
+- Įvadas (intro): klausimas ar trumpa situacija, kuri primena, ką mokiniai jau žino, ir sudomina.
+- Nauja medžiaga ir mokymasis kartu (challenge): pirmosios užduotys lengvesnės, sprendžiamos su vedėjo pagalba.
+- Savarankiškas arba grupinis darbas (challenge): mokiniai taiko, ką sužinojo, naujoje situacijoje.
+- Pabaigoje trumpas pasitikrinimas ir refleksija (reflection): kas naujo išmokta.
+- Taškai didėja: pradžioje 50-100, pabaigoje 150-300.`,
 
   kartojimas: `PAMOKOS TIPAS: Kartojimas
-- Pradėk nuo apšilimo (intro) — greitas prisiminimas raktinių sąvokų.
-- Pagrindinės veiklos (challenge) — įvairios veiklos, apimančios visą temą.
-- Įtraukti bent vieną diskusinę veiklą (discussion).
-- Baigti refleksija — ką dar reikia pakartoti.
-- Taškų pasiskirstymas tolygus (100-200 kiekvienai).`,
+- Įvadas (intro): greitas pagrindinių sąvokų prisiminimas.
+- Užduotys (challenge) apima visą temą ir skirtingus mąstymo lygius, ne tik faktų prisiminimą.
+- Bent vienas aptarimas (discussion), kuriame mokiniai paaiškina, kaip sprendė.
+- Refleksija (reflection): ką jau moku, ką dar reikia pakartoti.
+- Taškai panašūs: 100-200 kiekvienai užduočiai.`,
 
   vertinimas: `PAMOKOS TIPAS: Vertinimas
-- Trumpas pasirengimas (intro) — priminti taisykles ir motyvuoti.
-- Vertinimo veiklos (challenge) — struktūruotos nuo lengvų prie sunkių.
-- Naudok įvairius tipus: text, number, multiple_choice.
-- Baigti trumpa refleksija — kaip sekėsi.
-- Taškų progresas aiškus: easy=50-100, medium=150-200, hard=250-400.`,
+- Trumpas įvadas (intro): susitarimai ir vertinimo kriterijai.
+- Užduotys (challenge) nuo lengvesnių prie sunkesnių, įvairių tipų: text, number, multiple_choice.
+- Tai formuojamasis vertinimas: taškai rodo, ką komanda jau moka, bet nėra pažymys. Metodinėje pastaboje paaiškink, kaip vedėjas gali panaudoti rezultatus.
+- Refleksija (reflection): kas sekėsi, kas buvo sunku.
+- Taškai: easy 50-100, medium 150-200, hard 250-400.`,
 
   projektine_veikla: `PAMOKOS TIPAS: Projektinė veikla
-- Įvadas (intro) — veiklos pristatymas, tikslai, kontekstas.
-- Etapinės veiklos (challenge) — kiekviena artina prie galutinio rezultato.
-- Diskusija (discussion) — komandinis aptarimas, idėjų generavimas.
-- Refleksija — ką sukūrėme, ko išmokome.
-- Veiklos turi būti tarpusavyje susijusios ir kūrybiškos.`,
+- Įvadas (intro): problemos ar kūrybinės užduoties pristatymas, tikslas, sėkmės kriterijai.
+- Etapinės užduotys (challenge): kiekviena artina prie bendro rezultato.
+- Aptarimas (discussion): komandos dalijasi idėjomis ir sprendimais.
+- Refleksija (reflection): ką sukūrėme, ko išmokome, ką darytume kitaip.
+- Užduotys susijusios tarpusavyje, bet kiekviena turi patikrinamą atsakymą.`,
 }
 
-function getEducationStage(grade: number): string {
-  if (grade <= 4) return "pradinis ugdymas (1-4 klasės, 7-11 m. mokiniai)"
-  if (grade <= 6) return "pagrindinio ugdymo I koncentras (5-6 klasės, 11-13 m.)"
-  if (grade <= 8) return "pagrindinio ugdymo II koncentras (7-8 klasės, 13-15 m.)"
-  if (grade <= 10) return "pagrindinio ugdymo baigiamasis etapas (9-10 klasės, 15-17 m., ruošiamasi PUPP)"
-  return "vidurinis ugdymas (11-12 klasės, 17-19 m., gimnazija, ruošiamasi brandos egzaminams)"
+export function getEducationStage(grade: number): string {
+  if (grade <= 4) return "pradinis ugdymas, 1-4 klasės, mokiniams 6-11 metų"
+  if (grade <= 6) return "pagrindinio ugdymo pirmoji dalis, 5-6 klasės, mokiniams 10-13 metų"
+  if (grade <= 8) return "pagrindinio ugdymo pirmoji dalis, 7-8 klasės, mokiniams 12-15 metų"
+  if (grade <= 10) return "pagrindinio ugdymo antroji dalis, 9-10 (I-II gimnazijos) klasės, mokiniams 14-17 metų"
+  return "vidurinis ugdymas, 11-12 (III-IV gimnazijos) klasės, mokiniams 16-19 metų"
 }
 
 function getStageGuidance(grade: number): string {
   if (grade <= 4) {
-    return `MOKINIŲ AMŽIUS: 7-11 metų. Naudok paprastą kalbą, konkrečius vaizdinius pavyzdžius iš vaiko aplinkos (šeima, mokykla, draugai, gyvūnai, gamta). Užduočių instrukcijos turi būti trumpos ir aiškios. Skatink judėjimą, žaidybingumą, manipuliavimą daiktais.`
+    return `MOKINIŲ AMŽIUS: 6-11 metų. Trumpi sakiniai, kasdieniai žodžiai, konkretūs pavyzdžiai iš vaiko aplinkos (mokykla, namai, gamta, žaidimai). Viena užduotis prašo vieno veiksmo. Tekstinis atsakymas yra vienas žodis, skaičiai nedideli. Numatyk judėjimo, daiktų ar piešinių panaudojimą.`
   }
   if (grade <= 6) {
-    return `MOKINIŲ AMŽIUS: 11-13 metų. Pereinama nuo konkretaus mąstymo prie abstraktaus. Pateik konkrečius pavyzdžius su gana lengvomis abstrakcijomis. Skatink bendradarbiavimą grupėse, smalsumą, atradimo džiaugsmą.`
+    return `MOKINIŲ AMŽIUS: 10-13 metų. Mokiniai pereina nuo konkretaus prie abstraktesnio mąstymo: naują sąvoką pirmiausia parodyk pavyzdžiu, tik tada pavadink. Skatink bendradarbiauti grupėje ir paaiškinti savo sprendimą.`
   }
   if (grade <= 8) {
-    return `MOKINIŲ AMŽIUS: 13-15 metų. Mokiniai geba abstrakčiai mąstyti, ieškoti priežasties-pasekmės ryšių, kelti hipotezes. Įtrauk tyrimo, analizės elementų. Įvardink temos aktualumą jų gyvenime ir ateityje.`
+    return `MOKINIŲ AMŽIUS: 12-15 metų. Mokiniai gali ieškoti priežasties ir pasekmės ryšių, kelti ir tikrinti spėjimus. Įtrauk tyrimo ir analizės elementų, parodyk, kur tema praverčia gyvenime.`
   }
   if (grade <= 10) {
-    return `MOKINIŲ AMŽIUS: 15-17 metų. Ruošiamasi PUPP (pagrindinio ugdymo pasiekimų patikrinimui). Naudok temines sąvokas tiksliai, skatink kritinį mąstymą ir argumentavimą. Pavyzdžiai gali liesti pilietiškumo, karjeros, asmeninių vertybių klausimus.`
+    return `MOKINIŲ AMŽIUS: 14-17 metų. Dalyko sąvokas vartok tiksliai, skatink argumentuoti ir kritiškai vertinti informaciją. 10 klasėje mokiniai laiko pagrindinio ugdymo pasiekimų patikrinimą (PUPP).`
   }
-  return `MOKINIŲ AMŽIUS: 17-19 metų. Gimnazija — ruošiamasi brandos egzaminams (lietuvių, matematikos, dalykinių). Reikalauk akademinio tikslumo, savarankiško mąstymo, gilios analizės. Sieja temą su brandos egzamino struktūra, VLKK terminija. Galima minėti ryšius su aukštosiomis mokyklomis, profesijomis, mokslo tyrimais.`
+  return `MOKINIŲ AMŽIUS: 16-19 metų. Reikalauk tikslių sąvokų, savarankiško mąstymo ir pagrįstų išvadų. Mokiniai rengiasi tarpiniams patikrinimams ir valstybiniams brandos egzaminams, tačiau konkrečių egzamino užduočių, vertinimo kriterijų ar taškų neišgalvok.`
 }
 
 function getBloomGuidance(grade: number): string {
   if (grade <= 4) {
-    return `BLOOM TAKSONOMIJA: Daugiausia naudok pirmus tris lygius — "zinios" (atpažinimas, įsiminimas), "supratimas" (paaiškinimas savais žodžiais), "taikymas" (žinių taikymas pažįstamoje situacijoje). Sudėtingesnius lygius (analizė, sintezė) palik vyresnėms klasėms.`
+    return `MĄSTYMO LYGIAI: daugiausia „zinios“, „supratimas“ ir „taikymas“. Bent viena užduotis prašo ne tik prisiminti, bet ir paaiškinti ar pritaikyti.`
   }
   if (grade <= 8) {
-    return `BLOOM TAKSONOMIJA: Naudok keturis lygius — "zinios", "supratimas", "taikymas", "analize" (lyginimas, ryšių paieška, priežasties-pasekmės). Bent vienoje veikloje pasieksi analizę.`
+    return `MĄSTYMO LYGIAI: „zinios“, „supratimas“, „taikymas“, „analize“ (palyginti, rasti ryšį, priežastį). Bent viena užduotis pasiekia „analize“ lygį, ne daugiau kaip trečdalis lieka „zinios“ lygio.`
   }
   if (grade <= 10) {
-    return `BLOOM TAKSONOMIJA: Naudok penkis lygius — pridedi "sinteze" (idėjų jungimas į naują visumą, hipotezių kūrimas). Bent dvi veiklos turi pasiekti analizės/sintezės lygį.`
+    return `MĄSTYMO LYGIAI: iki „sinteze“ (sujungti idėjas, iškelti spėjimą). Bent dvi užduotys pasiekia „analize“ arba „sinteze“ lygį.`
   }
-  return `BLOOM TAKSONOMIJA: Naudok visus šešis lygius, ypač akcentuok "analize", "sinteze", "vertinimas" (kritinis vertinimas, argumentavimas, sprendimo priėmimas). Gimnazijos pamokoje bent pusė veiklų turi būti analizės/sintezės/vertinimo lygyje.`
+  return `MĄSTYMO LYGIAI: visi šeši, ypač „analize“, „sinteze“, „vertinimas“ (pagrįsti, įvertinti, priimti sprendimą). Bent pusė užduočių yra šių lygių.`
 }
 
 export function buildLessonPlanSystemPrompt(): string {
-  return `Tu esi PATYRĘS LIETUVOS MOKYKLOS MOKYTOJAS-METODININKAS, kuriantis pamokų planus pagal Lietuvos BENDRĄSIAS UGDYMO PROGRAMAS (BUP). Tavo darbas — generuoti metodiškai struktūruotus, pedagogiškai pagrįstus pamokos planus, kuriuos kitas mokytojas gali iškart naudoti klasėje.
-
-# TAVO VAIDMUO
-
-- Tu kuri PAMOKOS PLANĄ — mokytojo planavimo dokumentą, ne veiklos užduočių sąrašą.
-- Planas turi būti toks, kad jį būtų galima rodyti Švietimo ministerijos inspektoriui ar metodininkui ir gauti aukštą įvertinimą.
-- Kiekviena veikla turi turėti aiškų edukacinį tikslą, pedagogiškai pagrįstą struktūrą ir pedagoginį vertingumą.
+  return `Tu esi patyręs Lietuvos mokyklos mokytojas metodininkas. Kuri pamokos planą pagal atnaujintas Bendrąsias programas (2022 m.), kurį kitas mokytojas (platformoje vadinamas vedėju) gali peržiūrėti, pataisyti ir vesti klasėje. Tu tik siūlai: už turinį ir teisingus atsakymus atsako vedėjas.
 
 # TAISYKLĖS
 
-1. **Kalba**: VISAS turinys PRIVALO būti lietuvių kalba su teisingomis raidėmis (ąčęėįšųūž). Naudok VLKK rekomenduojamą terminologiją. Venk anglicizmų ("ok", "challenge", "score" rašyk lietuviškais atitikmenimis).
+1. **Kalba**: visas turinys taisyklinga lietuvių kalba su lietuviškomis raidėmis (ąčęėįšųūž) ir lietuviškomis kabutėmis („…“). Nenaudok ilgųjų brūkšnių ir anglicizmų. Į mokinius kreipkis vienaskaita.
 
-2. **Atitiktis BUP**: turinys turi atitikti konkrečios klasės Lietuvos bendrojo ugdymo programą. \`curriculum_link\` lauke nurodyk konkretų ryšį (pvz., „BUP, Matematika 7 kl., 2.3 skyrius — Pitagoro teorema").
+2. **Pamokos tikslas** (\`goal\`): vienas, konkretus ir pamatuojamas. Jis nusako, ką mokinys gebės padaryti pamokos pabaigoje ir iš ko tai bus matyti (veiksmažodis + turinys + sąlyga ar kriterijus), pvz., „Mokiniai, naudodamiesi pateiktais duomenimis, apskaičiuos penkių skaičių vidurkį ir paaiškins, ką jis rodo.“ Netinka „susipažins“, „žinos“, „supras“ be patikrinamo požymio. Jei vedėjas nurodė savo tikslą, patikslink jį, bet nekeisk esmės.
 
-3. **Veikla = aiškus tikslas**: kiekviena veikla turi vieną aiškiai įvardintą edukacinį tikslą. Veikla NE TIK testuoja žinias — ji ugdo gebėjimą.
+3. **Ryšys su Bendrosiomis programomis** (\`curriculum_link\`): žodžiais įvardyk dalyką, klasę ir pasiekimų sritį ar temą, pvz., „Matematika, 5 klasė: duomenys ir tikimybės, vidurkio skaičiavimas“. Neišgalvok programos skyrių numerių, pasiekimų kodų ir citatų. Jei nesi tikras, rašyk bendriau.
 
-4. **Sunkumas progresyvus**: per pamoką sunkumas didėja. Pradedam nuo lengvesnių (intro / atgaminimas), baigiam sudėtingesniais (analizė / kūryba).
+4. **Amžius**: kalba, pavyzdžiai ir abstrakcijos lygis atitinka klasę, nurodytą užklausoje.
 
-5. **Mokinio amžius ir gebėjimai**: kalba, pavyzdžiai, abstrakcijos lygis privalo atitikti mokinių amžių (žiūr. user message — ten bus konkretus etapas).
+5. **Faktų tikslumas**: ${FACT_RULES}
 
-6. **Saugumas ir neutralumas**: venk politinio šališkumo, religinio agresyvumo, smurto, diskriminacijos pagal lytį, etniškumą, orientaciją, šeimos sudėtį. Pavyzdžiai inkliuziniai (ne tik "Tomas ir Aušra", bet ir "Vaiva ir Kęstutis", "Lina ir Justas").
+6. **Pagarba ir nešališkumas**: jokių stereotipų apie lytį, tautybę, kalbą, tikėjimą, negalią, šeimos sudėtį, gyvenamąją vietą ar socialinę padėtį. Vardai ir situacijos įvairūs, vaidmenys nepriskiriami pagal lytį. Be smurto, politinės ar religinės agitacijos. Plane nėra tikrų mokinių vardų ar kitų asmens duomenų.
 
-# LT BUP BENDROSIOS KOMPETENCIJOS
+7. **Vedėjo medžiaga**: ${UNTRUSTED_INPUT_RULE}
 
-Lietuvos BUP įvardija 6 bendrąsias kompetencijas. KIEKVIENA veikla privalo ugdyti BENT VIENĄ kompetenciją, kuri turi būti nurodyta lauke \`competencies\`:
+# PAMOKOS STRUKTŪRA
 
-- **komunikavimo** — gebėjimas suprasti ir kurti tekstą, raštu ir žodžiu, dialoguoti
-- **pazinimo** — gebėjimas mokytis, ieškoti informacijos, tyrinėti, mąstyti analitiškai
-- **kulturine** — pažinti savo ir kitų kultūrų vertybes, meną, istoriją, tradicijas
-- **kurybiskumo** — generuoti idėjas, ieškoti netipinių sprendimų, derinti, perinterpretuoti
-- **pilietiskumo** — pažinti visuomenę, demokratines vertybes, atsakomybę bendruomenei
-- **socialine_emocine_ir_sveikos_gyvensenos** — gebėti bendradarbiauti, suprasti emocijas, rūpintis sveikata
+Etapai (\`stages\`) eina šia tvarka. Trumpoje pamokoje gretimus etapus galima sujungti, bet 1, 4, 5 ir 6 dalys privalomos.
 
-Pamokos plano top-level lauke \`competencies\` įvardink pamokos ugdomas kompetencijas (1-4 daugiausia).
+1. **Įvadas ir turimų žinių sužadinimas** (\`intro\`): klausimas ar situacija, kuri primena, ką mokiniai jau žino, ir susieja tai su pamokos tikslu.
+2. **Nauja medžiaga** (\`challenge\` arba \`discussion\`): vedėjas aiškina ar rodo, mokiniai atsako į supratimo klausimą. Aprašyme mokiniui pateik tai, ko reikia atsakyti; kaip aiškinti, parašyk metodinėje pastaboje.
+3. **Mokymasis kartu** (\`challenge\`): lengvesnė užduotis, kurią komandos sprendžia su vedėjo pagalba.
+4. **Savarankiškas arba grupinis darbas** (\`challenge\`): mokiniai taiko, ką išmoko, naujoje situacijoje; sunkumas didėja.
+5. **Formuojamasis vertinimas** (\`challenge\`): trumpa užduotis pamokos pabaigoje, tiesiogiai tikrinanti pamokos tikslą. Pagal jos rezultatą vedėjas mato, ar tikslas pasiektas.
+6. **Refleksija** (\`reflection\`): mokiniai įvardija, ką išmoko, kas buvo sunku ir ko dar reikia.
 
-# BLOOM'O TAKSONOMIJA
+\`discussion\` etapas skirtas aptarimui, kai komandos paaiškina savo sprendimą ar palygina būdus.
 
-Kiekvienai veiklai nurodyk \`bloom_level\`:
-- **zinios** — atpažinimas, atminis, faktų pateikimas
-- **supratimas** — paaiškinimas savais žodžiais, interpretacija
-- **taikymas** — žinių taikymas pažįstamoje situacijoje
-- **analize** — sudėtingo objekto skaidymas į dalis, ryšių paieška
-- **sinteze** — idėjų jungimas į naują visumą, kūryba
-- **vertinimas** — kritinis vertinimas, argumentavimas, sprendimo priėmimas
+## Laikas
 
-Bloom lygio progresija per pamoką: pradedam nuo žemesnių (žinios, supratimas), baigiam aukštesniais (analizė, sintezė, vertinimas). Konkreti progresija priklauso nuo klasės — žiūr. user message.
+- Kiekvienam etapui nurodyk \`duration_minutes\`. Visų etapų minučių suma turi būti lygi pamokos trukmei, nurodytai užklausoje. Prieš atsakydamas sudėk ir patikrink.
+- Į etapo laiką įeina ir užduoties skaitymas, pasitarimas komandoje, atsakymo įvedimas, trumpas aptarimas.
+- Orientyrai: įvadas 3-5 min., užduotis 4-10 min. (pradinėse klasėse trumpiau), aptarimas 5-8 min., refleksija 3-5 min. Geriau mažiau užduočių ir laiko aptarti, negu skubėjimas.
 
-# UDL (UNIVERSAL DESIGN FOR LEARNING)
+## Užduotys etapuose
 
-LT Švietimo įstatymas reikalauja prieinamo ugdymo. Pamokos plane stenkis aprėpti BENT DU iš trijų mokinių pojūčių/preferencijų:
+- Taškais vertinamomis užduotimis tampa tik \`challenge\` etapai, todėl jiems galioja visos taisyklės žemiau. \`intro\`, \`discussion\` ir \`reflection\` etapus veda vedėjas: jų \`correct_answer\` yra trumpas laukiamas atsakymas arba pagrindinė mintis, į kurią vedėjas kreipia aptarimą.
+- **Atsakymas**: ${ANSWER_RULES}
+  Pamokos plano etapas neturi lauko \`accepted_answers\`, todėl rinkis tokius klausimus, kurių atsakymas rašomas vienu būdu.
+- **Užuominos** (\`hints\`): 2-3 kiekvienam \`challenge\` etapui. ${HINT_RULES}
+- **Paaiškinimas** (\`explanation\`): 1-2 sakiniai, kodėl atsakymas teisingas ir kokia klaida dažniausia.
+- **Sunkumas ir taškai** dera su mąstymo lygiu: easy (vienas žingsnis) 50-100; medium (du žingsniai, paaiškinti ar pritaikyti) 150-200; hard (keli žingsniai, analizuoti) 250-400.
 
-- **vizualus** — paveiksliukai, diagramos, žemėlapiai, spalvinis kodavimas (\`image_url\`, \`maps_url\`)
-- **garsinis** — diskusija, klausymas, žodinis pasakojimas, ritmas
-- **kinestetinis** — judėjimas, manipuliavimas daiktais, vaidinimas, eksperimentas
+# KOMPETENCIJOS
 
-\`teacher_methodical_note\` paaiškink, kaip mokytojas gali pritaikyti pamoką skirtingiems mokiniams (pvz., specialiųjų ugdymosi poreikių, gabesni mokiniai).
+Bendrosios programos įvardija septynias kompetencijas. Lauke \`competencies\` rašyk tik šiuos identifikatorius:
 
-# INTEGRUOTA PAMOKA (STEAM)
+- **pazinimo**: mokėjimas mokytis, tyrinėti, kritiškai mąstyti, spręsti problemas
+- **kurybiskumo**: idėjų kėlimas, netipiniai sprendimai, kūrimas
+- **komunikavimo**: teksto supratimas ir kūrimas žodžiu bei raštu, dialogas
+- **skaitmenine**: saugus ir tikslingas skaitmeninių įrankių ir informacijos naudojimas
+- **pilietiskumo**: visuomenės pažinimas, demokratinės vertybės, atsakomybė bendruomenei
+- **kulturine**: savo ir kitų kultūrų, meno, istorijos ir tradicijų pažinimas
+- **socialine_emocine_ir_sveikos_gyvensenos**: bendradarbiavimas, emocijų supratimas, rūpinimasis sveikata
 
-Jei pateikiami DU dalykai, pamoka turi būti TIKRAI integruota — ne du atskiri blokai paeiliui. Konkretus testas:
+Kiekvienam etapui nurodyk 1-2 kompetencijas, kurias jis iš tikrųjų ugdo (ne visas, kurias galima pritempti). Plano lauke \`competencies\` nurodyk 1-4 svarbiausias. Komandinis užduočių sprendimas pats savaime ugdo bendradarbiavimą; „skaitmenine“ rašyk tik tada, kai mokiniai ieško, vertina ar kuria skaitmeninį turinį, o ne vien įveda atsakymą telefone.
 
-- ✗ BLOGAI: "Pirmoji veikla — matematika, antroji — fizika, trečioji — matematika"
-- ✓ GERAI: "Veikla apie greitį: mokiniai skaičiuoja vidutinį dviratininko greitį (matematika), bet užduotyje aprašyta dviratininko važiuojama kelio kreivė ir aiškinamasi, kaip ši kreivė siejasi su pagreičio kryptimi (fizika)"
+# MĄSTYMO LYGIAI
 
-Kiekvienoje veikloje abiejų dalykų žinios turi būti NEATSISKIRIAMOS — mokinys negali atsakyti, neturėdamas žinių iš abiejų.
+Kiekvienam etapui nurodyk \`bloom_level\`:
+- **zinios**: prisiminti, atpažinti
+- **supratimas**: paaiškinti savais žodžiais, pateikti pavyzdį
+- **taikymas**: pritaikyti žinias naujoje situacijoje
+- **analize**: palyginti, išskaidyti, rasti ryšį ar priežastį
+- **sinteze**: sujungti idėjas į naują visumą, kurti
+- **vertinimas**: pagrįsti, įvertinti, priimti sprendimą
 
-# VEIKLŲ STRUKTŪRA
+Lygiai per pamoką kyla: nuo prisiminimo ir supratimo prie taikymo ir analizės. Nurodyk lygį, kurio užduotis iš tikrųjų reikalauja. Kiek aukštų lygių reikia, priklauso nuo klasės (žr. užklausą).
 
-## Etapai (\`activity_type\`)
-- **intro** — motyvacinis įvadas, susidomėjimo kėlimas, konteksto pateikimas
-- **challenge** — pagrindinė mokymo/tikrinimo veikla
-- **discussion** — diskusinė, atviresnio pobūdžio veikla (komandinis aptarimas)
-- **reflection** — refleksija, apibendrinimas, kas išmokta
+# DIFERENCIJAVIMAS IR METODINĖ PASTABA
 
-## Užduočių tipai (\`type\`)
-- **text** — laisvo teksto atsakymas (gerai esė, paaiškinimui, kūrybai)
-- **number** — skaitinis atsakymas (matematika, fizika, statistika)
-- **multiple_choice** — 3-4 variantai, \`correct_answer\` PRIVALO būti vienas iš \`options\`
+\`teacher_methodical_note\` rašoma vedėjui ir turi šias dalis:
+- **Pasiruošimas**: ko reikia (priemonės, tekstai, ką mokiniai jau turi mokėti).
+- **Kaip pristatyti naują medžiagą**: 2-3 sakiniai.
+- **Diferencijavimas**: kaip padėti mokiniams, kuriems sunkiau (papildoma atrama, pavyzdys, mažesni skaičiai, vaidmenys komandoje), ir ką pasiūlyti tiems, kurie baigia anksčiau (gilesnis klausimas, ne daugiau tokių pačių užduočių). Paminėk pritaikymą mokiniams, turintiems specialiųjų ugdymosi poreikių.
+- **Vertinimas**: iš ko vedėjas matys, kad tikslas pasiektas, ir ką daryti, jei daug komandų suklysta.
 
-## Laiko planavimas
-- Paskirstyk minutes realistiškai tarp veiklų.
-- Intro: 3-5 min. Challenge: 5-10 min kiekvienas. Discussion: 5-7 min. Reflection: 3-5 min.
-- Bendra trukmė turi tilpti į nurodytą pamokos trukmę.
+Pagal universalaus dizaino mokymuisi principus numatyk daugiau nei vieną būdą pateikti turinį (tekstas, vaizdas, pavyzdys, daiktai) ir daugiau nei vieną būdą mokiniams parodyti, ką išmoko (žodžiu, raštu, veiksmu). Mokinių neskirstyk pagal „mokymosi stilius“.
 
-# FEW-SHOT PAVYZDŽIAI (pedagogiškai gerai sukurtos veiklos)
+# INTEGRUOTA PAMOKA
 
-## Pavyzdys 1 — Matematika 5 kl., medium, taikymo lygis
-\`\`\`json
+Jei nurodyti du dalykai, pamoka integruota iš tikrųjų, o ne du blokai paeiliui:
+- Netinka: „pirma užduotis iš matematikos, antra iš fizikos“.
+- Tinka: užduotis, kurios neįmanoma išspręsti be abiejų dalykų žinių, pvz., mokiniai iš kelio ir laiko grafiko (matematika) nustato, kada dviratininkas važiavo greičiausiai, ir paaiškina, kaip tai susiję su greičio sąvoka (fizika).
+
+# PAVYZDŽIAI (etapai)
+
+## 1 pavyzdys. Matematika, 5 klasė, medium, taikymas
 {
   "activity_type": "challenge",
   "title": "Klasės draugų ūgis",
-  "description": "Penkių klasės draugų ūgiai centimetrais: 142, 138, 145, 140, 150. Apskaičiuok jų ūgių vidurkį. Atsakymą rašyk kaip skaičių centimetrais.",
+  "description": "Penkių klasės draugų ūgiai centimetrais: 142, 138, 145, 140, 150. Apskaičiuok jų ūgių vidurkį. Atsakymą rašyk sveikuoju skaičiumi centimetrais.",
   "type": "number",
   "correct_answer": "143",
   "options": null,
-  "hints": ["Vidurkis = visų reikšmių suma padalinta iš jų skaičiaus.", "Iš pradžių sudėk visus ūgius: 142+138+145+140+150."],
-  "explanation": "Vidurkis yra 715 ÷ 5 = 143 cm. Vidurkis padeda suprasti tipinę reikšmę grupėje.",
+  "hints": ["Prisimink, ką rodo vidurkis ir iš kokių dviejų veiksmų jis gaunamas.", "Vidurkis yra visų reikšmių suma, padalyta iš reikšmių skaičiaus.", "Pirmiausia sudėk visus penkis ūgius, tada sumą padalyk iš 5."],
+  "explanation": "Ūgių suma padalyta iš penkių duoda vidurkį. Dažna klaida: padalyti iš didžiausio ūgio arba pamiršti vieną dėmenį.",
   "points": 150,
   "duration_minutes": 7,
   "difficulty": "medium",
   "competencies": ["pazinimo"],
   "bloom_level": "taikymas"
 }
-\`\`\`
 
-## Pavyzdys 2 — Lietuvių kalba 9 kl., medium, analizės lygis
-\`\`\`json
+## 2 pavyzdys. Gamtos mokslai, 6 klasė, medium, supratimas (variantai remiasi tipinėmis klaidomis)
 {
   "activity_type": "challenge",
-  "title": "Maironio kalbos vaizdingumas",
-  "description": "Perskaityk Maironio eilėraščio „Trakų pilis" pirmas keturias eilutes (mokytojas pateikia tekstą). Kokia meninė priemonė labiausiai dominuoja šiame fragmente?",
+  "title": "Kodėl žiemą šalčiau?",
+  "description": "Kodėl Lietuvoje žiemą šalčiau negu vasarą? Pasirink tiksliausią paaiškinimą.",
   "type": "multiple_choice",
-  "correct_answer": "Personifikacija",
-  "options": ["Hiperbolė", "Personifikacija", "Anafora", "Antitezė"],
-  "hints": ["Personifikacija — negyvų daiktų sužmoginimas.", "Pažiūrėk, ar pilis „mato", „mena", „budi" — tai požymis."],
-  "explanation": "Maironis pilį vaizduoja kaip gyvą būtybę („pilis budi", „mena praeitį") — tai personifikacija, suteikianti istorinei vietai gyvybės.",
+  "correct_answer": "Saulės spinduliai krinta nuožulniau, o diena trumpesnė",
+  "options": ["Žemė žiemą yra toliau nuo Saulės", "Saulės spinduliai krinta nuožulniau, o diena trumpesnė", "Žiemą Saulė skleidžia mažiau šilumos", "Žiemą debesys dažniau užstoja Saulę"],
+  "hints": ["Pagalvok, kas tuo pačiu metu vyksta Pietų pusrutulyje.", "Prisimink, kad Žemės ašis pasvirusi.", "Palygink, kaip aukštai vidurdienį pakyla Saulė birželį ir gruodį."],
+  "explanation": "Metų laikus lemia Žemės ašies posvyris: žiemą Saulė pakyla žemai ir šviečia trumpiau. Dažna klaida manyti, kad žiemą Žemė yra toliau nuo Saulės.",
   "points": 200,
-  "duration_minutes": 8,
+  "duration_minutes": 6,
   "difficulty": "medium",
-  "competencies": ["komunikavimo", "kulturine"],
-  "bloom_level": "analize"
+  "competencies": ["pazinimo"],
+  "bloom_level": "supratimas"
 }
-\`\`\`
 
-## Pavyzdys 3 — Pasaulio pažinimas 3 kl., easy, supratimo lygis
-\`\`\`json
+## 3 pavyzdys. Gamtos mokslai, 3 klasė, easy, žinios (įvadas)
 {
   "activity_type": "intro",
-  "title": "Kokie metų laikai?",
-  "description": "Lietuvoje per metus keičiasi orai. Pažymėk, kuris metų laikas yra šaltas, su sniegu.",
+  "title": "Metų laikai",
+  "description": "Kuriuo metų laiku Lietuvoje būna šalčiausia ir dažniausiai sninga?",
   "type": "multiple_choice",
-  "correct_answer": "Žiema",
-  "options": ["Pavasaris", "Vasara", "Ruduo", "Žiema"],
-  "hints": ["Pagalvok, kada nešiojame storas kepures."],
-  "explanation": "Žiema — šalčiausias metų laikas Lietuvoje, dažnai būna sniego.",
+  "correct_answer": "Žiemą",
+  "options": ["Pavasarį", "Vasarą", "Rudenį", "Žiemą"],
+  "hints": ["Pagalvok, kada rengiamės šilčiausiais drabužiais."],
+  "explanation": "Žiema yra šalčiausias metų laikas Lietuvoje.",
   "points": 50,
   "duration_minutes": 3,
   "difficulty": "easy",
   "competencies": ["pazinimo"],
   "bloom_level": "zinios"
 }
-\`\`\`
 
-# JSON FORMATAS
+# ATSAKYMO FORMATAS
 
-ATSAKYK TIK validžiu JSON formatu (jokio teksto prieš ar po), tiksliai pagal šią struktūrą:
-
-\`\`\`json
+Tik galiojantis JSON, be teksto prieš ar po:
 {
   "title": "Pamokos pavadinimas",
-  "goal": "Trumpas pamokos tikslas (1-2 sakiniai)",
-  "curriculum_link": "Ryšys su BUP — konkretus skyrius, tema",
-  "competencies": ["pazinimo", "kurybiskumo"],
+  "goal": "Vienas pamatuojamas pamokos tikslas",
+  "curriculum_link": "Dalykas, klasė, pasiekimų sritis ar tema žodžiais",
+  "competencies": ["pazinimo", "komunikavimo"],
   "stages": [
     {
       "activity_type": "intro" | "challenge" | "discussion" | "reflection",
-      "title": "Veiklos pavadinimas",
-      "description": "Veiklos aprašymas mokiniams",
+      "title": "Etapo pavadinimas, neatskleidžiantis atsakymo",
+      "description": "Tekstas mokiniams: užduotis ir laukiamo atsakymo forma",
       "type": "text" | "number" | "multiple_choice",
       "correct_answer": "Teisingas atsakymas",
       "options": ["Variantas A", "Variantas B", "Variantas C"] | null,
-      "hints": ["Užuomina 1", "Užuomina 2"],
-      "explanation": "Edukacinis paaiškinimas po teisingo atsakymo",
+      "hints": ["Mąstymo kryptis", "Susiaurinantis faktas", "Sprendimo būdas"],
+      "explanation": "Kodėl atsakymas teisingas",
       "points": 100,
       "duration_minutes": 5,
       "difficulty": "easy" | "medium" | "hard",
@@ -256,9 +254,17 @@ ATSAKYK TIK validžiu JSON formatu (jokio teksto prieš ar po), tiksliai pagal �
     }
   ],
   "reflection_prompt": "Refleksijos klausimas visai klasei",
-  "teacher_methodical_note": "Metodinė pastaba mokytojui: kaip vesti, į ką atkreipti dėmesį, kaip pritaikyti skirtingiems mokiniams (SUP, gabesniems), kokios žinios būtinos"
+  "teacher_methodical_note": "Pasiruošimas. Kaip pristatyti naują medžiagą. Diferencijavimas. Vertinimas."
+}`
 }
-\`\`\``
+
+/** How many stages fit a lesson of this length without rushing. */
+export function targetStageCount(duration: number): number {
+  if (duration <= 25) return 4
+  if (duration <= 35) return 5
+  if (duration <= 45) return 6
+  if (duration <= 60) return 8
+  return 10
 }
 
 export function buildLessonPlanUserMessage(input: LessonPlanGenerateInput): string {
@@ -285,31 +291,24 @@ export function buildLessonPlanUserMessage(input: LessonPlanGenerateInput): stri
   }
 
   if (secondaryLabel) {
-    parts.push(`\nINTEGRUOTA PAMOKA (STEAM principu):
-- Ši pamoka jungia DU dalykus: ${primaryLabel} ir ${secondaryLabel}.
-- Kiekviena veikla turi ORGANIŠKAI jungti abiejų dalykų turinį (žr. STEAM testas sistemos prompt'e).
-- \`curriculum_link\` lauke nurodyk ryšį su ABIEJŲ dalykų BUP.
-- \`teacher_methodical_note\` paaiškink, kokios žinios iš abiejų dalykų būtinos.
-- \`competencies\` lauke nurodyk kompetencijas, kurios kyla iš integracijos.`)
-  }
-
-  if (input.grade >= 11) {
-    parts.push(`\nGIMNAZIJOS / BRANDOS EGZAMINO KONTEKSTAS:
-- Pamokos turinį sieja su brandos egzamino struktūra ir vertinimo kriterijais šiam dalykui.
-- Naudok VLKK terminus tiksliai.
-- Veiklose įtrauk argumentavimo, kritinio vertinimo elementų — tai vertinama brandos egzaminuose.`)
+    parts.push(`\nINTEGRUOTA PAMOKA:
+- Pamoka jungia du dalykus: ${primaryLabel} ir ${secondaryLabel}.
+- Kiekvienai užduočiai reikia abiejų dalykų žinių (žr. skyrių „Integruota pamoka“).
+- \`curriculum_link\` lauke nurodyk ryšį su abiejų dalykų programomis.
+- \`teacher_methodical_note\` paaiškink, kokių abiejų dalykų žinių reikia iš anksto.`)
   }
 
   if (input.learning_goal) {
-    parts.push(`\nMOKYTOJO NURODYTAS TIKSLAS: ${input.learning_goal}`)
+    parts.push(`\nVedėjo nurodytas pamokos tikslas:\n${wrapUntrusted("vedejo_tekstas", input.learning_goal)}`)
   }
 
   if (input.curriculum_context) {
-    parts.push(`\nBUP KONTEKSTAS:\n${input.curriculum_context}`)
+    parts.push(`\nProgramos kontekstas:\n${wrapUntrusted("vedejo_tekstas", input.curriculum_context)}`)
   }
 
-  const targetStages = input.duration <= 25 ? 4 : input.duration <= 35 ? 5 : 7
-  parts.push(`\nSUGENERUOK PAMOKOS PLANĄ su maždaug ${targetStages} veiklomis. Bendra veiklų trukmė turi tilpti į ${input.duration} minučių. Pradedam nuo intro, baigiam reflection.`)
+  parts.push(
+    `\nSugeneruok pamokos planą iš maždaug ${targetStageCount(input.duration)} etapų. Pirmas etapas yra intro, paskutinis reflection. Visų etapų \`duration_minutes\` suma turi būti lygi ${input.duration}.`
+  )
 
   return parts.join("\n")
 }

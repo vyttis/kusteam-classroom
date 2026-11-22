@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useId } from "react"
+import { readStored, writeStored } from "@/lib/game/session"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -29,6 +30,11 @@ export function ReflectionForm({
   onDone,
 }: ReflectionFormProps) {
   const storageKey = `ctf_reflection_${gameCode}`
+  // Ids that tie each label and character counter to its field.
+  const formId = useId()
+  const hardestId = `${formId}-hardest`
+  const improvementId = `${formId}-improvement`
+  const likedId = `${formId}-liked`
 
   const [hardestChallengeId, setHardestChallengeId] = useState<string | null>(
     null
@@ -42,7 +48,7 @@ export function ReflectionForm({
 
   // Check if already done
   useEffect(() => {
-    const stored = localStorage.getItem(storageKey)
+    const stored = readStored(storageKey)
     if (stored === "submitted") {
       setSubmitted(true)
     } else if (stored === "skipped") {
@@ -92,30 +98,30 @@ export function ReflectionForm({
 
       if (res.status === 409) {
         // Already submitted
-        localStorage.setItem(storageKey, "submitted")
+        writeStored(storageKey, "submitted")
         setSubmitted(true)
         onDone()
         return
       }
 
       if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || "Nepavyko išsaugoti")
+        const data = (await res.json().catch(() => null)) as { error?: string } | null
+        setError(data?.error || "Nepavyko išsaugoti refleksijos. Bandykite dar kartą.")
         return
       }
 
-      localStorage.setItem(storageKey, "submitted")
+      writeStored(storageKey, "submitted")
       setSubmitted(true)
       onDone()
     } catch {
-      setError("Nepavyko išsaugoti refleksijos")
+      setError("Nepavyko išsaugoti refleksijos. Patikrinkite interneto ryšį ir bandykite dar kartą.")
     } finally {
       setLoading(false)
     }
   }
 
   function handleSkip() {
-    localStorage.setItem(storageKey, "skipped")
+    writeStored(storageKey, "skipped")
     setSkipped(true)
     onDone()
   }
@@ -145,7 +151,7 @@ export function ReflectionForm({
           <div className="space-y-4">
             {/* Q1: Hardest challenge */}
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-steam-dark">
+              <Label htmlFor={hardestId} className="text-sm font-medium text-steam-dark">
                 Kuri užduotis buvo sudėtingiausia?
               </Label>
               <Select
@@ -154,7 +160,7 @@ export function ReflectionForm({
                   setHardestChallengeId(val === "none" ? null : val)
                 }
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger id={hardestId} className="bg-white">
                   <SelectValue placeholder="Pasirinkite užduotį..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,43 +178,49 @@ export function ReflectionForm({
 
             {/* Q2: Improvement */}
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-steam-dark">
-                Ką kitą kartą darytum kitaip?
+              <Label htmlFor={improvementId} className="text-sm font-medium text-steam-dark">
+                Ką kitą kartą darytumėte kitaip?
               </Label>
               <Textarea
+                id={improvementId}
+                aria-describedby={`${improvementId}-count`}
                 value={improvementText}
                 onChange={(e) =>
                   setImprovementText(e.target.value.slice(0, 500))
                 }
-                placeholder="Pvz., daugiau tartumėmės komandoje, atidžiau skaityčiau sąlygas…"
+                placeholder="Pvz., daugiau tartumėmės komandoje, atidžiau skaitytume sąlygas…"
                 className="bg-white min-h-[80px] resize-none"
               />
-              <p className="text-xs text-muted-foreground text-right">
+              <p id={`${improvementId}-count`} className="text-xs text-muted-foreground text-right">
+                <span className="sr-only">Įvesta ženklų: </span>
                 {improvementText.length}/500
               </p>
             </div>
 
             {/* Q3: What liked (optional) */}
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-steam-dark">
+              <Label htmlFor={likedId} className="text-sm font-medium text-steam-dark">
                 Kas labiausiai patiko?{" "}
                 <span className="text-muted-foreground font-normal">
                   (neprivaloma)
                 </span>
               </Label>
               <Textarea
+                id={likedId}
+                aria-describedby={`${likedId}-count`}
                 value={likedText}
                 onChange={(e) => setLikedText(e.target.value.slice(0, 300))}
                 placeholder="Pvz., buvo smagu dirbti komandoje, patiko mįslės…"
                 className="bg-white min-h-[60px] resize-none"
               />
-              <p className="text-xs text-muted-foreground text-right">
+              <p id={`${likedId}-count`} className="text-xs text-muted-foreground text-right">
+                <span className="sr-only">Įvesta ženklų: </span>
                 {likedText.length}/300
               </p>
             </div>
 
             {error && (
-              <p className="text-sm text-accent-ink font-medium">{error}</p>
+              <p role="alert" className="text-sm text-accent-ink font-medium">{error}</p>
             )}
 
             {/* Actions */}

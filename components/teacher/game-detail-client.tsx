@@ -108,7 +108,7 @@ export function GameDetailClient({ game, canPublish = false }: GameDetailClientP
               <li>
                 <button type="button" className={menuItem} onClick={openFromMenu(setDuplicateDialogOpen)}>
                   <Copy className="h-4 w-4 text-primary-ink" aria-hidden="true" />
-                  Dubliuoti
+                  Kopijuoti
                 </button>
               </li>
               {canPublish && !publishOnHeader && (
@@ -120,24 +120,26 @@ export function GameDetailClient({ game, canPublish = false }: GameDetailClientP
                 </li>
               )}
               {isDraft && (
-                <>
-                  <li>
-                    <button type="button" className={menuItem} onClick={openFromMenu(setEditDialogOpen)}>
-                      <Edit3 className="h-4 w-4 text-secondary-ink" aria-hidden="true" />
-                      Redaguoti nustatymus
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`${menuItem} text-accent-ink`}
-                      onClick={openFromMenu(setDeleteDialogOpen)}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Ištrinti
-                    </button>
-                  </li>
-                </>
+                <li>
+                  <button type="button" className={menuItem} onClick={openFromMenu(setEditDialogOpen)}>
+                    <Edit3 className="h-4 w-4 text-secondary-ink" aria-hidden="true" />
+                    Redaguoti nustatymus
+                  </button>
+                </li>
+              )}
+              {/* A running activity is finished first. A finished one can be
+                  deleted: a participant may ask for their data to be removed. */}
+              {(isDraft || isFinished) && (
+                <li>
+                  <button
+                    type="button"
+                    className={`${menuItem} text-accent-ink`}
+                    onClick={openFromMenu(setDeleteDialogOpen)}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {isFinished ? "Ištrinti veiklą ir jos duomenis" : "Ištrinti"}
+                  </button>
+                </li>
               )}
             </ul>
           </PopoverContent>
@@ -156,12 +158,13 @@ export function GameDetailClient({ game, canPublish = false }: GameDetailClientP
         />
       )}
 
-      {isDraft && (
+      {(isDraft || isFinished) && (
         <GameDeleteDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           gameId={game.id}
           gameTitle={game.title}
+          finished={isFinished}
         />
       )}
 

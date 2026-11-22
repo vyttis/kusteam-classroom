@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { allRowsById } from "@/lib/supabase/all-pages"
 import { useSubmissionFilter } from "@/hooks/use-submission-filter"
+import {
+  FALLBACK_POLL_MS,
+  SAFETY_REFETCH_MS,
+  channelStatusAction,
+  type LiveConnectionState,
+} from "@/hooks/live-channel"
 
 export interface LiveTeam {
   id: string
@@ -13,7 +19,7 @@ export interface LiveTeam {
   joined_at: string
 }
 
-export type LiveConnectionState = "connecting" | "live" | "degraded"
+export type { LiveConnectionState }
 
 interface UseLiveGameResult {
   teams: LiveTeam[]
@@ -30,7 +36,9 @@ interface UseLiveGameResult {
 // Shared realtime data layer for the teacher live views (dashboard control
 // center and projector board): teams + solved counts + last activity, with
 // realtime subscriptions and a polling fallback when the channel degrades.
-export function useLiveGame(gameId: string): UseLiveGameResult {
+// `running` is false once the activity is finished: nothing changes any
+// more, so the slow safety read stops.
+export function useLiveGame(gameId: string, running = true): UseLiveGameResult {
   const [teams, setTeams] = useState<LiveTeam[]>([])
   // Mirror of the known team ids for cheap membership checks inside realtime
   // callbacks (avoids a DB round-trip per submission event)
@@ -138,7 +146,7 @@ export function useLiveGame(gameId: string): UseLiveGameResult {
       if (pollInterval) return
       pollInterval = setInterval(() => {
         fetchInitialData().catch(() => {})
-      }, 30000)
+      }, FALLBACK_POLL_MS)
     }
 
     function stopPolling() {
@@ -161,16 +169,38 @@ export function useLiveGame(gameId: string): UseLiveGameResult {
 
     // One channel carries team and answer changes (PERF-03): it is either
     // subscribed or not, so the board is never "live" over half its data.
-    const handleStatus = (status: string) => {
-      if (cancelled) return
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+    // A full read that failed means the board may be behind: say so and
+    // keep reading until one succeeds.
+    const refetchOrDegrade = () => {
+      fetchInitialData().catch(() => {
+        if (cancelled) return
         setConnectionState("degraded")
         startPolling()
-      } else if (status === "SUBSCRIBED") {
-        setConnectionState("live")
-        stopPolling()
-      }
+      })
     }
+
+    let subscribedBefore = false
+    const handleStatus = (status: string) => {
+      if (cancelled) return
+      const action = channelStatusAction(status, subscribedBefore)
+      if (status === "SUBSCRIBED") subscribedBefore = true
+      if (action.state) setConnectionState(action.state)
+      if (action.polling === "start") startPolling()
+      if (action.polling === "stop") stopPolling()
+      // Subscribed again after an error, a timeout or a close: answers given
+      // during the gap never come over the channel, so read everything.
+      if (action.refetch) refetchOrDegrade()
+    }
+
+    // The channel can lose events without reporting anything (a proxy that
+    // drops the socket silently). A slow full read bounds how long the
+    // board can stay behind while the activity runs.
+    const safetyInterval = running
+      ? setInterval(() => {
+          if (cancelled || document.visibilityState !== "visible") return
+          fetchInitialData().catch(() => {})
+        }, SAFETY_REFETCH_MS)
+      : null
 
     const channel = supabase
       .channel(`live_game_${gameId}`)
@@ -276,8 +306,9 @@ export function useLiveGame(gameId: string): UseLiveGameResult {
       window.removeEventListener("online", refresh)
       supabase.removeChannel(channel)
       stopPolling()
+      if (safetyInterval) clearInterval(safetyInterval)
     }
-  }, [gameId, fetchInitialData, retryNonce, submissionFilter])
+  }, [gameId, fetchInitialData, retryNonce, submissionFilter, running])
 
   const solvedCounts = new Map<string, number>()
   solvedSets.forEach((set, teamId) => solvedCounts.set(teamId, set.size))

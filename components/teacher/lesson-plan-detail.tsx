@@ -17,6 +17,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useLeaveWarning } from "@/hooks/use-leave-warning"
+import { useSessionExpired } from "@/hooks/use-session-expired"
+import { SessionExpiredNotice } from "@/components/teacher/session-expired-notice"
 import {
   ArrowLeft,
   GraduationCap,
@@ -97,6 +100,10 @@ interface Draft {
   teacher_methodical_note: string
 }
 
+/** The editable content of a draft: two drafts with the same content are equal. */
+const draftContent = (d: Draft) =>
+  JSON.stringify([d.title, d.goal, d.curriculum_link, d.stages, d.reflection_prompt, d.teacher_methodical_note])
+
 let nextKey = 0
 
 const draftOf = (plan: PlanData): Draft => ({
@@ -114,6 +121,9 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
   const { toast } = useToast()
   const [plan, setPlan] = useState(initialPlan)
   const [draft, setDraft] = useState<Draft | null>(null)
+  // The draft as it was when editing started: a difference is unsaved work.
+  const [draftBaseline, setDraftBaseline] = useState<string | null>(null)
+  const session = useSessionExpired()
   const [saving, setSaving] = useState(false)
   const [convertOpen, setConvertOpen] = useState(openConvert)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -122,6 +132,22 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
   const status = STATUS_LABELS[plan.status] || STATUS_LABELS.draft
   const stages = plan.stages || []
   const editing = draft !== null
+  // Stays set while saving: the edits are safe only once the save succeeded.
+  const dirty = draft !== null && draftBaseline !== null && draftContent(draft) !== draftBaseline
+  useLeaveWarning(dirty)
+
+  function startEditing() {
+    const next = draftOf(plan)
+    setDraft(next)
+    setDraftBaseline(draftContent(next))
+  }
+
+  function cancelEditing() {
+    if (dirty && !window.confirm("Plano pakeitimai neišsaugoti. Atmesti juos?")) return
+    session.clear()
+    setDraft(null)
+    setDraftBaseline(null)
+  }
 
   function updateStage(index: number, updated: LessonStage) {
     setDraft((d) => (d ? { ...d, stages: d.stages.map((s, i) => (i === index ? updated : s)) } : d))
@@ -163,6 +189,9 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
           competencies: plan.competencies ?? [],
         }),
       })
+      // Session ended: the notice next to the save button explains what to
+      // do, and the edits stay in the form.
+      if (session.check(res)) return
       const data = (await res.json().catch(() => ({}))) as { lesson_plan?: PlanData; error?: string }
       if (!res.ok || !data.lesson_plan) {
         toast({ title: "Nepavyko išsaugoti", description: data.error ?? "Bandykite dar kartą.", variant: "destructive" })
@@ -170,6 +199,7 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
       }
       setPlan(data.lesson_plan)
       setDraft(null)
+      setDraftBaseline(null)
       toast({ title: "Planas išsaugotas" })
       router.refresh()
     } catch {
@@ -236,7 +266,7 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
         </div>
         {!editing && (
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDraft(draftOf(plan))}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
               <Pencil className="h-4 w-4" aria-hidden="true" />
               Redaguoti
             </Button>
@@ -515,6 +545,10 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
         )
       )}
 
+      {editing && session.expired && (
+        <SessionExpiredNotice className="mb-3" onRetry={() => void save()} retrying={saving} />
+      )}
+
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3 pt-2 pb-8">
         {editing ? (
@@ -532,7 +566,7 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
               )}
               {saving ? "Išsaugoma..." : "Išsaugoti pakeitimus"}
             </Button>
-            <Button variant="outline" size="lg" onClick={() => setDraft(null)} disabled={saving}>
+            <Button variant="outline" size="lg" onClick={cancelEditing} disabled={saving}>
               Atšaukti
             </Button>
           </>

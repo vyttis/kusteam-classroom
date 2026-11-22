@@ -4,7 +4,7 @@ import Image from "next/image"
 
 const PHOTOS = [
   { src: "/photos/steam-lab.jpg", alt: "STEAM centro laboratorija", caption: "Laboratorija" },
-  { src: "/photos/steam-robot.jpg", alt: "Pepper robotas", caption: "Pepper" },
+  { src: "/photos/steam-robot.jpg", alt: "Robotas „Pepper“", caption: "Pepper" },
   { src: "/photos/activity-vr.jpg", alt: "VR technologijos", caption: "VR / AR" },
 ] as const
 
@@ -30,8 +30,8 @@ export function AboutCreatorsSection() {
           className="text-base md:text-lg text-muted-foreground mt-6 max-w-2xl leading-relaxed text-pretty"
         >
           Klaipėdos universiteto STEAM metodinis centras dirba su mokytojais ir
-          švietimo bendruomene. Įrankis sukurtas siekiant praktinių mokyklų poreikių,
-          remiantis realiu mokytojų darbu klasėse.
+          švietimo bendruomene. Įrankis sukurtas atsižvelgiant į praktinius mokyklų
+          poreikius ir remiantis tikru mokytojų darbu klasėse.
         </p>
       </div>
 

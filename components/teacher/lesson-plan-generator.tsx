@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useLeaveWarning } from "@/hooks/use-leave-warning"
+import { useSessionExpired } from "@/hooks/use-session-expired"
+import { SessionExpiredNotice } from "@/components/teacher/session-expired-notice"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Sparkles,
@@ -173,6 +175,7 @@ export function LessonPlanGenerator({ userId }: { userId: string }) {
   const [phase, setPhase] = useState<Phase>("input")
   const [loading, setLoading] = useState(false)
   const [converting, setConverting] = useState(false)
+  const session = useSessionExpired()
 
   // Prefill from a template (lesson-plans list "Pavyzdžiai", ?template=)
   const applyTemplate = useCallback((templateId: string) => {
@@ -383,6 +386,12 @@ export function LessonPlanGenerator({ userId }: { userId: string }) {
         }),
       })
 
+      // Session ended: the plan stays on the screen (and in this browser),
+      // the notice above the buttons says how to sign in and save again.
+      if (session.check(res)) {
+        setPhase("preview")
+        return
+      }
       const data = (await res.json().catch(() => ({}))) as { lesson_plan?: { id: string }; error?: string }
       if (!res.ok || !data.lesson_plan) throw new Error(data.error || "Nepavyko išsaugoti")
       clearPlanDraft(draftKey)
@@ -429,6 +438,10 @@ export function LessonPlanGenerator({ userId }: { userId: string }) {
         }),
       })
 
+      if (session.check(saveRes)) {
+        setConverting(false)
+        return
+      }
       const saveData = (await saveRes.json().catch(() => ({}))) as { lesson_plan?: { id: string }; error?: string }
       if (!saveRes.ok || !saveData.lesson_plan) throw new Error(saveData.error || "Nepavyko išsaugoti")
       clearPlanDraft(draftKey)
@@ -938,6 +951,9 @@ export function LessonPlanGenerator({ userId }: { userId: string }) {
 
       {/* Actions — lesson plan specific */}
       <div className="flex flex-col gap-3 pt-2">
+        {session.expired && (
+          <SessionExpiredNotice onRetry={() => void handleSave()} retrying={phase === "saving"} />
+        )}
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
             onClick={handleSave}

@@ -33,17 +33,17 @@ const statusConfig: Record<
     icon: <FileEdit className="h-3 w-3" />,
   },
   active: {
-    label: "Aktyvus",
+    label: "Vyksta",
     variant: "default",
     icon: <Play className="h-3 w-3" />,
   },
   paused: {
-    label: "Pristabdytas",
+    label: "Pristabdyta",
     variant: "secondary",
     icon: <Pause className="h-3 w-3" />,
   },
   finished: {
-    label: "Baigtas",
+    label: "Baigta",
     variant: "secondary",
     icon: <CheckCircle2 className="h-3 w-3" />,
   },
@@ -61,6 +61,10 @@ export function GameCard({ game, index, onUpdate }: GameCardProps) {
   const challengeCount = game.challenges?.[0]?.count || 0
   const isDraft = game.status === "draft"
   const isLive = game.status === "active" || game.status === "paused"
+  const isFinished = game.status === "finished"
+  // A running activity is finished first; a draft or a finished one can go
+  // (a participant may ask for their data to be deleted after the lesson).
+  const canDelete = isDraft || isFinished
 
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -117,8 +121,9 @@ export function GameCard({ game, index, onUpdate }: GameCardProps) {
 
             {/* Footer */}
             <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/30">
-              {isDraft && (
+              {canDelete && (
                 <div className="flex gap-1">
+                  {isDraft && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -132,6 +137,7 @@ export function GameCard({ game, index, onUpdate }: GameCardProps) {
                   >
                     <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
                   </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -173,7 +179,6 @@ export function GameCard({ game, index, onUpdate }: GameCardProps) {
 
       {/* Edit/Delete dialogs (rendered outside Link to avoid navigation) */}
       {isDraft && (
-        <>
           <GameEditDialog
             open={editOpen}
             onOpenChange={setEditOpen}
@@ -188,17 +193,19 @@ export function GameCard({ game, index, onUpdate }: GameCardProps) {
               onUpdate?.()
             }}
           />
+      )}
+      {canDelete && (
           <GameDeleteDialog
             open={deleteOpen}
             onOpenChange={setDeleteOpen}
             gameId={game.id}
             gameTitle={game.title}
+            finished={isFinished}
             onSuccess={() => {
               setDeleteOpen(false)
               onUpdate?.()
             }}
           />
-        </>
       )}
     </motion.div>
   )

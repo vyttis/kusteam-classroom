@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { useLeaveWarning } from "@/hooks/use-leave-warning"
+import { useSessionExpired } from "@/hooks/use-session-expired"
+import { SessionExpiredNotice } from "@/components/teacher/session-expired-notice"
+import { addFailureReason, partialAddSummary, type AddFailure } from "@/components/teacher/task-add-result"
+import { pluralizeLt } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Sparkles,
@@ -35,6 +40,7 @@ import {
   Target,
   MessageSquare,
   FileText,
+  AlertTriangle,
 } from "lucide-react"
 
 interface LessonGeneratorProps {
@@ -81,6 +87,15 @@ export function LessonGenerator({
   const [editTeacherNote, setEditTeacherNote] = useState("")
   const [editReflection, setEditReflection] = useState("")
   const [activities, setActivities] = useState<ActivityWithVerification[]>([])
+  // The last "add" run: how many tasks were saved and which were not. The
+  // ones that failed stay in `activities`, so adding again retries only them.
+  const [addedCount, setAddedCount] = useState(0)
+  const [failures, setFailures] = useState<AddFailure[]>([])
+  const session = useSessionExpired()
+
+  // A generated lesson is minutes of DI work and exists only on this page
+  // until its tasks are added: leaving or reloading asks first.
+  useLeaveWarning(loading || (phase !== "input" && activities.length > 0))
 
   // Derived
   const availableGrades = useMemo(() => getGradesForSubject(subject), [subject])
@@ -142,6 +157,8 @@ export function LessonGenerator({
       setEditTeacherNote(generated.teacher_note)
       setEditReflection(generated.reflection_question)
       setActivities([...generated.activities])
+      setFailures([])
+      setAddedCount(0)
       setPhase("preview")
     } catch (err) {
       toast({
@@ -176,10 +193,16 @@ export function LessonGenerator({
     if (activities.length === 0) return
 
     setPhase("creating")
-    let successCount = 0
+    const failed: { activity: ActivityWithVerification; reason: string }[] = []
+    let saved = 0
+    let sessionEnded = false
 
-    for (let i = 0; i < activities.length; i++) {
-      const activity = activities[i]
+    for (const activity of activities) {
+      // Once the session has ended every further request fails the same way.
+      if (sessionEnded) {
+        failed.push({ activity, reason: addFailureReason(401) })
+        continue
+      }
       try {
         const res = await fetch("/api/challenges", {
           method: "POST",
@@ -204,34 +227,54 @@ export function LessonGenerator({
         })
 
         if (res.ok) {
-          successCount++
+          saved++
+          continue
         }
+        if (res.status === 401) sessionEnded = true
+        const body = (await res.json().catch(() => null)) as { error?: unknown } | null
+        failed.push({ activity, reason: addFailureReason(res.status, body?.error) })
       } catch {
-        // Continue with remaining activities
+        failed.push({ activity, reason: addFailureReason(null) })
       }
     }
 
-    if (successCount > 0) {
+    session.check({ status: sessionEnded ? 401 : 200 })
+    const totalSaved = addedCount + saved
+
+    if (failed.length === 0) {
+      // Everything is saved: nothing is left to lose, so leaving is free.
+      setActivities([])
+      setFailures([])
       toast({
-        title: "Užduotys pridėtos!",
-        description: `${successCount} užduočių pridėta į veiklą.`,
+        title: "Užduotys pridėtos",
+        description: `Į veiklą ${pluralizeLt(totalSaved, "pridėta", "pridėtos", "pridėta")} ${totalSaved} ${pluralizeLt(totalSaved, "užduotis", "užduotys", "užduočių")}.`,
       })
       router.push(`/games/${gameId}/builder`)
       router.refresh()
-    } else {
-      toast({
-        title: "Klaida",
-        description: "Nepavyko pridėti užduočių. Bandykite dar kartą.",
-        variant: "destructive",
-      })
-      setPhase("preview")
+      return
     }
+
+    // Stay here: only the tasks that were not saved remain in the list, each
+    // named with its reason, and the button below tries them again.
+    setAddedCount(totalSaved)
+    setActivities(failed.map((f) => f.activity))
+    setFailures(failed.map((f) => ({ title: f.activity.title, reason: f.reason })))
+    setPhase("preview")
+    toast({
+      title: saved > 0 ? "Pridėtos ne visos užduotys" : "Užduočių pridėti nepavyko",
+      description: partialAddSummary(totalSaved, failed.length),
+      variant: "destructive",
+    })
+    if (saved > 0) router.refresh()
   }
 
   function handleRegenerate() {
     setPhase("input")
     setLesson(null)
     setActivities([])
+    setFailures([])
+    setAddedCount(0)
+    session.clear()
   }
 
   // --- Render ---
@@ -249,9 +292,10 @@ export function LessonGenerator({
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <FileText className="h-4 w-4" />
-                <span>Esamų užduočių:</span>
+                <span>Veikloje jau yra:</span>
                 <Badge variant="outline" className="ml-auto">
-                  {existingChallenges.length} užduočių
+                  {existingChallenges.length}{" "}
+                  {pluralizeLt(existingChallenges.length, "užduotis", "užduotys", "užduočių")}
                 </Badge>
               </div>
             </CardContent>
@@ -528,7 +572,8 @@ export function LessonGenerator({
       <div className="space-y-1">
         <h3 className="text-sm font-medium text-steam-dark flex items-center gap-2 mb-3">
           <Clock className="h-4 w-4 text-secondary-ink" />
-          Veiklų seka ({activities.length} veiklos)
+          Veiklų seka ({activities.length}{" "}
+          {pluralizeLt(activities.length, "veikla", "veiklos", "veiklų")})
         </h3>
 
         <AnimatePresence>
@@ -553,7 +598,7 @@ export function LessonGenerator({
           ))}
         </AnimatePresence>
 
-        {activities.length === 0 && (
+        {activities.length === 0 && phase !== "creating" && (
           <Card className="border-dashed border-2 border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
               Visos veiklos pašalintos. Generuokite iš naujo.
@@ -594,6 +639,38 @@ export function LessonGenerator({
         </CardContent>
       </Card>
 
+      {/* Result of the last attempt: what was saved, what was not and why */}
+      {failures.length > 0 && (
+        <div role="alert" className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm text-steam-dark">
+          <p className="flex items-center gap-2 font-medium text-accent-ink">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {partialAddSummary(addedCount, failures.length)}
+          </p>
+          <p className="mt-1">
+            {addedCount > 0
+              ? "Pridėtos užduotys jau yra veikloje. Sąraše aukščiau liko tik nepridėtos:"
+              : "Nė viena užduotis neišsaugota. Jos visos liko sąraše aukščiau:"}
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {failures.map((f, i) => (
+              <li key={`${f.title}-${i}`}>
+                <span className="font-medium">„{f.title}“</span>: {f.reason}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Jei reikia, pataisykite užduotį ir spauskite „Bandyti dar kartą“. Bus pridėtos tik šios užduotys.
+          </p>
+        </div>
+      )}
+      {session.expired && (
+        <SessionExpiredNotice
+          onRetry={() => void handleAddToGame()}
+          retrying={phase === "creating"}
+          retryLabel="Bandyti pridėti dar kartą"
+        />
+      )}
+
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3 pt-2">
         <Button
@@ -610,7 +687,9 @@ export function LessonGenerator({
           ) : (
             <>
               <Check className="h-4 w-4" />
-              Pridėti užduotis ({activities.length})
+              {failures.length > 0
+                ? `Bandyti dar kartą (${activities.length})`
+                : `Pridėti užduotis (${activities.length})`}
             </>
           )}
         </Button>

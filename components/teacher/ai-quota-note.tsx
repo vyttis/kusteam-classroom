@@ -4,6 +4,17 @@ import { useEffect, useState } from "react"
 import { pluralizeLt } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
+const USAGE_CHANGED_EVENT = "ks-ai-usage-changed"
+
+/**
+ * Call right after a DI action finishes (or is refused): every quota note on
+ * the page reads the allowance again, so "liko N DI užklausų" does not keep
+ * the number from before the action.
+ */
+export function notifyAiUsageChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(USAGE_CHANGED_EVENT))
+}
+
 interface Quota {
   used: number
   limit: number | null
@@ -21,14 +32,30 @@ export function AiQuotaNote({ className, refreshKey }: { className?: string; ref
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/ai/usage", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((q: Quota | null) => {
-        if (!cancelled) setQuota(q)
-      })
-      .catch(() => {})
+    let later: ReturnType<typeof setTimeout> | null = null
+    const load = () => {
+      fetch("/api/ai/usage", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((q: Quota | null) => {
+          // A failed read keeps the last known number instead of hiding it.
+          if (!cancelled && q) setQuota(q)
+        })
+        .catch(() => {})
+    }
+    // After a DI action: read now, and once more shortly after, because the
+    // server settles the count after it has sent the response (a slot of an
+    // action that made no model call is given back then).
+    const onUsageChanged = () => {
+      load()
+      if (later) clearTimeout(later)
+      later = setTimeout(load, 2500)
+    }
+    load()
+    window.addEventListener(USAGE_CHANGED_EVENT, onUsageChanged)
     return () => {
       cancelled = true
+      if (later) clearTimeout(later)
+      window.removeEventListener(USAGE_CHANGED_EVENT, onUsageChanged)
     }
   }, [refreshKey])
 

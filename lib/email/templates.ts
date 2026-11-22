@@ -337,7 +337,7 @@ export function aiBudgetEmail(to: string[], d: AiBudgetDetails, adminUrl: string
       parts.push(
         details(
           d.top.map((t) => [t.name, `${uzklausa(t.requests)}, ${usd(t.costUsd)}`] as [string, string]),
-          { heading: "Daugiausiai šį mėnesį", boxed: true },
+          { heading: "Daugiausia šį mėnesį", boxed: true },
         ),
       )
     }

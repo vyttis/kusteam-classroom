@@ -16,6 +16,8 @@ interface TaskListPanelProps {
   onSelect: (challenge: Challenge) => void
   onDelete: (challenge: Challenge) => void
   onDuplicate: (challenge: Challenge) => void
+  /** Moves a task one step: the alternative to dragging. */
+  onMove?: (challenge: Challenge, direction: -1 | 1) => void
   onAddNew: () => void
   isOverPanel: boolean
   locked?: boolean
@@ -27,6 +29,7 @@ export function TaskListPanel({
   onSelect,
   onDelete,
   onDuplicate,
+  onMove,
   onAddNew,
   isOverPanel,
   locked = false,
@@ -83,6 +86,9 @@ export function TaskListPanel({
                   onSelect={onSelect}
                   onDelete={onDelete}
                   onDuplicate={onDuplicate}
+                  onMove={onMove}
+                  isFirst={index === 0}
+                  isLast={index === challenges.length - 1}
                   locked={locked}
                 />
               ))}
