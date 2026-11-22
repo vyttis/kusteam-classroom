@@ -13,48 +13,79 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react"
-import type { GameStats, ChallengeStatItem } from "@/types/game"
+import type { DetailedChallengeStat, DetailedStats } from "@/lib/game/detailed-stats"
+import { summarizeClass } from "@/lib/game/formative-insights"
 
 interface GameResultsSummaryProps {
   gameId: string
   totalChallenges: number
 }
 
+type SummaryStats = DetailedStats & { game_status?: string }
+
+/** How often the numbers are read again while the activity runs. */
+const LIVE_REFRESH_MS = 10_000
+
 /**
- * Post-game pedagogical summary for the teacher.
- * Mirrors the data the Ministry inspector expects to see: completion rate,
- * difficulty distribution, hardest-challenge call-out, team leaderboard.
+ * Class summary for the facilitator: completion, accuracy, where the class
+ * got stuck and what went well.
  *
- * Renders only after at least one team has joined and submitted answers —
- * empty otherwise.
+ * The numbers come from the same per-task statistics as the analytics page
+ * (teams that solved a task, not answers), and while the activity is active
+ * or paused they are read again every few seconds: a summary read once when
+ * the page opened kept showing the first team with no answers for the rest
+ * of the lesson. The texts participants typed are not requested here
+ * ("answers=0"): this page is often on a projector.
  */
 export function GameResultsSummary({ gameId, totalChallenges }: GameResultsSummaryProps) {
-  const [stats, setStats] = useState<GameStats | null>(null)
+  const [stats, setStats] = useState<SummaryStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+
+  const running = stats?.game_status === "active" || stats?.game_status === "paused"
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(`/api/games/${gameId}/analytics`)
+        const res = await fetch(`/api/games/${gameId}/analytics/detailed?answers=0`, { cache: "no-store" })
         if (!res.ok) {
           if (!cancelled) setError("Nepavyko gauti statistikos")
           return
         }
-        const data = (await res.json()) as GameStats
-        if (!cancelled) setStats(data)
+        const data = (await res.json()) as SummaryStats
+        if (!cancelled) {
+          setStats(data)
+          setUpdatedAt(new Date())
+          setError(null)
+        }
       } catch {
         if (!cancelled) setError("Nepavyko gauti statistikos")
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
-    load()
+    void load()
+    if (!running) {
+      return () => {
+        cancelled = true
+      }
+    }
+    // A hidden tab does not read; it catches up when it is shown again.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load()
+    }, LIVE_REFRESH_MS)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load()
+    }
+    document.addEventListener("visibilitychange", onVisible)
     return () => {
       cancelled = true
+      window.clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [gameId])
+  }, [gameId, running])
 
   if (loading) {
     return (
@@ -67,30 +98,33 @@ export function GameResultsSummary({ gameId, totalChallenges }: GameResultsSumma
     )
   }
 
-  if (error || !stats) return null
+  // Numbers that can no longer be refreshed are not shown as current.
+  if (!stats || (error && running)) {
+    return error ? (
+      <p role="status" className="text-sm text-muted-foreground">
+        Klasės rezultatų suvestinės įkelti nepavyko. Tikslūs skaičiai yra analitikos puslapyje.
+      </p>
+    ) : null
+  }
   if (stats.total_teams === 0) return null
 
-  const overallAccuracy =
-    stats.total_submissions > 0
-      ? Math.round((stats.correct_submissions / stats.total_submissions) * 100)
-      : 0
-  const completionPct =
-    totalChallenges > 0 && stats.total_teams > 0
-      ? Math.round(
-          (stats.challenge_stats.reduce((sum, c) => sum + c.solves, 0) /
-            (totalChallenges * stats.total_teams)) *
-            100,
-        )
-      : 0
+  const taskCount = stats.challenge_stats.length || totalChallenges
+  const totals = summarizeClass(stats.challenge_stats, stats.total_teams)
 
-  const hardest = [...stats.challenge_stats]
-    .filter((c) => c.attempts > 0)
-    .sort((a, b) => a.solves / Math.max(a.attempts, 1) - b.solves / Math.max(b.attempts, 1))
+  const attempted = stats.challenge_stats
+    .map((c, index) => ({ ...c, index }))
+    .filter((c) => c.attempted_teams > 0)
+  const solvedShare = (c: DetailedChallengeStat) => c.solves / c.attempted_teams
+  const firstShare = (c: DetailedChallengeStat) => c.first_try_solves / c.attempted_teams
+
+  const hardest = attempted
+    .filter((c) => c.insight.kind !== "mastered")
+    .sort((a, b) => solvedShare(a) - solvedShare(b) || firstShare(a) - firstShare(b) || a.index - b.index)
     .slice(0, 3)
 
-  const easiest = [...stats.challenge_stats]
-    .filter((c) => c.attempts > 0)
-    .sort((a, b) => b.solves / Math.max(b.attempts, 1) - a.solves / Math.max(a.attempts, 1))
+  const easiest = attempted
+    .filter((c) => solvedShare(c) >= 0.5 && !hardest.some((h) => h.challenge_id === c.challenge_id))
+    .sort((a, b) => firstShare(b) - firstShare(a) || solvedShare(b) - solvedShare(a) || a.index - b.index)
     .slice(0, 3)
 
   return (
@@ -108,6 +142,12 @@ export function GameResultsSummary({ gameId, totalChallenges }: GameResultsSumma
           <p className="text-xs text-muted-foreground mt-1">
             Pedagoginis pamokos eigos apibendrinimas: kas pavyko, kur reikia grįžti.
           </p>
+          {running && updatedAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Veikla vyksta, skaičiai atnaujinami kas 10 s. Atnaujinta{" "}
+              {updatedAt.toLocaleTimeString("lt-LT", { timeZone: "Europe/Vilnius" })}.
+            </p>
+          )}
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -122,27 +162,27 @@ export function GameResultsSummary({ gameId, totalChallenges }: GameResultsSumma
             <KpiCard
               icon={<CheckCircle2 className="h-4 w-4" />}
               label="Užbaigta"
-              value={`${completionPct}%`}
-              hint={`${stats.challenge_stats.reduce((s, c) => s + c.solves, 0)} / ${totalChallenges * stats.total_teams}`}
+              value={`${totals.completion_pct} %`}
+              hint={`${totals.solved} iš ${totals.possible} sprendimų`}
               tint="primary"
             />
             <KpiCard
               icon={<TrendingUp className="h-4 w-4" />}
               label="Bandymų tikslumas"
-              value={`${overallAccuracy}%`}
-              hint={`${stats.correct_submissions} iš ${stats.total_submissions}`}
+              value={totals.attempts > 0 ? `${totals.accuracy_pct} %` : "-"}
+              hint={totals.attempts > 0 ? `${totals.correct} iš ${totals.attempts} atsakymų` : "Atsakymų dar nėra"}
               tint="highlight"
             />
             <KpiCard
               icon={<Trophy className="h-4 w-4" />}
               label="Iš viso užduočių"
-              value={totalChallenges.toString()}
+              value={taskCount.toString()}
               tint="accent"
             />
           </div>
 
           {/* Hardest / easiest split */}
-          {hardest.length > 0 && (
+          {(hardest.length > 0 || easiest.length > 0) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ChallengeListPanel
                 title="Sudėtingiausios užduotys"
@@ -150,7 +190,7 @@ export function GameResultsSummary({ gameId, totalChallenges }: GameResultsSumma
                 icon={<AlertCircle className="h-4 w-4 text-accent-ink" />}
                 tone="accent"
                 items={hardest}
-                totalTeams={stats.total_teams}
+                emptyText="Sunkių užduočių kol kas nėra."
               />
               <ChallengeListPanel
                 title="Lengviausiai pavyko"
@@ -158,7 +198,7 @@ export function GameResultsSummary({ gameId, totalChallenges }: GameResultsSumma
                 icon={<CheckCircle2 className="h-4 w-4 text-primary-ink" />}
                 tone="primary"
                 items={easiest}
-                totalTeams={stats.total_teams}
+                emptyText="Kol kas nėra užduoties, kurią išsprendė bent pusė bandžiusių komandų."
               />
             </div>
           )}
@@ -212,14 +252,14 @@ function ChallengeListPanel({
   icon,
   tone,
   items,
-  totalTeams,
+  emptyText,
 }: {
   title: string
   hint: string
   icon: React.ReactNode
   tone: "primary" | "accent"
-  items: ChallengeStatItem[]
-  totalTeams: number
+  items: (DetailedChallengeStat & { index: number })[]
+  emptyText: string
 }) {
   const borderTone = tone === "primary" ? "border-primary/20" : "border-accent/20"
   return (
@@ -229,32 +269,30 @@ function ChallengeListPanel({
         <h4 className="text-sm font-semibold text-steam-dark">{title}</h4>
       </div>
       <p className="text-xs text-muted-foreground mb-3">{hint}</p>
-      <ol className="space-y-2">
-        {items.map((c) => {
-          const successRate = c.attempts > 0 ? Math.round((c.solves / c.attempts) * 100) : 0
-          const coveragePct = totalTeams > 0 ? Math.round((c.solves / totalTeams) * 100) : 0
-          return (
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{emptyText}</p>
+      ) : (
+        <ol className="space-y-2">
+          {items.map((c) => (
             <li key={c.challenge_id} className="flex items-start justify-between gap-2 text-sm">
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-steam-dark text-[13px] truncate">
-                  {c.order_index + 1}. {c.title}
+                  {c.index + 1}. {c.title}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                  <span>{c.solves} išsprendė</span>
-                  <span>·</span>
-                  <span>{successRate}% tikslumas</span>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Išsprendė {c.solves} iš {c.attempted_teams} bandžiusių komandų, iš pirmo karto {c.first_try_solves}
                 </div>
               </div>
               <Badge
                 variant="outline"
                 className={`text-xs shrink-0 ${tone === "primary" ? "border-primary/30 text-primary-ink" : "border-accent/30 text-accent-ink"}`}
               >
-                {coveragePct}% klasės
+                {c.completion_rate} % klasės
               </Badge>
             </li>
-          )
-        })}
-      </ol>
+          ))}
+        </ol>
+      )}
     </div>
   )
 }
