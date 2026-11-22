@@ -1,9 +1,9 @@
 import { NextResponse, after } from "next/server"
 import { z } from "zod"
 import { requireSuperAdmin } from "@/lib/access/admin-guard"
-import { grantAccount, logAdminAction, loginUrl } from "@/lib/access/approve"
+import { grantAccount, inviteUrl, logAdminAction, loginUrl } from "@/lib/access/approve"
 import { sendEmail } from "@/lib/email/send"
-import { accountActivatedEmail } from "@/lib/email/templates"
+import { accountActivatedEmail, accountInviteEmail } from "@/lib/email/templates"
 import { schoolChoiceSchema } from "@/lib/access/profile-fields"
 
 const inviteSchema = z
@@ -54,9 +54,17 @@ export async function POST(request: Request) {
     role: d.role,
   })
 
-  // The email links to the sign-in page, not to a one-time link, so it does
-  // not expire. Creating the same account again sends it again.
-  after(() => sendEmail(accountActivatedEmail(d.email, d.first_name, loginUrl(new URL(request.url).origin))))
+  // A new account gets a one-time link straight to the registration form
+  // (details and password); an existing one is told where to sign in.
+  const origin = new URL(request.url).origin
+  const invite = result.existing ? null : await inviteUrl(guard.admin, d.email, origin)
+  after(() =>
+    sendEmail(
+      invite
+        ? accountInviteEmail(d.email, d.first_name, invite, loginUrl(origin))
+        : accountActivatedEmail(d.email, d.first_name, loginUrl(origin)),
+    ),
+  )
 
   const { data: profile } = await guard.admin.from("profiles").select("*").eq("id", result.userId).single()
   return NextResponse.json({
