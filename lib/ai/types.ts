@@ -15,6 +15,8 @@ export interface AiSuggestion {
   type: ChallengeType
   points: number
   correct_answer: string
+  /** Other spellings of a text answer the DI proposes; the facilitator confirms them. */
+  accepted_answers?: string[]
   hints: string[]
   options: string[] | null
   explanation?: string

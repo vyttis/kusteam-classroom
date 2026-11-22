@@ -318,7 +318,7 @@ export function SuggestionsPanel({
             onClick={() => setRegenerateConfirmOpen(true)}
           >
             <RefreshCw className="h-3 w-3" />
-            Regeneruoti
+            Generuoti iš naujo
           </Button>
         </div>
       )}
@@ -329,10 +329,10 @@ export function SuggestionsPanel({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RefreshCw className="h-5 w-5 text-accent-ink" />
-              Pergeneruoti pasiūlymus?
+              Generuoti pasiūlymus iš naujo?
             </DialogTitle>
             <DialogDescription>
-              Dabartiniai pasiūlymai bus pakeisti naujais.
+              Dabartiniai pasiūlymai bus pakeisti naujais. Tai bus nauja DI užklausa.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -349,7 +349,7 @@ export function SuggestionsPanel({
                 onGenerate()
               }}
             >
-              Pergeneruoti
+              Generuoti iš naujo
             </Button>
           </DialogFooter>
         </DialogContent>

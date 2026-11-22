@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useLeaveWarning } from "@/hooks/use-leave-warning"
+import { useSessionExpired } from "@/hooks/use-session-expired"
+import { SessionExpiredNotice } from "@/components/teacher/session-expired-notice"
 import {
   Loader2,
   Plus,
@@ -171,6 +173,7 @@ export function ManualTaskEditor({
   // Stays set while saving: the work is safe only once the save succeeded.
   const dirty = baseline !== null && snapshot !== baseline
   useLeaveWarning(dirty)
+  const session = useSessionExpired()
 
   // Initialize from challenge or prefill. Every field is set each time, so
   // nothing carries over from the task edited before.
@@ -321,7 +324,11 @@ export function ManualTaskEditor({
         if (showPrerequisites) {
           payload.prerequisites = prerequisites
         }
-        if (flaggedByDi) payload.mark_reviewed = true
+        // Saving a DI task in this editor is the facilitator's confirmation
+        // of its answer: the DI verdict (also a passing one) ends here, and
+        // the start dialog stops asking about this task (the rule is in
+        // components/teacher/ai-review.ts).
+        if (challenge.generated_by_di && challenge.verification_verdict !== null) payload.mark_reviewed = true
       }
 
       const res = await fetch(
@@ -333,6 +340,9 @@ export function ManualTaskEditor({
         }
       )
 
+      // Session ended: the form keeps everything typed, the notice above
+      // the save button says how to sign in and save again.
+      if (session.check(res)) return
       if (!res.ok) {
         const err = await readJson<{ error?: unknown }>(res)
         throw new Error(
@@ -728,6 +738,8 @@ export function ManualTaskEditor({
           </div>
         </div>
       )}
+
+      {session.expired && <SessionExpiredNotice onRetry={() => void handleSave()} retrying={loading} />}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">

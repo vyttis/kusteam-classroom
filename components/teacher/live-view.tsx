@@ -73,7 +73,7 @@ function formatClock(totalSeconds: number): string {
 // background, with a collapsible teacher control bar.
 export function LiveView({ game, challengeCount, accessRequestPath = null }: LiveViewProps) {
   const { toast } = useToast()
-  const { teams, solvedCounts, connectionState, retry } = useLiveGame(game.id)
+  const { teams, solvedCounts, connectionState, retry } = useLiveGame(game.id, game.status !== "finished")
 
   const [status, setStatus] = useState<GameStatus>(game.status)
   const [startsAt, setStartsAt] = useState<string | null>(game.starts_at)

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { GameStatus } from "@/types/game"
+import { Checkbox } from "@/components/ui/checkbox"
+import { aiVerdictLabel, type AiTaskToReview } from "@/lib/game/ai-review"
 import {
   Play,
   Pause,
@@ -16,6 +18,7 @@ import {
   AlertTriangle,
   Rocket,
   Wrench,
+  Sparkles,
 } from "lucide-react"
 import {
   Dialog,
@@ -33,6 +36,12 @@ interface GameStatusActionsProps {
   challengeCount: number
   // Duplicated/cloned tasks that still need a confirmed answer — blocks start
   tasksNeedingAnswer?: { id: string; title: string }[]
+  // DI-made tasks whose answer the facilitator has not confirmed (see
+  // components/teacher/ai-review.ts): the start asks about them explicitly.
+  aiTasksToReview?: AiTaskToReview[]
+  // In the builder a task opens in the editor on the same page; elsewhere
+  // the dialog links to the builder.
+  onOpenTask?: (taskId: string) => void
 }
 
 export function GameStatusActions({
@@ -40,6 +49,8 @@ export function GameStatusActions({
   status,
   challengeCount,
   tasksNeedingAnswer = [],
+  aiTasksToReview = [],
+  onOpenTask,
 }: GameStatusActionsProps) {
   const [loading, setLoading] = useState(false)
   const [showActivateDialog, setShowActivateDialog] = useState(false)
@@ -48,6 +59,12 @@ export function GameStatusActions({
   const { toast } = useToast()
 
   const hasPendingAnswers = tasksNeedingAnswer.length > 0
+  // The server's list wins when it refused the start: this page may have
+  // been loaded before a DI task was added in another tab.
+  const [serverAiTasks, setServerAiTasks] = useState<AiTaskToReview[] | null>(null)
+  const [aiReviewed, setAiReviewed] = useState(false)
+  const aiTasks = serverAiTasks ?? aiTasksToReview
+  const needsAiReview = aiTasks.length > 0
 
   async function updateStatus(newStatus: GameStatus) {
     setLoading(true)
@@ -55,11 +72,24 @@ export function GameStatusActions({
       const res = await fetch(`/api/games/${gameId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(
+          newStatus === "active" && status === "draft" && needsAiReview && aiReviewed
+            ? { status: newStatus, ai_reviewed: true }
+            : { status: newStatus }
+        ),
       })
 
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string }
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: string
+          code?: string
+          ai_tasks_to_review?: AiTaskToReview[]
+        }
+        // The start dialog stays open and now lists the tasks to confirm.
+        if (err.code === "ai_review_required" && Array.isArray(err.ai_tasks_to_review)) {
+          setServerAiTasks(err.ai_tasks_to_review)
+          setAiReviewed(false)
+        }
         // Another device already changed the status: show the current one.
         if (res.status === 409) router.refresh()
         throw new Error(err.error || "Nepavyko atnaujinti būsenos")
@@ -137,7 +167,17 @@ export function GameStatusActions({
 
   if (status === "draft") {
     return (
-      <Dialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+      <Dialog
+        open={showActivateDialog}
+        onOpenChange={(open) => {
+          setShowActivateDialog(open)
+          // Each opening asks again: tasks may have changed meanwhile.
+          if (!open) {
+            setAiReviewed(false)
+            setServerAiTasks(null)
+          }
+        }}
+      >
         <DialogTrigger asChild>
           <Button
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2"
@@ -184,6 +224,57 @@ export function GameStatusActions({
               </Link>
             </div>
           )}
+          {needsAiReview && (
+            <div className="rounded-lg border border-highlight/40 bg-highlight/10 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-steam-dark text-sm font-medium">
+                <Sparkles className="h-4 w-4 shrink-0 text-highlight-ink" aria-hidden="true" />
+                Šių DI sukurtų užduočių atsakymų dar nepatvirtinote:
+              </div>
+              <ul className="max-h-40 overflow-y-auto text-sm text-steam-dark list-disc pl-6 space-y-1">
+                {aiTasks.map((t) => (
+                  <li key={t.id}>
+                    {onOpenTask ? (
+                      <button
+                        type="button"
+                        className="text-left font-medium underline underline-offset-2 hover:text-primary-ink"
+                        onClick={() => {
+                          setShowActivateDialog(false)
+                          setAiReviewed(false)
+                          setServerAiTasks(null)
+                          onOpenTask(t.id)
+                        }}
+                      >
+                        {t.title}
+                      </button>
+                    ) : (
+                      <Link
+                        href={`/games/${gameId}/builder?task=${t.id}`}
+                        className="font-medium underline underline-offset-2 hover:text-primary-ink"
+                      >
+                        {t.title}
+                      </Link>
+                    )}
+                    <span className="block text-xs text-muted-foreground">{aiVerdictLabel(t.verdict)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                DI tik siūlo: teisingą atsakymą tvirtinate jūs. Atidarykite užduotį, patikrinkite atsakymą ir
+                išsaugokite, tada ji iš šio sąrašo dings.
+              </p>
+              <div className="flex items-start gap-2 pt-1">
+                <Checkbox
+                  id="ai-reviewed"
+                  checked={aiReviewed}
+                  onCheckedChange={(checked) => setAiReviewed(checked === true)}
+                  className="mt-0.5"
+                />
+                <label htmlFor="ai-reviewed" className="text-sm font-medium text-steam-dark cursor-pointer">
+                  Peržiūrėjau šių užduočių atsakymus ir patvirtinu, kad jie teisingi
+                </label>
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -193,7 +284,9 @@ export function GameStatusActions({
             </Button>
             <Button
               onClick={() => updateStatus("active")}
-              disabled={loading || challengeCount === 0 || hasPendingAnswers}
+              disabled={
+                loading || challengeCount === 0 || hasPendingAnswers || (needsAiReview && !aiReviewed)
+              }
               className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             >
               {loading ? (

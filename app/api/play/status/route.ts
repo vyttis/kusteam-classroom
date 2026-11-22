@@ -2,9 +2,10 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { tasksVersion } from "@/lib/game/tasks-version"
 import { NextResponse } from "next/server"
 
-// A participant sees an announcement this long after it was sent: a team
-// that reloads or joins a little later still gets it.
-const ANNOUNCEMENT_WINDOW_MS = 2 * 60 * 1000
+// A participant gets the latest announcement this long after it was sent: a
+// phone that was locked, or a team that reloads or joins later, still sees
+// it. The banner stays until closed and shows when it was sent.
+const ANNOUNCEMENT_WINDOW_MS = 15 * 60 * 1000
 
 // GET /api/play/status?game_code=XXXXXX — lightweight game-status poll for
 // the player page. Participants cannot read activities with the anon key
@@ -64,7 +65,8 @@ export async function GET(request: Request) {
         // Changes when a task is added, removed or saved: the phone then
         // reloads the tasks. Hidden before the start, like the tasks.
         tasks_version: game.status === "draft" ? null : tasksVersion(game.challenges),
-        // The latest announcement while it is fresh (the banner shows it once).
+        // The latest announcement of the last 15 minutes (the banner shows it
+        // until the participant closes it, once).
         announcement,
       },
       {

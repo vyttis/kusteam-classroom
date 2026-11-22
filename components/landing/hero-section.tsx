@@ -168,7 +168,7 @@ export function HeroSection() {
                 style={{ animationDelay: "320ms" }}
               >
                 {[
-                  { num: "24", label: "dalykų pasirinkimai" },
+                  { num: "24", label: "dalykai" },
                   { num: "1–12", label: "klasės" },
                   { num: "5+", label: "veiklos tipai" },
                 ].map((stat, i) => (
@@ -226,7 +226,7 @@ export function HeroSection() {
                       iliustruoja simbiozę?
                     </p>
                     <p className="text-xs text-muted-foreground mb-5">
-                      Simbiozė - abipusiškai naudingas dviejų skirtingų rūšių santykis.
+                      Simbiozė yra abipusiškai naudingas dviejų skirtingų rūšių santykis.
                     </p>
 
                     <div className="space-y-2">
@@ -283,7 +283,7 @@ export function HeroSection() {
                         ) : (
                           <>
                             <strong>Beveik.</strong> Ieškokite poros, kurioje abu gauna naudą:
-                            ne plėšrūnas-auka, ne tos pačios rūšies, ne parazitas.{" "}
+                            ne plėšrūnas ir auka, ne tos pačios rūšies gyvūnai, ne parazitas ir šeimininkas.{" "}
                             <button
                               onClick={() => setPicked(null)}
                               className="underline hover:no-underline"
