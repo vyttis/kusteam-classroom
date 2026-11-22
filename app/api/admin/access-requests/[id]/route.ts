@@ -1,9 +1,9 @@
 import { NextResponse, after } from "next/server"
 import { z } from "zod"
 import { requireSuperAdmin } from "@/lib/access/admin-guard"
-import { grantAccount, logAdminAction, loginUrl } from "@/lib/access/approve"
+import { grantAccount, inviteUrl, logAdminAction, loginUrl } from "@/lib/access/approve"
 import { sendEmail } from "@/lib/email/send"
-import { accountActivatedEmail, requestRejectedEmail } from "@/lib/email/templates"
+import { accountActivatedEmail, accountInviteEmail, requestRejectedEmail } from "@/lib/email/templates"
 
 const decisionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
@@ -95,14 +95,23 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     email: req.email,
     existing_account: account.existing,
   })
-  // New or existing, the account is ready: tell the teacher where to sign in.
-  after(() => sendEmail(accountActivatedEmail(req.email, req.first_name, loginUrl(new URL(request.url).origin))))
+  // A new account gets a one-time link straight to the registration form
+  // (details and password); an existing one is told where to sign in.
+  const origin = new URL(request.url).origin
+  const invite = account.existing ? null : await inviteUrl(guard.admin, req.email, origin)
+  after(() =>
+    sendEmail(
+      invite
+        ? accountInviteEmail(req.email, req.first_name, invite, loginUrl(origin))
+        : accountActivatedEmail(req.email, req.first_name, loginUrl(origin)),
+    ),
+  )
 
   return NextResponse.json({
     ok: true,
     status: "approved",
     message: account.existing
       ? "Paskyra jau buvo, ji aktyvuota: vedėjas gali prisijungti iš karto."
-      : "Kvietimas išsiųstas el. paštu. Vedėjas prisijungs per Google arba su kodu ir užbaigs registraciją.",
+      : "Paskyra sukurta, kvietimas siunčiamas el. paštu. Vedėjas atvers nuorodą, patikrins duomenis ir susikurs slaptažodį.",
   })
 }
