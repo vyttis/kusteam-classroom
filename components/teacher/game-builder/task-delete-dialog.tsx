@@ -35,7 +35,7 @@ export function TaskDeleteDialog({
             Ištrinti užduotį?
           </DialogTitle>
           <DialogDescription>
-            Ar tikrai norite ištrinti užduotį &ldquo;{taskTitle}&rdquo;? Šis
+            Ar tikrai norite ištrinti užduotį &bdquo;{taskTitle}&ldquo;? Šis
             veiksmas negrįžtamas.
           </DialogDescription>
         </DialogHeader>

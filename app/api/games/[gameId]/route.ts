@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { rpcRow } from "@/lib/supabase/rpc-row"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { AI_REVIEW_REQUIRED_MESSAGE, aiTasksToReview, type AiReviewCandidate } from "@/lib/game/ai-review"
 
 // Safe columns to return for challenges (never include answer_hash)
 const SAFE_CHALLENGE_SELECT = "id, game_id, title, description, type, points, hints, options, order_index, image_url, maps_url, created_at, updated_at"
@@ -13,6 +14,9 @@ const updateGameSchema = z.object({
   title: z.string().min(3).optional(),
   description: z.string().nullable().optional(),
   status: z.enum(["draft", "active", "paused", "finished"]).optional(),
+  // Sent with the start (draft -> active): the facilitator confirmed in the
+  // start dialog that the DI-made tasks' answers were reviewed.
+  ai_reviewed: z.boolean().optional(),
   settings: z
     .object({
       max_teams: z.number().min(2).max(100).optional(),
@@ -124,6 +128,25 @@ export async function PATCH(request: Request, props: { params: Promise<{ gameId:
         },
         { status: 400 }
       )
+    }
+
+    // DI only suggests: the facilitator confirms every answer. DI-made tasks
+    // nobody has confirmed start only with an explicit acknowledgement from
+    // the start dialog. A database without the DI columns has no such tasks.
+    if (parsed.data.ai_reviewed !== true) {
+      const { data: aiTasks, error: aiError } = await supabase
+        .from("challenges")
+        .select("id, title, generated_by_di, verification_verdict, needs_answer, created_at, updated_at, order_index")
+        .eq("game_id", params.gameId)
+        .eq("generated_by_di", true)
+
+      const unreviewed = aiError ? [] : aiTasksToReview((aiTasks ?? []) as AiReviewCandidate[])
+      if (unreviewed.length > 0) {
+        return NextResponse.json(
+          { error: AI_REVIEW_REQUIRED_MESSAGE, code: "ai_review_required", ai_tasks_to_review: unreviewed },
+          { status: 400 }
+        )
+      }
     }
   }
 
@@ -238,7 +261,8 @@ export async function DELETE(_request: Request, props: { params: Promise<{ gameI
     .eq("teacher_id", user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[games] delete failed", { code: error.code })
+    return NextResponse.json({ error: "Nepavyko ištrinti veiklos. Bandykite dar kartą." }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })
