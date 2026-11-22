@@ -5,9 +5,10 @@ import { clearLocalWork } from "@/hooks/use-leave-warning"
 import { SteamLogo } from "@/components/steam-logo"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { createClient } from "@/lib/supabase/client"
 import { usePathname, useRouter } from "next/navigation"
-import { LogOut, Gamepad2, GraduationCap, BookOpen, Shield, Menu } from "lucide-react"
+import { LogOut, Gamepad2, GraduationCap, BookOpen, Shield, Menu, Compass, KeyRound, ChevronDown, UserRound } from "lucide-react"
 import Link from "next/link"
 import { UserRole } from "@/types/game"
 import Image from "next/image"
@@ -19,7 +20,7 @@ interface TeacherNavProps {
   fullName: string
   role?: UserRole
   avatarUrl?: string | null
-  // The teacher's currently running game (active/paused), if any — renders
+  // The teacher's currently running game (active/paused), if any: renders
   // a prominent LIVE shortcut to the class screen
   activeGame?: { id: string; title: string; paused?: boolean } | null
   /** Pending account requests (super admin only). */
@@ -48,6 +49,9 @@ export function TeacherNav({
 }: TeacherNavProps) {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  // KU STEAM TEAM staff sign in through TEAM: their password is not managed here.
+  const canChangePassword = role !== "staff"
 
   async function handleLogout() {
     clearLocalWork()
@@ -71,6 +75,7 @@ export function TeacherNav({
     { href: "/lesson-plans", label: "Pamokų planai", icon: GraduationCap },
     { href: "/dashboard", label: "Mano veiklos", icon: Gamepad2 },
     { href: "/library", label: "Biblioteka", icon: BookOpen },
+    { href: "/gidas", label: "Gidas", icon: Compass },
     ...(canViewAdminDashboard(role)
       ? [{ href: "/admin", label: "Administravimas", icon: Shield, badge: pendingRequests }]
       : []),
@@ -130,29 +135,53 @@ export function TeacherNav({
                 </Link>
               </Button>
             )}
-            <div className="hidden xl:flex min-w-0 items-center gap-3">
-              {avatarUrl ? (
-                <Image src={avatarUrl} alt="" width={32} height={32} className="shrink-0 rounded-full" />
-              ) : null}
-              <div className="min-w-0 text-right">
-                <p className="truncate text-sm font-medium text-steam-dark leading-none">
-                  {fullName || email}
-                </p>
-                {secondaryLine && (
-                  <p className="truncate text-xs text-muted-foreground">{secondaryLine}</p>
+            {/* Account menu (desktop): password and sign-out. The name shows
+                from xl up; below that the trigger is the avatar alone. */}
+            <Popover open={accountMenuOpen} onOpenChange={setAccountMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`${fullName || email}, paskyros meniu`}
+                  className="hidden lg:flex h-10 min-w-0 shrink gap-2 px-2 text-steam-dark"
+                >
+                  {avatarUrl ? (
+                    <Image src={avatarUrl} alt="" width={28} height={28} className="shrink-0 rounded-full" />
+                  ) : (
+                    <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  )}
+                  <span className="hidden xl:block max-w-32 truncate text-sm font-medium">{fullName || email}</span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-1">
+                <div className="border-b border-border/50 px-3 py-2 mb-1">
+                  <p className="truncate text-sm font-medium text-steam-dark">{fullName || email}</p>
+                  {secondaryLine && <p className="truncate text-xs text-muted-foreground">{secondaryLine}</p>}
+                </div>
+                {canChangePassword && (
+                  <Link
+                    href="/slaptazodis"
+                    onClick={() => setAccountMenuOpen(false)}
+                    className="flex min-h-10 w-full items-center gap-2 rounded px-3 py-2 text-sm text-steam-dark hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <KeyRound className="h-4 w-4" aria-hidden="true" />
+                    Keisti slaptažodį
+                  </Link>
                 )}
-              </div>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              aria-label="Atsijungti"
-              className="hidden lg:flex shrink-0 text-muted-foreground hover:text-accent-ink"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountMenuOpen(false)
+                    handleLogout()
+                  }}
+                  className="flex min-h-10 w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-accent-ink hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Atsijungti
+                </button>
+              </PopoverContent>
+            </Popover>
 
             {/* Mobile hamburger menu */}
             <Button
@@ -170,8 +199,8 @@ export function TeacherNav({
 
       {/* Mobile menu dialog */}
       <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <DialogContent className="lg:hidden top-0 translate-y-0 data-[state=open]:slide-in-from-top-2 max-w-full h-auto rounded-none border-0 border-b p-0">
-          <DialogTitle className="sr-only">Navigacijos meniu</DialogTitle>
+        <DialogContent className="lg:hidden top-0 translate-y-0 data-[state=open]:slide-in-from-top-2 max-w-full h-auto max-h-dvh overflow-y-auto rounded-none border-0 border-b p-0">
+          <DialogTitle className="sr-only">Meniu</DialogTitle>
           <div className="p-4 space-y-1">
             {/* User info */}
             <div className="flex items-center gap-3 pb-3 mb-3 border-b border-border/50">
@@ -182,9 +211,9 @@ export function TeacherNav({
                   {(fullName || email).charAt(0).toUpperCase()}
                 </div>
               )}
-              <div>
-                <p className="text-sm font-medium text-steam-dark">{fullName || email}</p>
-                {secondaryLine && <p className="text-xs text-muted-foreground">{secondaryLine}</p>}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-steam-dark">{fullName || email}</p>
+                {secondaryLine && <p className="truncate text-xs text-muted-foreground">{secondaryLine}</p>}
               </div>
             </div>
 
@@ -223,6 +252,14 @@ export function TeacherNav({
             ))}
 
             <div className="pt-3 mt-3 border-t border-border/50">
+              {canChangePassword && (
+                <Button asChild variant="ghost" className="w-full justify-start gap-3 h-11 text-steam-dark">
+                  <Link href="/slaptazodis" onClick={() => setMobileMenuOpen(false)}>
+                    <KeyRound className="h-4 w-4" aria-hidden="true" />
+                    Keisti slaptažodį
+                  </Link>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -231,7 +268,7 @@ export function TeacherNav({
                 }}
                 className="w-full justify-start gap-3 h-11 text-accent-ink hover:text-accent-ink"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4" aria-hidden="true" />
                 Atsijungti
               </Button>
             </div>
