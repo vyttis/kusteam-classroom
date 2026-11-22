@@ -20,6 +20,8 @@ import type { LeaderboardResponse, LeaderboardTeam } from "@/lib/game/leaderboar
 import { getPlayerSession } from "@/lib/game/session"
 import { pluralizeLt } from "@/lib/utils"
 import { AchievementBadge } from "@/components/player/achievement-badge"
+import { AnnouncementBanner, type AnnouncementItem } from "@/components/player/announcement-banner"
+import { ConnectionBanner, useConnection } from "@/components/player/connection"
 
 const podiumColors = [
   "from-highlight/30 to-highlight/5 border-highlight/40",
@@ -43,6 +45,12 @@ export default function LeaderboardPage() {
   const [leaderboardDisabled, setLeaderboardDisabled] = useState(false)
   const [myTeamId, setMyTeamId] = useState<string | null>(null)
   const inFlight = useRef(false)
+  // "No connection" notice: two failed polls in a row, or the browser says
+  // it is offline; the first poll that gets through removes it.
+  const { offline, report: reportPoll } = useConnection()
+  // The facilitator's latest announcement, so it is not missed while the
+  // team looks at the board.
+  const [announcement, setAnnouncement] = useState<AnnouncementItem | null>(null)
 
   // The board comes from the server (participants cannot read teams with
   // the anon key since 20261107120000). One request at a time; a failed one
@@ -55,8 +63,12 @@ export default function LeaderboardPage() {
         cache: "no-store",
         signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined,
       })
-      if (res.status >= 500) return
+      if (res.status >= 500) {
+        reportPoll(false)
+        return
+      }
       const data = (await res.json()) as LeaderboardResponse | { error: string }
+      reportPoll(true)
       if ("error" in data || data.state === "not_found") {
         setNotFound(true)
       } else if (data.state === "disabled") {
@@ -67,12 +79,14 @@ export default function LeaderboardPage() {
         setTeams(data.teams)
       }
     } catch {
-      // Network hiccup or timeout: the next poll retries
+      // Network hiccup or timeout: the next poll retries; two in a row show
+      // the "no connection" notice.
+      reportPoll(false)
     } finally {
       inFlight.current = false
       setLoading(false)
     }
-  }, [gameCode])
+  }, [gameCode, reportPoll])
 
   useEffect(() => {
     const session = getPlayerSession(gameCode)
@@ -94,12 +108,44 @@ export default function LeaderboardPage() {
     const onVisible = () => {
       if (document.visibilityState === "visible") void fetchLeaderboard()
     }
+    // The network is back: ask at once, so the notice goes away.
+    const onOnline = () => void fetchLeaderboard()
     document.addEventListener("visibilitychange", onVisible)
+    window.addEventListener("online", onOnline)
     return () => {
       clearInterval(interval)
       document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("online", onOnline)
     }
   }, [stopped, fetchLeaderboard])
+
+  // The announcement comes with the same status read the task page uses
+  // (answered from the CDN for all phones of the class), asked less often
+  // here: every 10 s while the page is visible.
+  useEffect(() => {
+    if (stopped) return
+    let disposed = false
+    const check = async () => {
+      if (document.visibilityState !== "visible") return
+      try {
+        const res = await fetch(`/api/play/status?game_code=${encodeURIComponent(gameCode)}`, {
+          cache: "no-store",
+          signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined,
+        })
+        if (!res.ok) return
+        const data = (await res.json()) as { announcement?: AnnouncementItem | null }
+        if (!disposed && data.announcement !== undefined) setAnnouncement(data.announcement)
+      } catch {
+        // The next round retries; the board's own poll reports the connection.
+      }
+    }
+    void check()
+    const interval = setInterval(check, 10_000)
+    return () => {
+      disposed = true
+      clearInterval(interval)
+    }
+  }, [stopped, gameCode])
 
   if (loading) {
     return (
@@ -135,7 +181,9 @@ export default function LeaderboardPage() {
 
   return (
     <div className="min-h-screen p-4 pb-8">
+      <ConnectionBanner offline={offline} />
       <div className="max-w-lg mx-auto">
+        <AnnouncementBanner latest={announcement} />
         <div className="flex items-center justify-between mb-6">
           <Link href={`/play/${gameCode}/play`}>
             <Button variant="ghost" size="sm" className="gap-1">
