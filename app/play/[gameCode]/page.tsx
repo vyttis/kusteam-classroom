@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Users, ArrowRight, Loader2, Gamepad2, AlertCircle, ArrowLeft } from "lucide-react"
 import type { PlayerSession } from "@/types/game"
-import { getPlayerSession, savePlayerSession } from "@/lib/game/session"
+import { STORAGE_BLOCKED_MESSAGE, canStorePlayerSession, getPlayerSession, savePlayerSession } from "@/lib/game/session"
 import Link from "next/link"
 import Image from "next/image"
 import { PrivacyLink } from "@/components/privacy-link"
@@ -29,6 +29,9 @@ export default function JoinGamePage() {
   const [teamName, setTeamName] = useState("")
   const [loading, setLoading] = useState(false)
   const [gameState, setGameState] = useState<GameState>({ status: "loading" })
+  // The browser cannot keep the team's session: joining would create a team
+  // this device loses at once, so the form says why instead.
+  const [storageBlocked, setStorageBlocked] = useState(false)
 
   useEffect(() => {
     // Check existing session (with expiry validation)
@@ -37,6 +40,7 @@ export default function JoinGamePage() {
       router.replace(`/play/${gameCode}/play`)
       return
     }
+    setStorageBlocked(!canStorePlayerSession())
     // Validate game exists and is active
     validateGame()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,6 +122,13 @@ export default function JoinGamePage() {
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
     if (!teamName.trim()) return
+    // Asked again here: storage may have been allowed since the page opened.
+    // Without it the team would be created and lost on the next page.
+    if (!canStorePlayerSession()) {
+      setStorageBlocked(true)
+      return
+    }
+    setStorageBlocked(false)
 
     setLoading(true)
     try {
@@ -149,7 +160,10 @@ export default function JoinGamePage() {
         game_code: gameCode,
         team_name: data.team_name,
       }
-      savePlayerSession(gameCode, session)
+      if (!savePlayerSession(gameCode, session)) {
+        setStorageBlocked(true)
+        return
+      }
 
       router.push(`/play/${gameCode}/play`)
     } catch (error: unknown) {
@@ -336,6 +350,12 @@ export default function JoinGamePage() {
                   Sugalvokite komandos vardą be tikrų vardų ir pavardžių. Paskyros nereikia.
                 </p>
               </div>
+
+              {storageBlocked && (
+                <p role="alert" className="rounded-lg bg-accent/10 p-3 text-sm text-steam-dark">
+                  {STORAGE_BLOCKED_MESSAGE}
+                </p>
+              )}
 
               <Button
                 type="submit"

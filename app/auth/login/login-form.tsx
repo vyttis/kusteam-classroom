@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { SteamLogo } from "@/components/steam-logo"
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
-import { Mail, KeyRound, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
+import { Mail, KeyRound, Lock, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { PrivacyLink } from "@/components/privacy-link"
@@ -34,8 +34,12 @@ const NO_ACCOUNT =
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [otp, setOtp] = useState("")
   const [step, setStep] = useState<"email" | "otp">("email")
+  // Why a code was asked for: to sign in without a password, or to set a new one.
+  const [purpose, setPurpose] = useState<"signin" | "reset">("signin")
+  const [resendIn, setResendIn] = useState(0)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const { toast } = useToast()
@@ -63,6 +67,33 @@ export function LoginForm() {
     }
   }, [searchParams, toast])
 
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendIn])
+
+  async function handlePasswordLogin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email || !password) return
+    setLoading(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setLoading(false)
+      // One message for a wrong password, an unknown address and an account
+      // that has no password yet: the form does not reveal which it is.
+      toast({
+        title: "Prisijungti nepavyko",
+        description:
+          "Neteisingas el. paštas arba slaptažodis. Jei slaptažodžio dar nesusikūrėte arba jį pamiršote, spauskite „Pamiršau slaptažodį“: atsiųsime kodą el. paštu.",
+        variant: "destructive",
+      })
+      return
+    }
+    window.location.href = "/dashboard"
+  }
+
   async function handleGoogleLogin() {
     setGoogleLoading(true)
     const supabase = createClient()
@@ -82,9 +113,13 @@ export function LoginForm() {
     }
   }
 
-  async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault()
-    if (!email) return
+  async function sendCode(why: "signin" | "reset") {
+    if (!email) {
+      toast({ title: "Įrašykite el. paštą", description: "Kodą siunčiame jūsų paskyros el. pašto adresu." })
+      document.getElementById("email")?.focus()
+      return
+    }
+    setPurpose(why)
 
     setLoading(true)
     const supabase = createClient()
@@ -109,6 +144,7 @@ export function LoginForm() {
     }
 
     setStep("otp")
+    setResendIn(60)
     toast({
       title: "Kodas išsiųstas!",
       description: "Patikrinkite savo el. pašto dėžutę.",
@@ -130,15 +166,15 @@ export function LoginForm() {
 
     if (error) {
       toast({
-        title: "Neteisingas kodas",
-        description: "Patikrinkite kodą ir bandykite dar kartą.",
+        title: "Kodas netinka",
+        description: "Kodas neteisingas arba nebegalioja. Patikrinkite jį arba paprašykite naujo.",
         variant: "destructive",
       })
       return
     }
 
-    // Redirect to dashboard after successful login
-    window.location.href = "/dashboard"
+    // After "Pamiršau slaptažodį" the facilitator sets a new password first.
+    window.location.href = purpose === "reset" ? "/slaptazodis?pamirsau=1" : "/dashboard"
   }
 
   return (
@@ -171,8 +207,10 @@ export function LoginForm() {
             </h1>
             <CardDescription className="text-muted-foreground">
               {step === "email"
-                ? "Prisijunkite su Google arba el. paštu"
-                : `Kodas išsiųstas adresu ${email}`}
+                ? "Prisijunkite el. paštu ir slaptažodžiu arba su Google"
+                : purpose === "reset"
+                  ? `Kodą išsiuntėme adresu ${email}. Jį patvirtinę susikursite naują slaptažodį.`
+                  : `Kodas išsiųstas adresu ${email}`}
             </CardDescription>
           </CardHeader>
 
@@ -221,7 +259,7 @@ export function LoginForm() {
                   </div>
 
                   {/* Email OTP Form */}
-                  <form onSubmit={handleSendOtp} className="space-y-4">
+                  <form onSubmit={handlePasswordLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-steam-dark font-medium">
                         El. paštas
@@ -234,7 +272,26 @@ export function LoginForm() {
                           placeholder="vardas@mokykla.lt"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10 h-12 bg-white border-border/50 focus:border-primary focus:ring-primary/20"
+                          autoComplete="username"
+                          className="pl-10 h-12 text-base bg-white border-border/50 focus:border-primary focus:ring-primary/20"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-steam-dark font-medium">
+                        Slaptažodis
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="password"
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          autoComplete="current-password"
+                          className="pl-10 h-12 text-base bg-white border-border/50 focus:border-primary focus:ring-primary/20"
                           required
                         />
                       </div>
@@ -242,19 +299,38 @@ export function LoginForm() {
 
                     <Button
                       type="submit"
-                      disabled={loading || !email}
+                      disabled={loading || !email || !password}
                       className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
                     >
                       {loading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
                         <>
-                          Gauti prisijungimo kodą
+                          Prisijungti
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </>
                       )}
                     </Button>
                   </form>
+
+                  <div className="flex flex-col items-center gap-1 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => sendCode("reset")}
+                      disabled={loading}
+                      className="inline-flex min-h-11 items-center font-medium text-steam-dark underline underline-offset-4"
+                    >
+                      Pamiršau slaptažodį
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendCode("signin")}
+                      disabled={loading}
+                      className="inline-flex min-h-11 items-center font-medium text-steam-dark underline underline-offset-4"
+                    >
+                      Prisijungti su kodu iš laiško
+                    </button>
+                  </div>
                 </motion.div>
               ) : (
                 <motion.form
@@ -301,6 +377,16 @@ export function LoginForm() {
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => sendCode(purpose)}
+                    disabled={loading || resendIn > 0}
+                    className="w-full"
+                  >
+                    {resendIn > 0 ? `Siųsti kodą dar kartą (po ${resendIn} s)` : "Siųsti kodą dar kartą"}
                   </Button>
 
                   <Button

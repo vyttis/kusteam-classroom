@@ -241,13 +241,13 @@ export function accountActivatedEmail(to: string, firstName: string | null, logi
   const subject = "Jūsų vedėjo paskyra patvirtinta"
   const greeting = firstName ? `Sveiki, ${firstName},` : "Sveiki,"
   const lines = [
-    "jūsų vedėjo paskyra KU STEAM pamokose jau aktyvi. Prisijunkite per Google arba su kodu, kurį atsiųsime el. paštu. Naudokite šį el. pašto adresą.",
-    "Pirmą kartą prisijungę pažymėsite, kokius dalykus ir kokioms klasėms mokote. Tai užtruks minutę.",
+    "jūsų vedėjo paskyra KU STEAM pamokose jau aktyvi. Prisijunkite šiuo el. pašto adresu ir savo slaptažodžiu arba per Google.",
+    "Slaptažodžio dar neturite arba jį pamiršote? Prisijungimo puslapyje spauskite „Pamiršau slaptažodį“: atsiųsime kodą el. paštu ir galėsite susikurti naują.",
   ]
   const display = loginUrl.replace(/^https?:\/\//, "")
   const body = render({
     subject,
-    preheader: "Paskyra aktyvi. Prisijunkite per Google arba su kodu.",
+    preheader: "Paskyra aktyvi. Prisijunkite el. paštu ir slaptažodžiu arba per Google.",
     title: "Paskyra patvirtinta",
     footer: REQUEST_FOOTER,
     parts: [
@@ -259,6 +259,39 @@ export function accountActivatedEmail(to: string, firstName: string | null, logi
         `Prisijungimo adresas: <a href="${escapeHtml(loginUrl)}" style="color:#006F8F">${escapeHtml(display)}</a>`,
         `Prisijungimo adresas: ${loginUrl}`,
       ),
+    ],
+  })
+  return { to, subject, ...body }
+}
+
+/**
+ * To a teacher whose account was just created: one button that signs them in
+ * once and opens the registration form, where they create a password. The
+ * link is single use; the sign-in address below it always works.
+ */
+export function accountInviteEmail(to: string, firstName: string | null, inviteUrl: string, loginUrl: string): EmailMessage {
+  const subject = "Kvietimas į KU STEAM pamokas"
+  const greeting = firstName ? `Sveiki, ${firstName},` : "Sveiki,"
+  const lines = [
+    "jums sukurta vedėjo paskyra KU STEAM pamokose. Paspauskite mygtuką, patikrinkite savo duomenis ir susikurkite slaptažodį. Tai užtruks porą minučių.",
+    "Vėliau jungsitės šiuo el. pašto adresu ir savo slaptažodžiu arba per Google.",
+  ]
+  const display = loginUrl.replace(/^https?:\/\//, "")
+  const body = render({
+    subject,
+    preheader: "Užbaikite registraciją ir susikurkite slaptažodį.",
+    title: "Užbaikite registraciją",
+    footer: REQUEST_FOOTER,
+    parts: [
+      paragraph(escapeHtml(greeting), greeting),
+      ...lines.map((l) => paragraph(l, l)),
+      button("Užbaigti registraciją", inviteUrl),
+      divider(),
+      note(
+        `Mygtukas veikia vieną kartą ir ribotą laiką. Jei jis nebegalioja, atverkite <a href="${escapeHtml(loginUrl)}" style="color:#006F8F">${escapeHtml(display)}</a>, įrašykite šį el. pašto adresą ir spauskite „Pamiršau slaptažodį“: atsiųsime kodą.`,
+        `Mygtukas veikia vieną kartą ir ribotą laiką. Jei jis nebegalioja, atverkite ${loginUrl}, įrašykite šį el. pašto adresą ir spauskite „Pamiršau slaptažodį“: atsiųsime kodą.`,
+      ),
+      note("Kvietimo nelaukėte? Nieko nedarykite: be šios nuorodos prie paskyros niekas neprisijungs.", "Kvietimo nelaukėte? Nieko nedarykite: be šios nuorodos prie paskyros niekas neprisijungs."),
     ],
   })
   return { to, subject, ...body }

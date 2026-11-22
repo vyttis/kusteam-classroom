@@ -9,7 +9,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
-import { AlertTriangle, BarChart3, Clock, Loader2, LogOut, Play, Star, Trophy } from "lucide-react"
+import { AlertTriangle, BarChart3, Clock, Loader2, Play, Star, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AnnouncementBanner, type AnnouncementItem } from "@/components/player/announcement-banner"
@@ -19,8 +19,20 @@ import { TimerAnnouncer } from "@/components/player/timer-announcer"
 import { LeaveTeamButton } from "@/components/player/leave-team-button"
 import { formatTime } from "@/lib/game/play-format"
 
-/** Network failure or the activity is not available. */
-export function PlayLoadError({ onRetry, onRejoin }: { onRetry: () => void; onRejoin: () => void }) {
+/**
+ * Network failure or the activity is not available. Nothing here drops the
+ * team's session: without it the team cannot come back (its name is then
+ * taken), so the only action is to try again, and the way out is the
+ * facilitator's "Grąžinti į komandą" link.
+ */
+export function PlayLoadError({
+  onRetry,
+  retrying,
+}: {
+  onRetry: () => void
+  /** The page is still retrying by itself. */
+  retrying: boolean
+}) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm text-center">
@@ -30,9 +42,12 @@ export function PlayLoadError({ onRetry, onRejoin }: { onRetry: () => void; onRe
         <h1 className="text-xl font-bold text-steam-dark mb-2">
           Nepavyko įkelti veiklos
         </h1>
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-sm text-muted-foreground mb-2">
           Patikrinkite interneto ryšį arba paklauskite vedėjo, ar veikla
           vis dar vyksta.
+        </p>
+        <p className="text-sm text-muted-foreground mb-6 min-h-5" role="status" aria-live="polite">
+          {retrying ? "Bandome prisijungti iš naujo..." : ""}
         </p>
         <Button
           onClick={onRetry}
@@ -40,14 +55,10 @@ export function PlayLoadError({ onRetry, onRejoin }: { onRetry: () => void; onRe
         >
           Bandyti dar kartą
         </Button>
-        <Button
-          variant="ghost"
-          onClick={onRejoin}
-          className="w-full mt-2 text-muted-foreground gap-2"
-        >
-          <LogOut className="h-4 w-4" />
-          Prisijungti iš naujo
-        </Button>
+        <p className="text-sm text-muted-foreground mt-4">
+          Jei nepavyksta, paprašykite vedėjo nuorodos arba QR kodo
+          „Grąžinti į komandą“.
+        </p>
       </div>
     </div>
   )

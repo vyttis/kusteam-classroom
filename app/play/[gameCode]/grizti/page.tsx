@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { clearPlayerSession, savePlayerSession } from "@/lib/game/session"
+import { STORAGE_BLOCKED_MESSAGE, canStorePlayerSession, clearPlayerSession, savePlayerSession } from "@/lib/game/session"
 
 type State = { kind: "working" } | { kind: "error"; message: string }
 
@@ -33,6 +33,12 @@ export default function RejoinPage() {
       setState({ kind: "error", message: "Nuorodoje nėra komandos kodo. Paprašykite vedėjo naujos nuorodos." })
       return
     }
+    // Asked before the link is used: a browser that cannot keep the session
+    // would spend the facilitator's link for nothing.
+    if (!canStorePlayerSession()) {
+      setState({ kind: "error", message: STORAGE_BLOCKED_MESSAGE })
+      return
+    }
     let cancelled = false
     ;(async () => {
       try {
@@ -54,12 +60,16 @@ export default function RejoinPage() {
         }
         // Whatever this device held for the activity belongs to another team.
         clearPlayerSession(gameCode)
-        savePlayerSession(gameCode, {
+        const saved = savePlayerSession(gameCode, {
           team_id: data.team_id,
           session_token: data.session_token,
           game_code: gameCode,
           team_name: data.team_name ?? "",
         })
+        if (!saved) {
+          setState({ kind: "error", message: STORAGE_BLOCKED_MESSAGE })
+          return
+        }
         router.replace(`/play/${gameCode}/play`)
       } catch {
         if (!cancelled) setState({ kind: "error", message: "Nepavyko susisiekti. Patikrinkite interneto ryšį." })
