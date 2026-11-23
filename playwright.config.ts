@@ -8,6 +8,9 @@ import { defineConfig, devices } from "@playwright/test"
  */
 export default defineConfig({
   testDir: "e2e",
+  // e2e/local needs a local Supabase stack and has its own config
+  // (playwright.local.config.ts, npm run test:e2e:local).
+  testIgnore: "**/e2e/local/**",
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
