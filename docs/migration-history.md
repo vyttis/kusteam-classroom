@@ -352,7 +352,7 @@ Produkcija 2026-11-07:
 | table | 18 | `4456d03e6c5fa3e0ee1b8a1835df268d` |
 | trigger | 11 | `6b0e207b15b5ecf28ecd7e75c9c4dbb6` |
 
-Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Vėliau jį atnaujino CLS-015 (`grant.table`, `policy`) ir TEAM-001 (9 sritys): dabartinės reikšmės yra pačiame faile, pasikeitimai nurodyti tų migracijų įrašuose. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
+Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Vėliau jį atnaujino CLS-015 (`grant.table`, `policy`), TEAM-001 (9 sritys) ir `20261123120000` (6 sritys; produkcijoje dar netaikyta, todėl produkcija iki taikymo atitinka ankstesnes reikšmes, jos surašytos tos migracijos įraše): dabartinės reikšmės yra pačiame faile, pasikeitimai nurodyti tų migracijų įrašuose. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
 
 ## 2026-11-06: atsakymų, rolių ir statistikos spragos
 
@@ -944,6 +944,372 @@ Visa seka su Vercel, domenu ir E2E: `kusteam-team/docs/LAUNCH.md`. DB dalis:
 ### Grąžinimas
 
 `supabase/rollback/20261109111400_team_staff_access.sql` SQL Editor, kai nevyksta veiklos; prieš tai galima paleisti `rollback-check.sql`. TEAM eilutės, nuorodos ir trigeris dingsta, CLASSROOM profiliai nekeičiami. TEAM sukurti auth naudotojai (taip pat superadministratoriaus paskyra) lieka be CLASSROOM profilio, juos galima ištrinti Authentication > Users. Po grąžinimo `state.sql`: TEAM objektų nėra, `handle_new_user_md5` nepakitęs. Kraštutiniu atveju kasdienė fizinė kopija, bet ji grąžina visą projektą į tos nakties būseną.
+
+## 2026-11-23: neaktyvių paskyrų skaitymas, administratoriaus rašymas, bibliotekos šaltinis ir `games.starter_slug`
+
+Failas `supabase/migrations/20261123120000_security_hardening_and_starter_slug.sql`
+(SHA-256 `cb900877562aabdf64cfb30b49313b721288365ba34daf90df548fb7bebe144b`),
+grąžinimas `supabase/rollback/20261123120000_security_hardening_and_starter_slug.sql`
+(SHA-256 `3685b4a83209a4ffececd1fcbb63dd609ab21243cabf3378982b34e8b061b781`).
+Pagrindas: 2026-11-22 auditas (`docs/audits/CLASSROOM-TEACHER-READINESS-2026-11-22.md`,
+įrodymai `docs/audits/evidence/blocked-read-probe.sql` ir
+`library-and-admin-probe.sql`).
+
+**Produkcijoje NETAIKYTA.** Taikoma tik su Vyčio leidimu, pagal eigą žemiau.
+Programa veikia ir be šios migracijos, ir su ja: kodas `starter_slug` dar
+nerašo ir neskaito, o pašalinamų politikų nenaudoja. Kodas, kuris rašys
+`starter_slug`, diegiamas tik po migracijos (kitaip Data API atmes įrašą su
+nežinomu stulpeliu). Duomenys nekeičiami. `types/database.ts` šiame PR
+nekeistas.
+
+### Ką keičia ir kodėl
+
+1. **Užblokuotos ir laukiančios paskyros nebeskaito vedėjo duomenų.**
+   Iki šiol ribojančios politikos „Only active accounts ...“ galiojo tik
+   INSERT, UPDATE ir DELETE (ir SELECT tik `library_items`), todėl
+   užblokuota ar `pending` paskyra su dar galiojančia sesija per Data API
+   savo žetonu skaitė savo veiklas, užduotis, komandas, rezultatus,
+   skelbimus, ženklelius, pamokų planus, refleksijas ir failus (auditas: po
+   1 eilutę kiekvienoje lentelėje). Dabar ribojanti SELECT politika „Only
+   active accounts read“ su `is_active_account()` yra lentelėse `games`,
+   `challenges`, `teams`, `submissions`, `announcements`, `achievements`,
+   `lesson_plans`, `reflections`, o `storage.objects` turi „Only active
+   accounts read uploads“. Neaktyvi paskyra mato tik savo `profiles` eilutę
+   (jos reikia puslapiui `/laukia`). Aktyviam mokytojui, administratoriui ir
+   super administratoriui niekas nesikeičia: ribojanti politika tik
+   pridedama prie esamų leidžiančių.
+   Tą pačią taisyklę gavo dvi RLS apeinančios funkcijos `get_game_stats()`
+   ir `get_game_reflections()`: jos per `can_read_game()` atsakydavo ir
+   užblokuotam savininkui. Dabar jos papildomai tikrina
+   `is_active_account()` (service role kaip ir anksčiau praleidžiama). Tai
+   nedidelis nukrypimas nuo „tik politikos“: be jo refleksijos ir statistika
+   liktų skaitomos per RPC.
+   `is_active_account()` ir `can_read_game()` nekeičiamos, nes jų apibrėžimą
+   valdo TEAM-006 (produkcijoje jos jau turi `team_staff_access_ok()`).
+   Todėl rezultatas tas pats su TEAM-006 ir be jo: darbuotojas (`staff`) su
+   galiojančia TEAM sesija yra aktyvus ir mato tą patį, be sesijos jį jau
+   atmetė TEAM-006 politika.
+   Sąmoningai neįtraukta: `profiles` (sava eilutė lieka matoma),
+   `team_members` ir `team_activity_grants` (TEAM darbuotojai neturi
+   CLASSROOM profilio ir turi toliau matyti savo eilutę), `library_items`
+   (politika jau yra) ir lentelės, kurių klientų rolės visai neskaito
+   (`access_requests`, `admin_audit_log`, `ai_usage`, `hint_reveals`,
+   `platform_settings`, `request_links`, `team_tokens`). Dalyviai
+   nepaliečiami: jie neturi sesijos, juos aptarnauja service role.
+   Pastaba: `challenges`, `teams`, `submissions`, `announcements`,
+   `achievements` ir `reflections` savininko politikos eina per `games`,
+   todėl jas uždaro jau `games` politika; atskiros politikos šiose lentelėse
+   yra antra apsauga, kad skaitymas nepriklausytų nuo to, kaip parašyta
+   leidžianti politika.
+2. **Administratorius nebegali perimti svetimos veiklos ar pamokos plano.**
+   Politika `admins_update_all_games` (00002) leido `admin` ir `super_admin`
+   per Data API keisti bet kurį bet kurios veiklos stulpelį, taip pat
+   `teacher_id`; „Admins update lesson plans“ ir „Admins delete lesson
+   plans“ (00017, 20261106140000) leido keisti ir trinti bet kurį pamokos
+   planą. Šios trys politikos pašalinamos. Programa jų nenaudojo: visi
+   veiklų ir planų rašymai vartotojo sesija filtruoja `teacher_id =
+   auth.uid()`, `set_game_status()`, `update_game_settings()` ir
+   `extend_game_time()` priima tik savininką, o administratoriaus „Baigti
+   veiklą“ rašo service role
+   (`app/api/admin/games/[gameId]/finish/route.ts`). Skaitymo politikos
+   administratoriams lieka.
+   Paliktos, nes programa jomis remiasi: `admin_update_library` (bibliotekos
+   moderavimas administratoriaus sesija, `PATCH /api/library/[itemId]`) ir
+   `super_admin_delete_library` (`DELETE` tame pačiame maršrute). Kad per
+   jas nebūtų galima pakeisti nuosavybės, 3 punkto trigeris draudžia keisti
+   `published_by` ir `source_game_id`.
+3. **Bibliotekos įrašas rodo tik į savo autoriaus veiklą.** Politikos
+   `teacher_insert_library` ir `publisher_update_own_library` netikrino
+   `source_game_id`, todėl vedėjas galėjo pateikti įrašą su svetimos veiklos
+   šaltiniu. Serveris atsakymus jau kopijuoja tik iš autoriaus veiklos; tai
+   ta pati taisyklė duomenų bazėje. Naujas trigeris
+   `library_items_source_rules` (tik klientų rolėms `anon` ir
+   `authenticated`; service role ir SQL pasitikima, kaip
+   `games_status_rules`): `published_by` keisti negalima; nustatomas (INSERT)
+   ar keičiamas (UPDATE) `source_game_id` turi būti autoriaus veikla, o jį
+   nustato pats autorius; `NULL` visada tinka. Pasirinktas trigeris, o ne
+   `WITH CHECK`, nes taisyklė taikoma pokyčiui: atnaujinimas, kuris
+   šaltinio neliečia (administratoriaus moderavimas, senas įrašas, veikla,
+   vėliau perduota kitam savininkui), neatmetamas, o ištrynus šaltinio
+   veiklą išorinio rakto `ON DELETE SET NULL` veikia kaip anksčiau.
+   Klaida `42501`.
+4. **`games.starter_slug`.** Naujas neprivalomas `text` stulpelis be išorinio
+   rakto (paruoštų veiklų katalogas yra kode), su apribojimu
+   `starter_slug_format`: `^[a-z0-9]+(-[a-z0-9]+)*$` ir ne daugiau kaip 60
+   ženklų (tas pats formatas kaip `app/api/games/starter/route.ts`). Juo
+   iš katalogo sukurta veikla galės rodyti savo metodines pastabas. Teisės:
+   `games` rolei `authenticated` turi lentelės lygio teises (ne stulpelių
+   sąrašą kaip `challenges`, `teams`, `submissions`), todėl atskiro `GRANT`
+   nereikia: savininkas stulpelį skaito ir gali įrašyti kurdamas veiklą.
+   UPDATE paliktas kaip visiems kitiems `games` stulpeliams: jį uždrausti
+   vienam stulpeliui reikštų lentelės UPDATE teisę pakeisti stulpelių
+   sąrašu, o reikšmė tik parenka, kurias viešas pastabas savininkas mato
+   prie savo veiklos. `anon` lentelės `games` neskaito.
+
+Kas pasikeičia programoje užblokuotai paskyrai su atidarytu skirtuku: API
+maršrutai, kurie pirmiausia perskaito veiklą, atsakys „Veikla nerasta“ (404)
+vietoj pranešimo apie neaktyvią paskyrą. `proxy.ts` tokią paskyrą ir taip
+nukreipia į `/laukia`.
+
+### Patikrinta lokaliai (Postgres 17, `PGBIN=/opt/pg17/bin npm run test:db`)
+
+Visos migracijos tuščioje bazėje, atspaudai, TEAM-006 pasiūlymas ant viršaus
+(taikymo patikra, taikymas, patikra, grąžinimo patikra, testas, grąžinimas),
+`security.sql`, visų migracijų grąžinimas ir pakartotinis taikymas: žalia.
+TEAM-006 patikrų failų perkurti nereikėjo (jų md5 apima tik TEAM-006
+funkcijas, kurios nekeistos). Atspaudas sutampa, kai migracija taikoma prieš
+TEAM-006 (kaip testuose) ir po jo (kaip bus produkcijoje).
+
+`security.sql` nauji testai: aktyvus mokytojas mato tik savo eilutes visose
+devyniose lentelėse, administratorius ir super administratorius visas kaip
+anksčiau; `pending`, užblokuotas mokytojas, užblokuotas administratorius ir
+sesija be profilio nemato nieko, išskyrus savo profilį, o `get_game_stats`
+ir `get_game_reflections` jiems grąžina `42501`; atblokavus viskas grįžta;
+administratorius ir super administratorius nepakeičia svetimos veiklos
+`teacher_id`, pavadinimo, jos neištrina, nepakeičia ir neištrina svetimo
+plano; savo planą keičia ir trina; bibliotekos įrašas su svetimu šaltiniu
+atmetamas kuriant ir keičiant, su savu ir be šaltinio priimamas;
+administratorius moderuoja svetimą įrašą (su savu, tuščiu ir senu svetimu
+šaltiniu), bet nepakeičia `published_by` ir `source_game_id`; savininkui
+ištrynus šaltinio veiklą `source_game_id` tampa `NULL`; `starter_slug`
+formatas (11 netinkamų reikšmių atmetama, 60 ženklų tinka), savininkas jį
+įrašo ir skaito, kitas vedėjas nemato, `anon` negali. Kiekviena dalis
+išbandyta atskirai ją pašalinus: testai krenta (išskyrus atskiras politikas
+lentelėse, kurias jau uždaro `games` politika, žr. 1 punkto pastabą).
+`scripts/test-data-api.sh` (PostgREST) lokaliai nepaleistas, jį paleidžia CI.
+
+Atspaudas, tik pasikeitusios sritys (kitos penkios nepakito):
+
+| kind | be TEAM-006: buvo | be TEAM-006: tapo (`schema-fingerprint.expected`) | su TEAM-006: buvo (produkcija dabar) | su TEAM-006: tapo (`fingerprint-after.expected`) |
+| --- | --- | --- | --- | --- |
+| column | `206\|f083c38098a9f4caddbcc54aefd7e30c` | `207\|0ab90623f5efae18349293b7d1788964` | `228\|9e7608fce82fbee74a67b16a1f7f7f9e` | `229\|06df989221ab7dea4337fcead2411611` |
+| constraint | `101\|0f0a734daf4e3b6fa9923aa85cfe12b0` | `102\|3f5fc9067b832e087a14663becfa7565` | `117\|0074bca4ea0725168ccc6394ff5e4fd2` | `118\|d2ea86cf3e1c860ea425ee4dbad90b83` |
+| function | `29\|f1f7967f7f9624fc61c146d2d0af4ecb` | `30\|30d6cc4e0639cdd8f893d8c48570b5cd` | `40\|638f6221097a506ddf03ba466847e44a` (produkcijoje `40\|1f98d3c00fb11c1193271d57751b066d`, CLS-011) | `41\|29f59cd1be2fabe9f38652c4195df716` (produkcijoje md5 bus kitoks, CLS-011) |
+| grant.function | `56\|887bf0760f4e90318eca6e027708167d` | `57\|870fe4886537d8560a5064365befce19` | `68\|75d4d0a471b9bf0fe3f4e1db40943598` | `69\|4f29cf477f13540a45b635f21975123e` |
+| policy | `60\|6e34e6be978e5366a052f980ad98751f` | `66\|6e4b44784a178e49541b6b0359f1e45a` | `76\|a84af6fc5a640aaabf1c2f218b538d8e` | `82\|fee195cfd1c084e13eb80f5663283c8b` |
+| trigger | `13\|f5225223b411d95a17b3e6dc53ca8300` | `14\|6f32f53398be4efb119e40cd8db51068` | `16\|fc083e3d84f4c8a2d439be134c89f23c` | `17\|42609e49894ab6c8163d7238ef464ec8` |
+
+Politikų +9 ir -3, funkcijų +1 (dvi pakeistos), trigerių +1, stulpelių +1,
+apribojimų +1, funkcijų teisių +1 (`library_items_source_rules()` rolei
+`service_role` pagal numatytąsias teises; `anon` ir `authenticated` jos
+neturi).
+
+### Prieš taikymą: patikra produkcijoje (tik skaitymas, SQL Editor)
+
+Rezultatus išsaugoti. Sustojimo sąlygos nurodytos prie užklausų.
+
+```sql
+-- 1. Vykstančios veiklos: turi būti 0, kitaip netaikyti.
+select count(*) as running from public.games where status in ('active', 'paused');
+
+-- 2. Paskyros pagal rolę ir būseną (palyginimui po taikymo).
+select role, status, count(*) from public.profiles group by 1, 2 order by 1, 2;
+
+-- 3. Neaktyvios paskyros, kurios po taikymo nebematys savo duomenų: kiek jų
+--    turi veiklų, planų ir dar gyvų sesijų. Tai laukiamas poveikis; jei
+--    tarp jų yra paskyra, kuri turėtų dirbti, pirma ją aktyvuoti.
+select p.status,
+  count(*) as accounts,
+  count(*) filter (where exists (select 1 from public.games g where g.teacher_id = p.id)) as with_activities,
+  count(*) filter (where exists (select 1 from public.lesson_plans l where l.teacher_id = p.id)) as with_lesson_plans,
+  count(*) filter (where exists (select 1 from auth.sessions s where s.user_id = p.id)) as with_sessions
+from public.profiles p
+where p.status <> 'active'
+group by 1 order by 1;
+
+-- 4. Bibliotekos įrašai, kurių šaltinis yra ne autoriaus veikla. Migracija
+--    jų nekeičia ir neatmeta (trigeris tikrina tik pokytį), bet jei
+--    foreign_source > 0, tuos įrašus peržiūrėti atskirai.
+select count(*) as items,
+  count(*) filter (where l.source_game_id is not null) as with_source,
+  count(*) filter (where g.id is not null and g.teacher_id is distinct from l.published_by) as foreign_source
+from public.library_items l left join public.games g on g.id = l.source_game_id;
+
+-- 5. Šalinamos politikos yra tokios, kokias atkuria grąžinimo failas:
+--    3 eilutės, PERMISSIVE, {public}, qual su get_my_role(). Kitaip sustoti.
+select tablename, policyname, cmd, roles::text, permissive, qual
+from pg_policies
+where policyname in ('admins_update_all_games', 'Admins update lesson plans', 'Admins delete lesson plans')
+order by 1, 2;
+
+-- 6. Kam priklauso veiklos. Ar administratorius kada nors pakeitė svetimą
+--    veiklą per Data API, nustatyti negalima: tokie rašymai niekur
+--    neregistruojami (admin_audit_log pildo tik programa). Ši užklausa tik
+--    parodo, ar administratorių vardu yra netikėtai daug veiklų.
+select p.role, p.status, count(*) as activities
+from public.games g join public.profiles p on p.id = g.teacher_id
+group by 1, 2 order by 1, 2;
+
+-- 7. Nieko iš naujų objektų dar nėra ir TEAM-006 taisyklė vietoje.
+--    Laukiama: 1 (tik library_items), 0, false, true. Kitaip sustoti.
+select
+  (select count(*) from pg_policies where policyname in ('Only active accounts read', 'Only active accounts read uploads')) as read_policies,
+  (select count(*) from information_schema.columns
+     where table_schema = 'public' and table_name = 'games' and column_name = 'starter_slug') as slug_column,
+  to_regprocedure('public.library_items_source_rules()') is not null as trigger_fn,
+  (select prosrc like '%team_staff_access_ok()%' from pg_proc
+     where oid = 'public.is_active_account()'::regprocedure) as staff_rule;
+```
+
+8. `supabase/tests/schema-fingerprint.sql`: visos sritys kaip lentelės
+   stulpelyje „su TEAM-006: buvo“ (nepakitusios sritys kaip
+   `fingerprint-after.expected`), `function` `40|1f98d3c00fb11c1193271d57751b066d`.
+   Kitaip sustoti: produkcija nebe tokia, ant kokios migracija išbandyta.
+
+### Taikymas (viena transakcija)
+
+1. Sąlygos: Vyčio leidimas šiam žingsniui; Database > Backups paskutinė
+   kasdienė kopija ne senesnė nei 24 h; 1 užklausa grąžina 0; patikros 5, 7
+   ir 8 atitinka.
+2. SQL Editor: visas migracijos failas, SHA-256 sutampa su nurodytu
+   viršuje. Failas pats turi `BEGIN` ir `COMMIT` bei `SET LOCAL
+   lock_timeout = '5s'`: jei kurios nors lentelės užrakto nepavyksta gauti
+   per 5 s, viskas atšaukiama (klaida 55P03) ir niekas nepritaikoma. Tada
+   galima vieną kartą pakartoti po 10 min.; antrą kartą sustoti. Jei SQL
+   Editor po klaidos rašo „current transaction is aborted“, pirmiausia
+   paleisti `ROLLBACK;`.
+3. Laukiama „Success. No rows returned“.
+4. Patikra po taikymo (žemiau). Jei nepavyksta: grąžinimas.
+5. Jei CLS-005 jau atliktas: `migration repair --status applied --remote 20261123120000`.
+6. Įrašas čia: data, kas vykdė, rezultatai.
+
+Užraktai: `ALTER TABLE games` (ACCESS EXCLUSIVE, lentelė neperrašoma, CHECK
+vieną kartą perskaito lentelę), `CREATE`/`DROP POLICY` ir `CREATE TRIGGER`
+minėtose lentelėse ir `storage.objects` (trumpi). Visi laikomi iki
+transakcijos pabaigos, todėl taikyti, kai nevyksta veiklos.
+
+### Patikra po taikymo
+
+```sql
+-- Laukiama: 10, 0, 1, false, 2, true, CHECK su ^[a-z0-9]+(-[a-z0-9]+)*$ ir 60, true, false.
+select
+  (select count(*) from pg_policies where policyname in ('Only active accounts read', 'Only active accounts read uploads')
+     and permissive = 'RESTRICTIVE' and cmd = 'SELECT' and roles::text = '{authenticated}') as read_policies,
+  (select count(*) from pg_policies where policyname in
+     ('admins_update_all_games', 'Admins update lesson plans', 'Admins delete lesson plans')) as admin_write_policies,
+  (select count(*) from pg_trigger where tgname = 'library_items_source_rules' and not tgisinternal) as library_trigger,
+  has_function_privilege('authenticated', 'public.library_items_source_rules()', 'EXECUTE') as trigger_fn_exposed,
+  (select count(*) from pg_proc where pronamespace = 'public'::regnamespace
+     and proname in ('get_game_stats', 'get_game_reflections') and prosrc like '%is_active_account()%') as stats_rule,
+  (select prosrc like '%team_staff_access_ok()%' from pg_proc
+     where oid = 'public.is_active_account()'::regprocedure) as staff_rule_kept,
+  (select pg_get_constraintdef(oid) from pg_constraint
+     where conrelid = 'public.games'::regclass and conname = 'starter_slug_format') as slug_check,
+  has_column_privilege('authenticated', 'public.games', 'starter_slug', 'SELECT, INSERT') as slug_owner_access,
+  has_column_privilege('anon', 'public.games', 'starter_slug', 'SELECT') as slug_anon_read;
+```
+
+Tikros aktyvios paskyros patikra per RLS. Nieko nekeičia: baigiasi klaida
+specialiai, todėl laikinas būsenos pakeitimas atšaukiamas. Laukiama klaida
+`CLS read check OK: active sees N/N activities (active t), blocked sees 0,
+pending sees 0, blocked reads 1 profile`. `FAILED` ar kita klaida: grąžinimas.
+
+```sql
+do $$
+declare
+  t uuid;
+  own int;
+  seen_active int;
+  seen_blocked int;
+  seen_pending int;
+  own_profile int;
+  act boolean;
+begin
+  select g.teacher_id into t
+  from public.games g join public.profiles p on p.id = g.teacher_id
+  where p.status = 'active' and p.role in ('teacher', 'admin', 'super_admin')
+  group by g.teacher_id order by count(*) desc, g.teacher_id limit 1;
+  if t is null then
+    raise exception 'CLS read check: no active account with an activity, nothing to compare';
+  end if;
+  select count(*) into own from public.games where teacher_id = t;
+  perform set_config('request.jwt.claim.sub', t::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', t, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  select count(*) into seen_active from public.games where teacher_id = t;
+  select public.is_active_account() into act;
+  reset role;
+  update public.profiles set status = 'blocked' where id = t;
+  set local role authenticated;
+  select count(*) into seen_blocked from public.games;
+  select count(*) into own_profile from public.profiles;
+  reset role;
+  update public.profiles set status = 'pending' where id = t;
+  set local role authenticated;
+  select count(*) into seen_pending from public.games;
+  reset role;
+  raise exception 'CLS read check %: active sees %/% activities (active %), blocked sees %, pending sees %, blocked reads % profile',
+    case when seen_active = own and act and seen_blocked = 0 and seen_pending = 0 and own_profile = 1 then 'OK' else 'FAILED' end,
+    seen_active, own, act, seen_blocked, seen_pending, own_profile;
+end $$;
+```
+
+Atspaudas (`schema-fingerprint.sql`): visos sritys kaip
+`supabase/proposals/team-006-sso/fingerprint-after.expected`:
+
+```
+column|229|06df989221ab7dea4337fcead2411611|
+constraint|118|d2ea86cf3e1c860ea425ee4dbad90b83|
+function|41|...            (md5 kitoks dėl CLS-011, skaičius turi būti 41)
+grant.column|50|95c8dcc0fa52abb386b95f8942e022de|
+grant.function|69|4f29cf477f13540a45b635f21975123e|
+grant.table|49|af94879cdd2d16607d32415b06326e55|
+index|40|dd2281cfe97f0d19241092ef7bc1769d|
+policy|82|fee195cfd1c084e13eb80f5663283c8b|
+realtime|5|d718741a8a346c9aa2c306739d3fada4|
+table|24|1e88087c44bacb15ab6ae3aa0c8a80af|
+trigger|17|42609e49894ab6c8163d7238ef464ec8|
+```
+
+Kadangi `function` md5 produkcijoje nesutampa dėl CLS-011, trijų šios
+migracijos funkcijų tekstą patikrinti detaliu režimu: prieš atspaudo užklausą
+`select set_config('fingerprint.detail', 'function', false);`, po jos
+`select set_config('fingerprint.detail', '', false);`. Laukiama:
+
+```
+get_game_reflections(uuid)     c492650369c4169eddea5a338cf9e84c
+get_game_stats(uuid)           104e16294ba0e4ff4c7911b0ab2bfac5
+library_items_source_rules()   f525af9f992438b9cdc59a65e827a2f6
+```
+
+Toliau: CLASSROOM `E2E smoke (production)` paleistas rankiniu būdu žalias,
+Vercel runtime klaidų nėra, Vytis prisijungęs kaip vedėjas mato savo veiklas,
+tiesioginį vaizdą (Realtime taiko tas pačias SELECT politikas) ir
+ataskaitą su refleksijomis; administratorius mato visas veiklas ir gali
+patvirtinti ar atmesti bibliotekos šabloną; „Pateikti į biblioteką“ iš savo
+veiklos veikia.
+
+### Grąžinimas
+
+Grąžinimo failas SQL Editor (viena transakcija, tas pats `lock_timeout`),
+kai nevyksta veiklos. Po jo atspaudas kaip stulpelyje „su TEAM-006: buvo“
+(patikrinta lokaliai abiem tvarkomis). `starter_slug` reikšmės prarandamos
+kartu su stulpeliu; jei kodas jį jau rašo, pirma grąžinti kodą. **Dėmesio:
+visas grąžinimas vėl atveria tris spragas** (neaktyvių paskyrų skaitymą,
+administratoriaus rašymą į svetimas veiklas ir planus, svetimą bibliotekos
+šaltinį). Jei bėda tik vienoje dalyje, užtenka dalinio grąžinimo:
+
+```sql
+-- Tik jei aktyvus vedėjas ar administratorius staiga nebemato savo duomenų
+-- (library_items politika lieka, ji iš CLS-015):
+DROP POLICY IF EXISTS "Only active accounts read" ON public.games;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.challenges;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.teams;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.submissions;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.announcements;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.achievements;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.lesson_plans;
+DROP POLICY IF EXISTS "Only active accounts read" ON public.reflections;
+DROP POLICY IF EXISTS "Only active accounts read uploads" ON storage.objects;
+
+-- Tik jei neveikia pateikimas į biblioteką ar moderavimas:
+DROP TRIGGER IF EXISTS library_items_source_rules ON public.library_items;
+```
+
+Grįžti į pilną migraciją: vėl pritaikyti migracijos failą po viso grąžinimo
+failo (po dalinio grąžinimo migracijos failas pakartotinai netaikomas, nes
+stulpelis jau yra; tada atkurti tik pašalintą dalį iš migracijos failo).
 
 ## Konvencija toliau
 
