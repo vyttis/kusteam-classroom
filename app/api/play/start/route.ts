@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { retryLater } from "@/lib/api/retry-later"
 
 // POST /api/play/start — stamp the team's timed-run start, once.
 //
@@ -35,10 +36,7 @@ export async function POST(request: Request) {
       .select("id, game_id, started_at, pause_offset_ms")
       .eq("session_token", parsed.data.session_token)
       .maybeSingle()
-    if (teamError) {
-      console.error("play/start error:", teamError.message)
-      return NextResponse.json({ error: "Serverio klaida" }, { status: 500 })
-    }
+    if (teamError) return retryLater("play/start team", teamError)
     if (!team) return NextResponse.json({ error: "Komanda nerasta" }, { status: 404 })
 
     if (team.started_at) {

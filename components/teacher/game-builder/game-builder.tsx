@@ -42,6 +42,7 @@ import {
   partialAddSummary,
   type AddFailure,
 } from "@/components/teacher/task-add-result"
+import { suggestionToChallengePayload } from "./suggestion-payload"
 import { DND_INSTRUCTIONS_LT, dndAnnouncementsLt, stepTarget } from "./dnd-a11y"
 import {
   pendingSuggestionsKey,
@@ -340,22 +341,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
       const res = await fetch("/api/challenges", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          game_id: game.id,
-          title: suggestion.title,
-          description: suggestion.description || "",
-          type: suggestion.type,
-          points: Number(suggestion.points) || 100,
-          correct_answer: String(suggestion.correct_answer),
-          hints: (suggestion.hints || []).slice(0, 10),
-          options: suggestion.type === "multiple_choice" ? suggestion.options : null,
-          explanation: suggestion.explanation || null,
-          difficulty: suggestion.difficulty || null,
-          generated_by_di: true,
-          verification_verdict: suggestion.verification?.verdict ?? null,
-          verification_issues: suggestion.verification?.issues ?? [],
-          verification_confidence: suggestion.verification?.confidence ?? null,
-        }),
+        body: JSON.stringify(suggestionToChallengePayload(game.id, suggestion)),
       })
       session.check(res)
       if (res.ok) {

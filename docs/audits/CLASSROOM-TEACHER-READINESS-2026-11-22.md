@@ -591,3 +591,56 @@ Prie `PILOT.md` scenarijaus pridėti šio audito patikras:
 | P16 | Naršyklės įrankiuose `x-vercel-cache` būsenos ir lentelės užklausoms | `HIT` | 10 skyrius |
 
 Po piloto: Vercel runtime klaidos, Supabase žurnalai, radinių lentelė, sprendimas `PILOT PASSED` ar ne.
+
+## 17. Būsena 2026-11-23
+
+Šis skyrius pridėtas po audito. Ankstesni skyriai nekeisti ir rodo 2026-11-22 būseną. Išvada lieka **CONDITIONAL GO**: A sąlygos dar neįvykdytos visos.
+
+### 17.1 Radiniai
+
+| Radinys | Būsena | Įrodymas ar kas liko |
+| --- | --- | --- |
+| R-01 | Ištaisyta kode | #133: šaltinio atsakymai skaitomi tik iš publikavusio vedėjo veiklos. DB taisyklė `library_items_source_rules` yra #144 (nepritaikyta). Produkcijos užklausa 6 (16.1) nevykdyta |
+| R-02 | Neatlikta | Atkūrimo bandymas, Vyčio veiksmas (16.3) |
+| R-03 | Iš dalies | #134: žemėlapis įkeliamas tik paspaudus. Užduočių paveikslėliai iš bet kurio `https` serverio lieka |
+| R-04 | Neatlikta | Antras asmuo su prieiga ir pranešimų gavėjas, Vyčio sprendimas |
+| R-05 | Parengta, nepritaikyta | #144: RESTRICTIVE skaitymo politika tik aktyvioms paskyroms |
+| R-06 | Ištaisyta | #149: atsakymas ir administratoriaus ekranas rodo, ar laišką priėmė siuntimo paslauga; „Siųsti dar kartą“. Gyvai produkcijoje nebandyta (reikėtų siųsti tikrą laišką) |
+| R-07 | Ištaisyta | #139: veiklos pradėti negalima, kol vedėjas nepatvirtina peržiūrėjęs DI užduotis (`ai_review_required`). #138, #148: užuominų ir atsakymų patikros, „DI klaidų nerado“ |
+| R-08 | Parengta, nepritaikyta | #144: pašalinamos `admins_update_all_games` ir administratorių planų keitimo bei trynimo politikos |
+| R-09 | Neatlikta | CLS-011, CLS-005, TEAM-006 perkėlimas į migracijas: Vyčio sprendimai |
+| R-10 | Iš dalies | #137: klaidos ekranas nebetrina žetono, bandoma iš naujo. #147: DB trikdis nebelaikomas „komanda nerasta“. Komandos kūrimo idempotentiškumas nekeistas |
+| R-11 | Ištaisyta | #137: ryšio juosta ir neišnykstantys skelbimai. #139, #145: vedėjo ekranas perskaito duomenis po kiekvieno kanalo prisijungimo |
+| R-12 | Vykdoma | CLS-022, reikia migracijos |
+| R-13 | Vykdoma | CLS-022, reikia migracijos |
+| R-14 | Neperžiūrėta po audito | |
+| R-15 | Neatlikta | |
+| R-16 | Iš dalies | #136: kodo pakartotinis siuntimas. #139: pasibaigusios sesijos pranešimas, veiklos trynimo ir kopijavimo dialogai. Atsijungimas visuose įrenginiuose nekeistas |
+| R-17 | Ištaisyta | #143: visos pamokos E2E su vietiniu Supabase kiekvienam PR. #147: maršrutų testai |
+| R-18 | Parengta, laukia patvirtinimo | #150 (juodraštis): pranešimo papildymas ir 11 klausimų Vyčiui |
+| R-19 | Iš dalies | #137: skelbimo kontrastas, formų etiketės. #139: užduočių rikiavimas klaviatūra. 11 skyriaus sąrašas iš naujo netikrintas |
+| R-20 | Neatlikta | Greičio ribos lieka atmintyje |
+| R-21 | Iš dalies | #137: saugus `localStorage` skaitymas. Kiti punktai neperžiūrėti. Gyvo bandymo radiniai N-1 (#136), N-2 ir N-5 (#147) ištaisyti |
+| R-22 | Neatlikta | `RETENTION_MODE` nekeistas, terminas 2027-02-04 |
+
+### 17.2 Sąlygos
+
+| Nr. | Būsena |
+| --- | --- |
+| A1 | Kodas ištaisytas (#133). Produkcijos užklausa 6 nevykdyta |
+| A2 | Įvykdyta žemėlapiui (#134). Išoriniai paveikslėliai lieka (R-03) |
+| A3 | Neįvykdyta |
+| A4 | Iš dalies: T1 mokytojo paskyra ir visa pamokos eiga patikrinta gyvai (`CLASSROOM-LIVE-TEST-2026-11-22.md`). T2, naujos paskyros kvietimo nuoroda ir neigiami atvejai nevykdyti |
+| A5 | Neįvykdyta: sesijos Supabase jungtis neturėjo prieigos prie projekto |
+| A6 | Neįvykdyta |
+| A7 | Neįvykdyta |
+| B1 | Neįvykdyta |
+| B2 | R-06, R-07, R-11 ištaisyti; R-10 iš dalies; R-05 ir R-08 laukia #144 pritaikymo |
+| B3 | Neįvykdyta |
+| B4 | Neįvykdyta |
+| B5 | Įvykdyta (#143) |
+| B6 | Neįvykdyta |
+
+### 17.3 Papildomai padaryta po audito
+
+Slaptažodžio prisijungimas ir „Pamiršau slaptažodį“ (#136), DI metodikos patikros (#138, #148), 15 paruoštų veiklų (#140), formuojamoji analitika (#141), pirmo karto pradžia ir gidas (#142). Po kiekvieno sujungimo tikrinta produkcija: diegimas, `CI`, `E2E smoke (production)`, Vercel vykdymo klaidos. Pastaba: `E2E smoke (production)` buvo raudonas nuo #136 iki #146 dėl pasenusio testo, ne dėl produkto klaidos.

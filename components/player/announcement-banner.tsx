@@ -1,5 +1,6 @@
 "use client"
 
+import { realtimeSignedIn } from "@/lib/supabase/realtime-auth"
 import { useEffect, useRef, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
@@ -142,8 +143,13 @@ export function AnnouncementBanner({ gameId, variant = "default", latest }: Anno
   useEffect(() => {
     if (fromPoll || !gameId) return
     const supabase = createClient()
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
-    const channel = supabase
+    // Join only once realtime has the facilitator's token (realtimeSignedIn).
+    realtimeSignedIn(supabase).then(() => {
+      if (cancelled) return
+      channel = supabase
       .channel(`player_announcements_${gameId}`)
       .on(
         "postgres_changes",
@@ -160,9 +166,11 @@ export function AnnouncementBanner({ gameId, variant = "default", latest }: Anno
         }
       )
       .subscribe()
+    })
 
     return () => {
-      supabase.removeChannel(channel)
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
     }
   }, [gameId, fromPoll])
 

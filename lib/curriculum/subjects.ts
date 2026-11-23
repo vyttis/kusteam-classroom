@@ -7,11 +7,17 @@ export interface Subject {
 
 const g = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
 
+// The ids are stored on saved lesson plans (lesson_plans.subject) and name
+// the topic lists in topics.ts, so they never change: only the labels follow
+// the names of the updated general curricula (Bendrosios programos, 2022).
+// "pasaulio-pazinimas" keeps its old name: the updated curricula split it
+// into "Gamtos mokslai" and "Visuomeninis ugdymas", which needs a subject
+// expert and new topic lists, not a new label.
 export const SUBJECTS: Subject[] = [
   { id: "lietuviu-kalba",         label: "Lietuvių kalba ir literatūra", grades: g(1, 12), icon: "BookText" },
   { id: "matematika",             label: "Matematika",                   grades: g(1, 12), icon: "Calculator" },
   { id: "pasaulio-pazinimas",     label: "Pasaulio pažinimas",           grades: g(1, 4),  icon: "Compass" },
-  { id: "gamta-ir-zmogus",        label: "Gamta ir žmogus",              grades: [5, 6],   icon: "Sprout" },
+  { id: "gamta-ir-zmogus",        label: "Gamtos mokslai",               grades: [5, 6],   icon: "Sprout" },
   { id: "biologija",              label: "Biologija",                    grades: g(7, 12), icon: "Leaf" },
   { id: "chemija",                label: "Chemija",                      grades: g(8, 12), icon: "FlaskConical" },
   { id: "fizika",                 label: "Fizika",                       grades: g(7, 12), icon: "Atom" },
@@ -26,8 +32,8 @@ export const SUBJECTS: Subject[] = [
   { id: "muzika",                 label: "Muzika",                       grades: g(1, 10), icon: "Music" },
   { id: "technologijos",          label: "Technologijos",                grades: g(1, 10), icon: "Hammer" },
   { id: "fizinis-ugdymas",        label: "Fizinis ugdymas",              grades: g(1, 12), icon: "Dumbbell" },
-  { id: "tikyba",                 label: "Tikyba",                       grades: g(1, 12), icon: "Church" },
-  { id: "etika",                  label: "Etika",                        grades: g(1, 12), icon: "HeartHandshake" },
+  { id: "tikyba",                 label: "Dorinis ugdymas (tikyba)",     grades: g(1, 12), icon: "Church" },
+  { id: "etika",                  label: "Dorinis ugdymas (etika)",      grades: g(1, 12), icon: "HeartHandshake" },
   { id: "psichologija",           label: "Psichologija",                 grades: [11, 12], icon: "Brain" },
   { id: "filosofija",             label: "Filosofija",                   grades: [11, 12], icon: "Lightbulb" },
   { id: "teatras",                label: "Teatras",                      grades: g(5, 12), icon: "Drama" },

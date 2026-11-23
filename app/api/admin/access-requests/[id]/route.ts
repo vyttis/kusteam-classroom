@@ -1,9 +1,10 @@
 import { NextResponse, after } from "next/server"
 import { z } from "zod"
 import { requireSuperAdmin } from "@/lib/access/admin-guard"
-import { grantAccount, inviteUrl, logAdminAction, loginUrl } from "@/lib/access/approve"
+import { grantAccount, logAdminAction } from "@/lib/access/approve"
+import { accountEmailNotice, sendAccountEmail } from "@/lib/access/notify"
 import { sendEmail } from "@/lib/email/send"
-import { accountActivatedEmail, accountInviteEmail, requestRejectedEmail } from "@/lib/email/templates"
+import { requestRejectedEmail } from "@/lib/email/templates"
 
 const decisionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
@@ -11,7 +12,8 @@ const decisionSchema = z.discriminatedUnion("action", [
 ])
 
 // POST /api/admin/access-requests/[id]: approve (sends the invitation or
-// activates an existing account) or reject a pending request.
+// activates an existing account) or reject a pending request. An approval
+// answers with `email.sent`: whether the email provider accepted the email.
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params
   const guard = await requireSuperAdmin()
@@ -95,23 +97,19 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     email: req.email,
     existing_account: account.existing,
   })
-  // A new account gets a one-time link straight to the registration form
-  // (details and password); an existing one is told where to sign in.
-  const origin = new URL(request.url).origin
-  const invite = account.existing ? null : await inviteUrl(guard.admin, req.email, origin)
-  after(() =>
-    sendEmail(
-      invite
-        ? accountInviteEmail(req.email, req.first_name, invite, loginUrl(origin))
-        : accountActivatedEmail(req.email, req.first_name, loginUrl(origin)),
-    ),
+  // Awaited (not after()): the response must say whether the email went
+  // out, so the administrator is not told "sent" when it was not.
+  const email = await sendAccountEmail(
+    guard.admin,
+    { email: req.email, firstName: req.first_name, existing: account.existing },
+    new URL(request.url).origin,
   )
 
   return NextResponse.json({
     ok: true,
     status: "approved",
-    message: account.existing
-      ? "Paskyra jau buvo, ji aktyvuota: vedėjas gali prisijungti iš karto."
-      : "Paskyra sukurta, kvietimas siunčiamas el. paštu. Vedėjas atvers nuorodą, patikrins duomenis ir susikurs slaptažodį.",
+    existing: account.existing,
+    email,
+    message: accountEmailNotice(account.existing, email),
   })
 }

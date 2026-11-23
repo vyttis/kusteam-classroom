@@ -1,9 +1,8 @@
-import { NextResponse, after } from "next/server"
+import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireSuperAdmin } from "@/lib/access/admin-guard"
-import { grantAccount, inviteUrl, logAdminAction, loginUrl } from "@/lib/access/approve"
-import { sendEmail } from "@/lib/email/send"
-import { accountActivatedEmail, accountInviteEmail } from "@/lib/email/templates"
+import { grantAccount, logAdminAction } from "@/lib/access/approve"
+import { accountEmailNotice, sendAccountEmail } from "@/lib/access/notify"
 import { schoolChoiceSchema } from "@/lib/access/profile-fields"
 
 const inviteSchema = z
@@ -17,7 +16,8 @@ const inviteSchema = z
 
 // POST /api/admin/invite: the super admin creates an account directly
 // (same result as approving a request). The person gets an invitation
-// email and completes the profile on first sign-in.
+// email and completes the profile on first sign-in. The response says
+// whether that email was handed to the email provider (`email.sent`).
 export async function POST(request: Request) {
   const guard = await requireSuperAdmin()
   if (!guard.ok) return guard.response
@@ -54,16 +54,13 @@ export async function POST(request: Request) {
     role: d.role,
   })
 
-  // A new account gets a one-time link straight to the registration form
-  // (details and password); an existing one is told where to sign in.
-  const origin = new URL(request.url).origin
-  const invite = result.existing ? null : await inviteUrl(guard.admin, d.email, origin)
-  after(() =>
-    sendEmail(
-      invite
-        ? accountInviteEmail(d.email, d.first_name, invite, loginUrl(origin))
-        : accountActivatedEmail(d.email, d.first_name, loginUrl(origin)),
-    ),
+  // Awaited (not after()): the response must say whether the email went
+  // out. Sending the same form again is the "send again" action: the account
+  // exists by then, so it only gets the sign-in email.
+  const email = await sendAccountEmail(
+    guard.admin,
+    { email: d.email, firstName: d.first_name, existing: result.existing },
+    new URL(request.url).origin,
   )
 
   const { data: profile } = await guard.admin.from("profiles").select("*").eq("id", result.userId).single()
@@ -71,8 +68,7 @@ export async function POST(request: Request) {
     ok: true,
     existing: result.existing,
     user: profile,
-    message: result.existing
-      ? "Paskyra su šiuo el. paštu jau buvo. Ji aktyvuota, rolė nepakeista, kvietimas išsiųstas iš naujo."
-      : "Kvietimas išsiųstas el. paštu.",
+    email,
+    message: accountEmailNotice(result.existing, email),
   })
 }

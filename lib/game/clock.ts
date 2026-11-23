@@ -65,3 +65,17 @@ export function secondsRunning(clock: GameClock, startedAtMs: number, nowMs: num
 export function pauseOffsetAtStart(clock: GameClock, nowMs: number): number {
   return totalPausedMs(clock, nowMs)
 }
+
+/**
+ * The server's time when a status answer reached the phone. The answer may
+ * come from the CDN (/api/play/status is shared for a couple of seconds), so
+ * its "now" is older by what the Age header says. Without the header, or
+ * with a broken one, "now" is taken as it is. NaN when "now" is missing.
+ */
+export function serverNowMs(nowIso: string | null | undefined, ageHeader: string | null | undefined): number {
+  const now = nowIso ? Date.parse(nowIso) : NaN
+  if (!Number.isFinite(now)) return NaN
+  const age = ageHeader ? Number(ageHeader) : 0
+  // A cached answer lives a few seconds; anything else is not ours to trust.
+  return now + (Number.isFinite(age) && age > 0 && age <= 60 ? age * 1000 : 0)
+}
