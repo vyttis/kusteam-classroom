@@ -26,7 +26,7 @@ export default async function TeamSignInMessagePage(props: { searchParams: Promi
           <h1 className="text-xl font-bold text-steam-dark">Prisijungimas per KU STEAM TEAM</h1>
           <p className="text-sm text-muted-foreground">{message.text}</p>
           {message.button && (
-            <Button asChild className="w-full sm:w-auto">
+            <Button asChild size="lg" className="w-full sm:w-auto">
               <a href={teamHomeUrl()}>{message.button}</a>
             </Button>
           )}

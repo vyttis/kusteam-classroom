@@ -47,7 +47,7 @@ export function PasswordForm({ email }: { email: string }) {
         <p className="rounded-md bg-primary/10 px-3 py-2 text-sm text-steam-dark">
           Slaptažodis išsaugotas. Nuo šiol junkitės el. paštu {email} ir šiuo slaptažodžiu. Ankstesnis slaptažodis, jei jį turėjote, nebegalioja.
         </p>
-        <Button asChild className="h-12 w-full bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90">
+        <Button asChild size="lg" className="w-full">
           <Link href="/dashboard">Į mano veiklas</Link>
         </Button>
       </div>
@@ -75,7 +75,7 @@ export function PasswordForm({ email }: { email: string }) {
       <Button
         type="submit"
         disabled={saving}
-        className="h-12 w-full bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
+        size="lg" className="w-full"
       >
         {saving ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : "Išsaugoti slaptažodį"}
       </Button>

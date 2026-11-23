@@ -28,7 +28,7 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
           justifyContent: "center",
           padding: 16,
           background: "#F8FAFB",
-          color: "#00323C",
+          color: "#003B4E",
           fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         }}
       >
@@ -47,7 +47,7 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
                 padding: "0 20px",
                 border: 0,
                 borderRadius: 10,
-                background: "#00323C",
+                background: "#003B4E",
                 color: "#FFFFFF",
                 fontSize: 16,
                 fontWeight: 600,
@@ -67,7 +67,7 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
                 alignItems: "center",
                 borderRadius: 10,
                 border: "1px solid #6F8A91",
-                color: "#00323C",
+                color: "#003B4E",
                 fontSize: 16,
                 fontWeight: 600,
                 textDecoration: "none",
