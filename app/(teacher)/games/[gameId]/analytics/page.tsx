@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GameStats } from "@/types/game"
 import type { DetailedStats } from "@/lib/game/detailed-stats"
-import { ArrowLeft, BarChart3, Loader2, MessageSquare } from "lucide-react"
+import { ArrowLeft, BarChart3, Loader2, MessageSquare, RefreshCw } from "lucide-react"
 import Link from "next/link"
 
 interface Reflection {
@@ -129,32 +129,30 @@ export default function GameAnalyticsPage() {
       <Link href={`/games/${gameId}`} className="inline-block mb-6">
         <Button
           variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground"
+          className="-ml-3 h-11 gap-2 text-muted-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Veiklos puslapis
         </Button>
       </Link>
 
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-steam-dark flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary-ink" />
-            Veiklos analitika
-          </h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-steam-dark">Veiklos analitika</h1>
+          {stats?.game_title && <p className="mt-1 text-base text-steam-dark">{stats.game_title}</p>}
           <p className="text-muted-foreground text-sm mt-1">
             Ką aptarti su klase, komandų rezultatai, užduočių statistika ir refleksijos
           </p>
         </div>
         <Button
           variant="outline"
-          size="sm"
+          className="h-11 gap-2 rounded-full px-5"
           onClick={() => {
             setReloadKey((k) => k + 1)
             if (reflections !== null) void loadReflections(true)
           }}
         >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
           Atnaujinti
         </Button>
       </div>
@@ -168,12 +166,12 @@ export default function GameAnalyticsPage() {
       <Tabs defaultValue="stats" onValueChange={(v) => {
         if (v === "reflections") loadReflections()
       }}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="stats" className="gap-2">
+        <TabsList className="mb-6 h-auto">
+          <TabsTrigger value="stats" className="min-h-11 gap-2 px-4">
             <BarChart3 className="h-4 w-4" />
             Statistika
           </TabsTrigger>
-          <TabsTrigger value="reflections" className="gap-2">
+          <TabsTrigger value="reflections" className="min-h-11 gap-2 px-4">
             <MessageSquare className="h-4 w-4" />
             Refleksijos
           </TabsTrigger>
