@@ -1,9 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { ArrowLeft, Search } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { requireRole } from "@/lib/auth/roles"
+import { AccessDeniedError, requireRole } from "@/lib/auth/roles"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -70,7 +71,15 @@ export default async function AdminActivitiesPage(props: {
   searchParams: Promise<{ busena?: string; q?: string; puslapis?: string }>
 }) {
   const supabase = await createClient()
-  await requireRole(supabase, "admin", "super_admin")
+  // The admin layout redirects a facilitator too, but this page renders at
+  // the same time: a thrown denial would be logged as a server error (N-5).
+  // Only the expected denial is turned into a redirect; real failures throw.
+  try {
+    await requireRole(supabase, "admin", "super_admin")
+  } catch (e) {
+    if (e instanceof AccessDeniedError) redirect("/dashboard")
+    throw e
+  }
   const params = await props.searchParams
   const filter = FILTERS.find((f) => f.key === params.busena) ?? FILTERS[0]
   const q = (params.q ?? "").trim().slice(0, 80)

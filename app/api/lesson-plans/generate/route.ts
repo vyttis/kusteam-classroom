@@ -7,6 +7,7 @@ import { getGradesForSubject, getGradesIntersection } from "@/lib/curriculum/sub
 import { MODELS, cachedSystem } from "@/lib/ai/client"
 import { createWithSchemaRetry } from "@/lib/ai/retry"
 import { checkAiRateLimitAsync } from "@/lib/ai/rate-limit"
+import { lessonPlanWarnings } from "@/lib/lesson-plans/checks"
 import { z } from "zod"
 
 const requestSchema = z.object({
@@ -147,7 +148,12 @@ export async function POST(request: Request) {
       { logPrefix: "lesson-plan-generate", maxRetries: 1 },
     )
 
-    return NextResponse.json({ lesson_plan: lessonPlan })
+    // Rule-based notes for the facilitator (stage minutes against the lesson
+    // length, hints that give an answer away). The plan is returned as the
+    // model wrote it; the preview shows the notes.
+    const warnings = lessonPlanWarnings(lessonPlan.stages, parsed.data.duration)
+
+    return NextResponse.json({ lesson_plan: lessonPlan, warnings })
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error)
     console.error("Lesson plan generate error:", errMsg, error)

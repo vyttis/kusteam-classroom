@@ -93,7 +93,7 @@ export function LessonPlanConvertDialog({ planId, stages, open, onOpenChange }: 
       if (data.needs_review) notes.push(`Reikia peržiūros: ${uzduotis(data.needs_review)}.`)
       toast({
         title: `Veikla sukurta: ${uzduotis(data.challenges_created ?? 0)}`,
-        description: notes.length > 0 ? notes.join(" ") : "DI patikrino visus atsakymus.",
+        description: notes.length > 0 ? notes.join(" ") : "DI klaidų atsakymuose nerado. Vis tiek juos peržiūrėkite.",
       })
       onOpenChange(false)
       // Tasks to fix are fixed in the builder; otherwise the overview.

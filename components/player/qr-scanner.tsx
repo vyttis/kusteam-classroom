@@ -70,7 +70,7 @@ export function QRScanner({ onScan }: QRScannerProps) {
     } catch (err) {
       setScanning(false)
       if (err instanceof Error && err.message.includes("Permission")) {
-        setError("Leiskite prieigą prie kameros, kad galėtumėte skenuoti QR kodą")
+        setError("Leiskite prieigą prie kameros, kad galėtumėte nuskaityti QR kodą")
       } else {
         setError("Nepavyko paleisti kameros. Patikrinkite leidimus.")
       }
@@ -102,7 +102,7 @@ export function QRScanner({ onScan }: QRScannerProps) {
           className="w-full h-12 gap-2 border-dashed border-2"
         >
           <Camera className="h-5 w-5" />
-          Skenuoti QR kodą
+          Nuskaityti QR kodą
         </Button>
         {error && (
           <p className="text-xs text-accent-ink text-center">{error}</p>

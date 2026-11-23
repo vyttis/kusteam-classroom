@@ -37,6 +37,7 @@ import { ImageUpload } from "../image-upload"
 import { MapsEmbed } from "@/components/shared/maps-embed"
 import { ChallengePrerequisites } from "../challenge-prerequisites"
 import { AcceptedAnswersField } from "./accepted-answers-field"
+import { proposedAcceptedAnswers } from "./suggestion-payload"
 
 interface ManualTaskEditorProps {
   gameId: string
@@ -102,7 +103,8 @@ function initialForm(challenge: Challenge | null, prefill: AiSuggestion | null):
     type: prefill?.type ?? "text",
     pointsText: String(prefill?.points ?? 100),
     correctAnswer: prefill?.correct_answer ?? "",
-    acceptedAnswers: [],
+    // Spellings the DI proposed stay editable when the suggestion is edited.
+    acceptedAnswers: prefill ? proposedAcceptedAnswers(prefill) : [],
     removeAccepted: false,
     hints: prefill?.hints || [],
     options: prefill?.type === "multiple_choice" && prefill.options ? prefill.options : [],
