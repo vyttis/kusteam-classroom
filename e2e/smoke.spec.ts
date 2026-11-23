@@ -33,7 +33,8 @@ test.describe("canonical host", () => {
     await page.goto(`${CLASSROOM}/dashboard`)
     await expect(page).toHaveURL(/\/vedejui$/)
     await expect(page.getByRole("button", { name: /Google/ })).toBeVisible()
-    await expect(page.getByRole("textbox")).toBeVisible()
+    await expect(page.getByLabel("El. paštas")).toBeVisible()
+    await expect(page.getByLabel("Slaptažodis", { exact: true })).toBeVisible()
   })
 
   test("the participant entry has no horizontal overflow on phones", async ({ page }) => {
