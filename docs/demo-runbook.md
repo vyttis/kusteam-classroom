@@ -36,7 +36,7 @@ Visi 4 turi grąžinti `true`. Jei kuris nors `false`:
 1. Vercel env vars patikrinti: `NEXT_PUBLIC_PLAY_URL=https://play.kusteam.app`
 2. Atidaryti vieną demo žaidimą mokytojo aplinkoje
 3. Žaidimo QR kortelėje URL turi prasidėti `https://play.kusteam.app/play/…`
-4. Mobile iPhone Safari — nuskenuoti QR → patekti į join page (NE login)
+4. Mobile iPhone Safari — nuskaityti QR → patekti į join page (NE login)
 
 ### Pre-generated demo lesson plans
 Sukurti **3 pamokos planus prod'e**:
@@ -49,7 +49,7 @@ Sukurti **3 pamokos planus prod'e**:
 
 Kiekvieną — peržiūrėti, kad matoma:
 - Top-level „Ugdomos kompetencijos" kortelė su badges'ais
-- Per-stage Bloom level badge (pvz., „Bloom: Analizė")
+- Per-stage Bloom level badge (pvz., „Mąstymo lygis: Analizė")
 - Per-stage competency badges
 - `curriculum_link` su konkrečiu BUP ryšiu
 
@@ -134,7 +134,7 @@ Tikslas — kad Vercel funkcijos būtų „šiltos" kai mokytojas paspaus „Gen
    - Klausimas: „Ar QR siunčia į play.kusteam.app?" → taip
 
 6. **Mokinio prisijungimas (mobile)**
-   - Nuskenuoti QR iPhone'u
+   - Nuskaityti QR iPhone'u
    - Komandos vardas: „Audito komanda"
    - Pradėti žaidimą
 

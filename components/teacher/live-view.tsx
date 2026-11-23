@@ -390,7 +390,7 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
                   className="mx-auto"
                 />
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Mokytojai: nuskenuokite ir pateikite prašymą. Patvirtinus gausite laišką.
+                  Mokytojai: nuskaitykite ir pateikite prašymą. Patvirtinus gausite laišką.
                 </p>
               </div>
             )}
