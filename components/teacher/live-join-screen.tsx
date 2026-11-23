@@ -103,7 +103,7 @@ export function LiveJoinScreen({ gameCode, playUrl, joinAddress, teams }: LiveJo
 
         {/* The brand element, once and large: this is the screen a whole class
             sees first. It has its own column, so it never sits under text. */}
-        <SteamRays draw onDark className="hidden h-[40vh] max-h-[26rem] w-auto xl:block" />
+        <SteamRays draw onDark weight={5} className="hidden h-[40vh] max-h-[26rem] w-auto xl:block" />
       </div>
     </section>
   )
