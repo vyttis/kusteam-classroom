@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { tasksVersion } from "@/lib/game/tasks-version"
 import { forParticipant, type HintReveal, type TeamStart } from "@/lib/game/player-hints"
+import { retryLater } from "@/lib/api/retry-later"
 
 // GET /api/play/state?game_code=ABC123 with x-session-token header
 // Single round-trip player state lookup — replaces 3 sequential anon queries.
@@ -73,14 +74,16 @@ export async function GET(request: Request) {
 
   const code = (error as { code?: string }).code
   if (code !== "42883" && code !== "PGRST202") {
-    // Real error, not just "function not deployed"
-    console.error("get_player_game_state RPC error:", error.message)
-    return NextResponse.json({ error: "Serverio klaida" }, { status: 500 })
+    // Real error, not just "function not deployed": the read failed, which
+    // says nothing about the activity or the team. 503 asks the page to try
+    // again; it never answers "team: null" (that would end the session).
+    return retryLater("play/state rpc", error)
   }
 
   // Fallback: raw queries (parallel)
   console.warn("get_player_game_state RPC unavailable — falling back to raw queries. Apply migration 00018.")
   const fallback = await fetchPlayerStateRaw(supabase, gameCode, sessionToken)
+  if ("failed" in fallback) return retryLater(`play/state ${fallback.where}`, fallback.failed)
   return NextResponse.json(forParticipant(fallback, reveals, tasks_version, start), {
     headers: { "Cache-Control": "private, max-age=0, must-revalidate" },
   })
@@ -94,12 +97,16 @@ async function fetchPlayerStateRaw(
   // Status list must mirror the RPC (00022): draft games are visible so the
   // join page can show "not started yet"; paused so a mid-pause refresh
   // doesn't degrade to "game not found".
-  const { data: game } = await supabase
+  const { data: game, error: gameError } = await supabase
     .from("games")
     .select("id, title, description, status, settings")
     .eq("game_code", gameCode)
     .in("status", ["draft", "active", "paused", "finished"])
     .maybeSingle()
+
+  // A failed read is not "no such activity" or "no such team": the page
+  // would show "not found" or drop the team's session.
+  if (gameError) return { failed: gameError, where: "game" }
 
   if (!game) {
     return { game: null }
@@ -138,18 +145,22 @@ async function fetchPlayerStateRaw(
           .eq("session_token", sessionToken)
           .eq("game_id", game.id)
           .maybeSingle()
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
   ])
+
+  if (teamRes.error) return { failed: teamRes.error, where: "team" }
+  if (challengesRes.error) return { failed: challengesRes.error, where: "challenges" }
 
   const team = (teamRes as { data: { id: string; name: string; total_points: number; current_challenge_index: number } | null }).data
   let solved: { challenge_id: string; points_awarded: number }[] = []
 
   if (team) {
-    const { data } = await supabase
+    const { data, error: solvedError } = await supabase
       .from("submissions")
       .select("challenge_id, points_awarded")
       .eq("team_id", team.id)
       .eq("is_correct", true)
+    if (solvedError) return { failed: solvedError, where: "solved" }
     solved = data ?? []
   }
 

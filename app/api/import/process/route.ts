@@ -5,7 +5,7 @@ import { checkAiAllowance, enterAiContext } from "@/lib/ai/usage"
 import { NextResponse } from "next/server"
 import { IMPORT_TEXT_LIMIT } from "@/lib/upload-limits"
 import { z } from "zod"
-import { buildSystemPrompt } from "@/lib/ai/prompt"
+import { buildImportUserMessage, buildSystemPrompt } from "@/lib/ai/prompt"
 import { aiSuggestResponseSchema } from "@/lib/ai/schemas"
 import { getAnthropicClient, MODELS, cachedSystem } from "@/lib/ai/client"
 import { createWithSchemaRetry } from "@/lib/ai/retry"
@@ -105,17 +105,14 @@ export async function POST(request: Request) {
 
     // Generate tasks from document content
     const systemPrompt = buildSystemPrompt()
-    const userMessage = `Veiklos pavadinimas: ${parsed.data.game_title}
-${parsed.data.game_description ? `Veiklos aprašymas: ${parsed.data.game_description}` : ""}
-
-Vedėjas įkėlė dokumentą su mokomąja medžiaga. Pagal šį turinį sugeneruok ${parsed.data.count} komandinės edukacinės veiklos užduotis.
-
-DOKUMENTO TURINYS:
----
-${truncatedText}
----
-
-Sugeneruok ${parsed.data.count} užduotis pagal šį dokumentą. Užduotys turi tikrinti mokinių supratimą apie dokumento turinį.`
+    // The document is untrusted text: buildImportUserMessage delimits it so
+    // it cannot close its own block or pass for instructions.
+    const userMessage = buildImportUserMessage({
+      game_title: parsed.data.game_title,
+      game_description: parsed.data.game_description,
+      document_text: truncatedText,
+      count: parsed.data.count,
+    })
 
     const validatedData = await createWithSchemaRetry(
       {

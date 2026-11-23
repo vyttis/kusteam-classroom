@@ -14,6 +14,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import {
+  EmailNotSentNotice,
+  resendAccountEmail,
+  type AccountEmailResponse,
+} from "@/components/admin/email-not-sent-notice"
 import { Check, Loader2, X } from "lucide-react"
 
 type RequestStatus = "pending" | "approved" | "rejected"
@@ -58,6 +63,10 @@ export function AccessRequestsPanel({ onPendingChange }: { onPendingChange?: (n:
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ row: AccessRequestRow; action: "approve" | "reject" } | null>(null)
   const [note, setNote] = useState("")
+  // An approved request whose email did not go out: shown until it is sent
+  // again or closed, because the row itself leaves the pending list.
+  const [unsent, setUnsent] = useState<{ row: AccessRequestRow; message: string } | null>(null)
+  const [resending, setResending] = useState(false)
 
   const load = useCallback(
     async (status: RequestStatus) => {
@@ -89,12 +98,17 @@ export function AccessRequestsPanel({ onPendingChange }: { onPendingChange?: (n:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(action === "approve" ? { action } : { action, note: note.trim() || undefined }),
       })
-      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+      const data = (await res.json().catch(() => ({}))) as AccountEmailResponse
       if (!res.ok) throw new Error(data.error ?? "Nepavyko.")
-      toast({
-        title: action === "approve" ? "Prašymas patvirtintas" : "Prašymas atmestas",
-        description: data.message,
-      })
+      if (action === "approve" && data.email?.sent === false) {
+        setUnsent({ row, message: data.message ?? "Paskyra sukurta, bet laiškas neišsiųstas." })
+        toast({ title: "Prašymas patvirtintas, bet laiškas neišsiųstas", variant: "destructive" })
+      } else {
+        toast({
+          title: action === "approve" ? "Prašymas patvirtintas" : "Prašymas atmestas",
+          description: data.message,
+        })
+      }
       setRows((prev) => {
         const next = (prev ?? []).filter((r) => r.id !== row.id)
         if (tab === "pending") onPendingChange?.(next.length)
@@ -109,6 +123,24 @@ export function AccessRequestsPanel({ onPendingChange }: { onPendingChange?: (n:
     } finally {
       setBusyId(null)
     }
+  }
+
+  async function resend() {
+    if (!unsent) return
+    setResending(true)
+    const { row } = unsent
+    const data = await resendAccountEmail({ email: row.email, first_name: row.first_name, last_name: row.last_name })
+    setResending(false)
+    if (!data.ok) {
+      toast({ title: "Klaida", description: data.error ?? "Nepavyko.", variant: "destructive" })
+      return
+    }
+    if (data.email?.sent === false) {
+      setUnsent({ row, message: data.message ?? unsent.message })
+      return
+    }
+    toast({ title: "Laiškas išsiųstas", description: data.message })
+    setUnsent(null)
   }
 
   return (
@@ -134,6 +166,16 @@ export function AccessRequestsPanel({ onPendingChange }: { onPendingChange?: (n:
           </TabsList>
         </Tabs>
       </div>
+
+      {unsent && (
+        <EmailNotSentNotice
+          email={unsent.row.email}
+          message={unsent.message}
+          busy={resending}
+          onResend={resend}
+          onDismiss={() => setUnsent(null)}
+        />
+      )}
 
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">

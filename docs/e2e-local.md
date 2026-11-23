@@ -71,6 +71,6 @@ Pastabos:
 - DI: užduočių generavimo, tikrinimo ir pamokų planų. Tam reikėtų mokamo rakto.
 - El. laiškų pristatymo: kvietimų, kodų, slaptažodžio atkūrimo. Pašto serveris nepaleidžiamas.
 - Prisijungimo su Google ir KU STEAM TEAM prisijungimo.
-- Tikrų įrenginių: iPhone profilis yra Chromium su telefono ekranu, o ne Safari. QR kodo skenavimas kamera netikrinamas.
+- Tikrų įrenginių: iPhone profilis yra Chromium su telefono ekranu, o ne Safari. QR kodo nuskaitymas kamera netikrinamas.
 - Apkrovos: trys komandos nėra klasė iš trisdešimties telefonų.
 - Vercel aplinkos: CDN talpyklos, kelių serverio egzempliorių ir Vercel KV ribojimų.

@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { PlayerSession, GameSettings, AchievementType } from "@/types/game"
 import { getPlayerSession, clearPlayerSession, readStored, savePlayerSession } from "@/lib/game/session"
 import { ConnectionBanner, loadRetryDelayMs, useConnection } from "@/components/player/connection"
-import { type GameClock, secondsLeft } from "@/lib/game/clock"
+import { type GameClock, secondsLeft, serverNowMs } from "@/lib/game/clock"
 import { remapTaskIndex } from "@/lib/game/tasks-version"
 import { normalizeNumericAnswer, openedHintCount, sheetKey } from "@/lib/game/play-format"
 import { AnnouncementBanner, type AnnouncementItem } from "@/components/player/announcement-banner"
@@ -581,7 +581,8 @@ export default function PlayPage() {
         // the round trip, and only from a quick one, so network delay or a
         // suspended tab is not mistaken for this device's clock being off.
         const receivedAt = Date.now()
-        const serverNow = data.now ? Date.parse(data.now) : NaN
+        // An answer shared by the CDN is up to 2 s old: Age adds it back.
+        const serverNow = serverNowMs(data.now, res.headers.get("age"))
         if (Number.isFinite(serverNow) && receivedAt - sentAt < 2000) {
           skewMsRef.current = serverNow - (sentAt + receivedAt) / 2
         }

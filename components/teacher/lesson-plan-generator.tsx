@@ -9,6 +9,7 @@ import { getLessonTemplate } from "@/lib/curriculum/lesson-templates"
 import { Switch } from "@/components/ui/switch"
 import { SubjectCombobox } from "@/components/ui/subject-combobox"
 import type { LessonStage } from "@/types/lesson-plan"
+import { lessonPlanWarnings } from "@/lib/lesson-plans/checks"
 import { LessonActivityCard } from "./lesson-activity-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -278,6 +279,14 @@ export function LessonPlanGenerator({ userId }: { userId: string }) {
     }
     return parts.filter(Boolean).join("\n")
   }, [subject, secondarySubject, grade, topicId, isIntegrated])
+
+  // Rule-based notes (stage minutes, hints that give an answer away). They
+  // follow the plan as it is edited, so a fixed stage clears its note, and a
+  // plan restored from this browser gets them too.
+  const planWarnings = useMemo(
+    () => (phase === "preview" ? lessonPlanWarnings(stages, duration) : []),
+    [phase, stages, duration]
+  )
 
   const effectiveTopic = topicId
     ? curriculumTopics.find((t) => t.id === topicId)?.label ?? customTopic
@@ -812,6 +821,19 @@ export function LessonPlanGenerator({ userId }: { userId: string }) {
           <Button variant="outline" size="sm" className="shrink-0" onClick={handleRegenerate}>
             Išmesti
           </Button>
+        </div>
+      )}
+      {planWarnings.length > 0 && (
+        <div
+          role="status"
+          className="rounded-lg border border-highlight/30 bg-highlight/10 px-4 py-3 text-sm text-steam-dark"
+        >
+          <p className="font-medium">Prieš išsaugodami peržiūrėkite</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {planWarnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
         </div>
       )}
       {/* Lesson plan header */}

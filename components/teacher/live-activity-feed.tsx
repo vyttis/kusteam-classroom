@@ -152,6 +152,9 @@ export function LiveActivityFeed({ gameId, variant = "default", hidePoints = fal
       } else if (status === "SUBSCRIBED") {
         setDegraded(false)
         stopPolling()
+        // Teams that joined while the channel was still joining (or during a
+        // gap) are in neither the first read nor the channel: read again.
+        loadRecent().catch(() => {})
       }
     }
 

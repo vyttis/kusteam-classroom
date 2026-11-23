@@ -17,6 +17,11 @@ import { useToast } from "@/hooks/use-toast"
 import type { UserRole, Profile } from "@/types/game"
 import { getRoleLabel } from "@/lib/auth/roles"
 import { SchoolPicker, type SchoolValue } from "@/components/access/school-picker"
+import {
+  EmailNotSentNotice,
+  resendAccountEmail,
+  type AccountEmailResponse,
+} from "@/components/admin/email-not-sent-notice"
 import { UserPlus, Loader2 } from "lucide-react"
 
 interface InviteUserDialogProps {
@@ -33,6 +38,11 @@ export function InviteUserDialog({ currentUserRole, onUserInvited }: InviteUserD
   const [lastName, setLastName] = useState("")
   const [school, setSchool] = useState<SchoolValue | null>(null)
   const [role, setRole] = useState<UserRole>("teacher")
+  // The account was made but its email did not go out: the dialog stays
+  // open with the reason and a "send again" action.
+  const [unsent, setUnsent] = useState<{ email: string; first_name: string; last_name: string; message: string } | null>(
+    null,
+  )
   const { toast } = useToast()
 
   if (currentUserRole !== "super_admin") return null
@@ -62,11 +72,20 @@ export function InviteUserDialog({ currentUserRole, onUserInvited }: InviteUserD
             : {}),
         }),
       })
-      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string; user?: Profile }
+      const data = (await res.json().catch(() => ({}))) as AccountEmailResponse & { user?: Profile }
       if (!res.ok || !data.user) throw new Error(data.error || "Nepavyko sukurti paskyros")
 
-      toast({ title: "Paskyra sukurta", description: data.message })
       onUserInvited(data.user)
+      if (data.email?.sent === false) {
+        setUnsent({
+          email: email.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          message: data.message ?? "Paskyra sukurta, bet laiškas neišsiųstas.",
+        })
+        return
+      }
+      toast({ title: "Paskyra sukurta", description: data.message })
       resetForm()
       setOpen(false)
     } catch (error: unknown) {
@@ -80,10 +99,40 @@ export function InviteUserDialog({ currentUserRole, onUserInvited }: InviteUserD
     }
   }
 
+  async function handleResend() {
+    if (!unsent) return
+    setLoading(true)
+    const data = await resendAccountEmail(unsent)
+    setLoading(false)
+    if (!data.ok) {
+      toast({ title: "Klaida", description: data.error ?? "Bandykite dar kartą", variant: "destructive" })
+      return
+    }
+    if (data.email?.sent === false) {
+      setUnsent({ ...unsent, message: data.message ?? unsent.message })
+      return
+    }
+    toast({ title: "Laiškas išsiųstas", description: data.message })
+    closeDialog()
+  }
+
+  function closeDialog() {
+    setUnsent(null)
+    resetForm()
+    setOpen(false)
+  }
+
   const roles: UserRole[] = ["teacher", "admin", "super_admin"]
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Closing after an unsent email also clears the finished form.
+        if (!next && unsent) closeDialog()
+        else setOpen(next)
+      }}
+    >
       <DialogTrigger asChild>
         <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
           <UserPlus className="h-4 w-4" aria-hidden="true" />
@@ -94,11 +143,23 @@ export function InviteUserDialog({ currentUserRole, onUserInvited }: InviteUserD
         <DialogHeader>
           <DialogTitle className="text-steam-dark">Nauja vedėjo paskyra</DialogTitle>
           <DialogDescription>
-            Žmogus gaus kvietimą el. paštu. Prisijungęs pirmą kartą jis užpildys dalykus ir klases.
+            {unsent
+              ? "Paskyra sukurta, bet žmogus apie ją dar nežino."
+              : "Žmogus gaus kvietimą el. paštu. Prisijungęs pirmą kartą jis užpildys dalykus ir klases."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="mt-2 space-y-4">
+        {unsent && (
+          <EmailNotSentNotice
+            email={unsent.email}
+            message={unsent.message}
+            busy={loading}
+            onResend={handleResend}
+            onDismiss={closeDialog}
+          />
+        )}
+
+        <form onSubmit={handleSubmit} className={unsent ? "hidden" : "mt-2 space-y-4"}>
           <div className="space-y-1.5">
             <Label htmlFor="invite-email">El. paštas</Label>
             <Input
