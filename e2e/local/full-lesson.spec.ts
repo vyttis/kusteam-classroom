@@ -193,11 +193,18 @@ test("the facilitator signs in with email and password", async () => {
   await teacher.getByRole("button", { name: "Prisijungti", exact: true }).click()
 
   await expect(teacher).toHaveURL(/\/dashboard$/)
-  await expect(teacher.getByRole("heading", { name: "Mano veiklos" })).toBeVisible()
+  await expect(teacher).toHaveTitle(/Mano veiklos/)
+  await expect(teacher.getByText(`${account.firstName} ${account.lastName}`).first()).toBeVisible()
+  // A facilitator without activities gets the first-run screen, one with
+  // activities (a second run on the same stack) the list.
+  await expect(
+    teacher.getByRole("heading", { level: 1, name: /^(Pradėkite nuo paruoštos veiklos|Mano veiklos)$/ }),
+  ).toBeVisible()
 })
 
 test("the facilitator creates an activity with a time limit", async () => {
-  await teacher.getByRole("link", { name: "Nauja veikla" }).first().click()
+  // "Kurti nuo nulio" on the first-run screen, "Nauja veikla" above the list.
+  await teacher.getByRole("link", { name: /^(Kurti nuo nulio|Nauja veikla)$/ }).first().click()
   await expect(teacher.getByRole("heading", { name: "Nauja veikla" })).toBeVisible()
 
   await teacher.getByLabel("Veiklos pavadinimas *").fill(ACTIVITY.title)
@@ -635,7 +642,7 @@ test("the analytics page shows the right totals", async () => {
   const card = (label: string) => teacher.getByText(label, { exact: true }).locator("xpath=..")
   await expect(card("Komandos")).toHaveText(/^3\s*Komandos$/)
   await expect(card("Atsakymų iš viso")).toHaveText(/^8\s*Atsakymų iš viso$/)
-  await expect(card("Teisingi atsakymai")).toHaveText(/^7 \(88%\)\s*Teisingi atsakymai$/)
+  await expect(card("Teisingi atsakymai")).toHaveText(/^7 \(88\s?%\)\s*Teisingi atsakymai$/)
 
   const results = teacher.getByRole("region", { name: "Komandų rezultatai" })
   const cells = async (team: string) =>
@@ -666,7 +673,7 @@ test("the results export is a CSV with a BOM and the team names", async () => {
   const lines = file.subarray(3).toString("utf8").split("\n")
   expect(lines).toHaveLength(4)
   expect(lines[0]).toBe(
-    '"Vieta";"Komanda";"Taškai";"Išspręsta užduočių";"Bandymai";"Panaudota užuominų";"Prisijungė";"Paskutinis aktyvumas"',
+    '"Vieta";"Komanda";"Taškai";"Išspręsta užduočių";"Bandymai";"Panaudota užuominų";"Prisijungė";"Paskutinis atsakymas"',
   )
   expect(lines[1]).toMatch(/^"1";"Alfa";"220";"4 \/ 4";"5";"0";/)
   expect(lines[2]).toMatch(/^"2";"Beta";"150";"2 \/ 4";"2";"0";/)

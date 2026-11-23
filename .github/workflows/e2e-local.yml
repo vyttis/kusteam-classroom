@@ -106,7 +106,7 @@ jobs:
         run: |
           docker ps -a --format '{{.Names}}\t{{.Status}}' || true
           for c in $(docker ps -a --format '{{.Names}}' | grep -E 'auth|rest|realtime|kong' || true); do
-            echo "=== $c"; docker logs --tail 60 "$c" 2>&1 || true
+            echo "=== $c"; docker logs --tail 15 "$c" 2>&1 || true
           done
 
       - uses: actions/upload-artifact@v4
