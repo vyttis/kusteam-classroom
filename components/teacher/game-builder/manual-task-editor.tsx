@@ -490,6 +490,11 @@ export function ManualTaskEditor({
       {/* ===== Answer ===== */}
       <section className="space-y-4 border-t border-border pt-5">
         <h3 className={sectionTitle}>Atsakymas</h3>
+        {challenge && !challenge.needs_answer && (
+          <p className="text-sm text-muted-foreground">
+            Teisingas atsakymas išsaugotas ir čia nerodomas. Jei jo nekeisite, jis liks toks pat.
+          </p>
+        )}
 
         {/* Type */}
         <fieldset className="space-y-1.5">
