@@ -1,32 +1,30 @@
 import type { Metadata } from "next"
 import localFont from "next/font/local"
-import { Instrument_Serif } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { MotionProvider } from "@/components/shared/motion-provider"
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+// Metropolis is the STEAM LT Klaipėda typeface: Regular for text, Bold for
+// headings, SemiBold only for interface labels. It is not on Google Fonts,
+// so the files are self-hosted (public domain, see fonts/Metropolis-LICENSE.txt;
+// taken from @fontsource/metropolis 5.3.0). They cover ą č ę ė į š ų ū ž.
+const metropolis = localFont({
+  src: [
+    { path: "./fonts/Metropolis-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Metropolis-RegularItalic.woff2", weight: "400", style: "italic" },
+    { path: "./fonts/Metropolis-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/Metropolis-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-metropolis",
+  display: "swap",
+  fallback: ["system-ui", "-apple-system", "Segoe UI", "Arial", "sans-serif"],
 })
 
+// Activity codes and other fixed-width text.
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
   weight: "100 900",
-})
-
-// Editorial display serif — used for landing hero / section headlines.
-// Instrument Serif is a contemporary humanist serif with optical-size feel,
-// pairs naturally with Geist Sans (geometric grotesque) on landing pages
-// and supports full Latin Extended (LT diacritics ąčęėįšųūž).
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin", "latin-ext"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-display",
-  display: "swap",
 })
 
 // Canonical public address of the classroom; .vercel.app hosts are
@@ -80,7 +78,7 @@ export default function RootLayout({
   return (
     <html lang="lt" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} font-sans antialiased`}
+        className={`${metropolis.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <MotionProvider>
           {children}

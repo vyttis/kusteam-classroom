@@ -42,7 +42,7 @@ export function AdminNav({ superAdmin, pendingTemplates }: AdminNavProps) {
               >
                 {item.label}
                 {item.count ? (
-                  <span className="rounded-full bg-accent px-1.5 text-xs font-semibold leading-5 text-white">
+                  <span className="rounded-full bg-accent-ink px-1.5 text-xs font-semibold leading-5 text-white">
                     <span className="sr-only">laukia </span>
                     {item.count}
                   </span>

@@ -2,42 +2,26 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { motion, AnimatePresence } from "framer-motion"
-import {
-  Medal,
-  Crown,
-  ArrowLeft,
-  Users,
-  Star,
-  Loader2,
-} from "lucide-react"
+import { motion, useReducedMotion } from "framer-motion"
+import { ArrowLeft, BarChart3, Crown, Loader2, SearchX, Star, Users } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 import type { LeaderboardResponse, LeaderboardTeam } from "@/lib/game/leaderboard"
 import { getPlayerSession } from "@/lib/game/session"
 import { pluralizeLt } from "@/lib/utils"
+import { SteamRays } from "@/components/brand/steam-rays"
 import { AchievementBadge } from "@/components/player/achievement-badge"
 import { AnnouncementBanner, type AnnouncementItem } from "@/components/player/announcement-banner"
 import { ConnectionBanner, useConnection } from "@/components/player/connection"
+import { sharedRanks } from "@/components/player/play-progress"
+import { SCREEN, SECONDARY_BUTTON, StateScreen } from "@/components/player/play-ui"
 
-const podiumColors = [
-  "from-highlight/30 to-highlight/5 border-highlight/40",
-  "from-muted to-muted/30 border-border",
-  "from-accent/20 to-accent/5 border-accent/30",
-]
-
-const podiumIcons = [
-  <Crown key="1" className="h-5 w-5 text-highlight-ink" />,
-  <Medal key="2" className="h-5 w-5 text-muted-foreground" />,
-  <Medal key="3" className="h-5 w-5 text-accent-ink" />,
-]
+const MAX_BADGES = 4
 
 export default function LeaderboardPage() {
   const params = useParams()
   const gameCode = (params.gameCode as string).toUpperCase()
+  const reduce = useReducedMotion()
 
   const [teams, setTeams] = useState<LeaderboardTeam[]>([])
   const [loading, setLoading] = useState(true)
@@ -149,148 +133,176 @@ export default function LeaderboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-ink" />
+      <div className={`${SCREEN} flex items-center justify-center`} role="status">
+        <Loader2 className="h-8 w-8 text-foreground motion-safe:animate-spin" aria-hidden="true" />
+        <span className="sr-only">Kraunama...</span>
       </div>
     )
   }
 
   if (notFound || leaderboardDisabled) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-sm text-center">
-          <Users className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-          <h1 className="text-xl font-bold text-steam-dark mb-2">
-            {notFound ? "Veikla nerasta" : "Rezultatų lentelė išjungta"}
-          </h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            {notFound
-              ? `Kodas ${gameCode} neatitinka jokios veiklos.`
-              : "Vedėjas išjungė rezultatų lentelę šioje veikloje."}
-          </p>
-          <Link href={notFound ? "/play" : `/play/${gameCode}/play`}>
-            <Button variant="outline" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
+      <StateScreen
+        icon={notFound ? SearchX : BarChart3}
+        tone="info"
+        title={notFound ? "Veikla nerasta" : "Rezultatų lentelė išjungta"}
+        actions={
+          <Button asChild variant="outline" className={SECONDARY_BUTTON}>
+            <Link href={notFound ? "/play" : `/play/${gameCode}/play`}>
+              <ArrowLeft aria-hidden="true" />
               {notFound ? "Įvesti kitą kodą" : "Grįžti į veiklą"}
-            </Button>
-          </Link>
-        </div>
-      </div>
+            </Link>
+          </Button>
+        }
+      >
+        <p>
+          {notFound
+            ? `Kodas ${gameCode} neatitinka jokios veiklos.`
+            : "Vedėjas išjungė rezultatų lentelę šioje veikloje."}
+        </p>
+      </StateScreen>
     )
   }
 
+  // Teams tied on points share a place; a team without points has none
+  // yet, so nobody wears a crown before anyone has scored.
+  const ranks = sharedRanks(teams)
+  const myIndex = teams.findIndex((team) => team.id === myTeamId)
+  const myRank = myIndex >= 0 ? ranks[myIndex] : null
+
   return (
-    <div className="min-h-screen p-4 pb-8">
+    <div className={`${SCREEN} px-4 pb-24 pt-3`}>
       <ConnectionBanner offline={offline} />
       <div className="max-w-lg mx-auto">
         <AnnouncementBanner latest={announcement} />
-        <div className="flex items-center justify-between mb-6">
-          <Link href={`/play/${gameCode}/play`}>
-            <Button variant="ghost" size="sm" className="gap-1">
-              <ArrowLeft className="h-4 w-4" />
-              Veikla
-            </Button>
+        <div className="mb-4 flex min-h-11 items-center justify-between">
+          <Link
+            href={`/play/${gameCode}/play`}
+            className="-ml-3 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-base font-bold text-foreground hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            Veikla
           </Link>
-          <Badge variant="outline" className="font-mono tracking-wider">{gameCode}</Badge>
+          <span className="rounded-full border-2 border-foreground/25 bg-white px-3 py-0.5 font-mono text-sm font-bold tracking-wider text-foreground">
+            {gameCode}
+          </span>
         </div>
 
-        <div className="text-center mb-8">
-          <Image src="/illustrations/trophy.svg" alt="" width={128} height={128} className="mx-auto mb-3" />
-          <h1 className="text-2xl font-bold text-steam-dark">Rezultatų lentelė</h1>
-          <div className="flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span>{teams.length} {pluralizeLt(teams.length, "komanda", "komandos", "komandų")}</span>
-          </div>
-          <div className="flex items-center justify-center gap-1 mt-1">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs text-muted-foreground">Atnaujinama kas kelias sekundes</span>
+        <div className="mb-5 flex items-center gap-3">
+          <SteamRays className="h-12 w-auto shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold leading-tight text-foreground">Rezultatų lentelė</h1>
+            <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-4 w-4" aria-hidden="true" />
+                <span>
+                  {teams.length} {pluralizeLt(teams.length, "komanda", "komandos", "komandų")}
+                </span>
+              </span>
+              <span aria-hidden="true">&middot;</span>
+              <span>atnaujinama pati</span>
+            </p>
           </div>
         </div>
+
+        {myIndex >= 0 && (
+          <p className="mb-3 text-base font-bold text-foreground" role="status">
+            {myRank
+              ? `Jūsų vieta: ${myRank} iš ${teams.length}`
+              : "Jūsų komanda dar be taškų. Vieta atsiras po pirmo teisingo atsakymo."}
+          </p>
+        )}
 
         {teams.length > 0 ? (
-          <div className="space-y-2">
-            <AnimatePresence>
-              {teams.map((team, index) => {
-                const isMe = team.id === myTeamId
-                const isTop3 = index < 3
+          <ol className="space-y-2">
+            {teams.map((team, index) => {
+              const isMe = team.id === myTeamId
+              const rank = ranks[index]
+              const visible = team.achievements.slice(0, MAX_BADGES)
+              const overflow = team.achievements.length - visible.length
 
-                return (
-                  <motion.div
-                    key={team.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
+              return (
+                // Rows glide to their new place when the order changes.
+                <motion.li
+                  key={team.id}
+                  layout={reduce ? false : "position"}
+                  transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 34 }}
+                  aria-current={isMe ? "true" : undefined}
+                  className={`flex items-center gap-3 rounded-2xl border-2 bg-white p-3.5 ${
+                    isMe ? "border-foreground shadow-[4px_4px_0_0_hsl(var(--primary))]" : "border-transparent"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-lg font-bold text-foreground">{team.name}</span>
+                      {isMe && (
+                        <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-xs font-bold text-background">
+                          Jūs
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{team.solved} užd. išspręsta</p>
+                    {visible.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                        {visible.map((a) => (
+                          <AchievementBadge key={a.id} type={a.type} size="sm" />
+                        ))}
+                        {overflow > 0 && (
+                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-bold text-foreground">
+                            +{overflow}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* The place: shown first, read after the name (the order
+                      a screen reader and the lesson test follow). */}
+                  <div
+                    className={`relative order-first flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold tabular-nums ${
+                      rank === 1
+                        ? "bg-highlight text-highlight-foreground"
+                        : rank !== null && rank <= 3
+                          ? "border-2 border-highlight bg-white text-foreground"
+                          : "bg-muted text-foreground"
+                    }`}
                   >
-                    <Card className={`border transition-all overflow-hidden ${
-                      isMe
-                        ? "border-primary/40 bg-primary/5 shadow-md shadow-primary/10"
-                        : isTop3
-                        ? `bg-gradient-to-r ${podiumColors[index]}`
-                        : "border-border/50 bg-white"
-                    }`}>
-                      <CardContent className="p-3.5 flex items-start gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                          isTop3 ? "bg-white shadow-sm" : "bg-muted/50 text-muted-foreground"
-                        }`}>
-                          {isTop3 ? podiumIcons[index] : index + 1}
-                        </div>
+                    {rank === 1 && (
+                      <Crown
+                        className="absolute -top-2.5 left-1/2 h-4 w-4 -translate-x-1/2 fill-highlight text-foreground"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {rank !== null ? (
+                      <>
+                        <span aria-hidden="true">{rank}</span>
+                        <span className="sr-only">{rank} vieta</span>
+                      </>
+                    ) : (
+                      <>
+                        <span aria-hidden="true" className="h-0.5 w-3 rounded-full bg-foreground/40" />
+                        <span className="sr-only">dar be vietos</span>
+                      </>
+                    )}
+                  </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`font-semibold truncate ${isMe ? "text-primary-ink" : "text-steam-dark"}`}>
-                              {team.name}
-                            </span>
-                            {isMe && (
-                              <Badge variant="outline" className="text-xs px-1.5 py-0 border-primary/30 text-primary-ink shrink-0">
-                                Jūs
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {team.solved} užd. išspręsta
-                          </p>
-                          {(() => {
-                            const achievements = team.achievements
-                            const MAX_VISIBLE = 4
-                            const visible = achievements.slice(0, MAX_VISIBLE)
-                            const overflow = achievements.length - visible.length
-                            if (achievements.length === 0) return null
-                            return (
-                              <div className="flex items-center flex-wrap gap-1 mt-1.5">
-                                {visible.map((a) => (
-                                  <AchievementBadge key={a.id} type={a.type} size="sm" />
-                                ))}
-                                {overflow > 0 && (
-                                  <span className="text-xs font-bold text-muted-foreground bg-muted/60 rounded-full px-1.5 py-0.5">
-                                    +{overflow}
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })()}
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <div className="flex items-center gap-1 justify-end">
-                            <Star className="h-3.5 w-3.5 text-highlight-ink shrink-0" />
-                            <span className="font-bold text-lg text-steam-dark tabular-nums">{team.total_points}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {pluralizeLt(team.total_points, "taškas", "taškai", "taškų")}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )
-              })}
-            </AnimatePresence>
-          </div>
+                  <div className="shrink-0 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Star className="h-4 w-4 shrink-0 fill-highlight text-foreground" aria-hidden="true" />
+                      <span className="text-xl font-bold text-foreground tabular-nums">{team.total_points}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {pluralizeLt(team.total_points, "taškas", "taškai", "taškų")}
+                    </p>
+                  </div>
+                </motion.li>
+              )
+            })}
+          </ol>
         ) : (
-          <div className="text-center py-12">
-            <Users className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">Dar nėra prisijungusių komandų</p>
+          <div className="rounded-2xl border border-border bg-white px-4 py-10 text-center">
+            <Users className="mx-auto mb-3 h-10 w-10 text-foreground/30" aria-hidden="true" />
+            <p className="text-base text-muted-foreground">Dar nėra prisijungusių komandų</p>
           </div>
         )}
       </div>

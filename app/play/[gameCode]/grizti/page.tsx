@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Link2Off, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { SCREEN, SECONDARY_BUTTON, StateScreen } from "@/components/player/play-ui"
 import { STORAGE_BLOCKED_MESSAGE, canStorePlayerSession, clearPlayerSession, savePlayerSession } from "@/lib/game/session"
 
 type State = { kind: "working" } | { kind: "error"; message: string }
@@ -83,30 +84,30 @@ export default function RejoinPage() {
 
   if (state.kind === "working") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-4 text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-ink" aria-hidden="true" />
-        <p role="status">Grąžiname jus į komandą...</p>
+      <div className={`${SCREEN} flex flex-col items-center justify-center gap-3 p-4`}>
+        <Loader2 className="h-8 w-8 text-foreground motion-safe:animate-spin" aria-hidden="true" />
+        <p role="status" className="text-base text-muted-foreground">
+          Grąžiname jus į komandą...
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-sm text-center">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-          <AlertCircle className="h-10 w-10 text-accent-ink" aria-hidden="true" />
-        </div>
-        <h1 className="text-xl font-bold text-steam-dark mb-2">Grįžti nepavyko</h1>
-        <p className="text-muted-foreground mb-6" role="alert">
-          {state.message}
-        </p>
-        <Link href="/prisijungti">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+    <StateScreen
+      icon={Link2Off}
+      tone="wait"
+      title="Grįžti nepavyko"
+      actions={
+        <Button asChild variant="outline" className={SECONDARY_BUTTON}>
+          <Link href="/prisijungti">
+            <ArrowLeft aria-hidden="true" />
             Įvesti veiklos kodą
-          </Button>
-        </Link>
-      </div>
-    </div>
+          </Link>
+        </Button>
+      }
+    >
+      <p role="alert">{state.message}</p>
+    </StateScreen>
   )
 }

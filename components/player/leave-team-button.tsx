@@ -16,32 +16,40 @@ export function LeaveTeamButton({ onLeave }: { onLeave: () => void }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="text-xs text-muted-foreground/70 hover:text-accent-ink transition-colors inline-flex items-center gap-1"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
-        <LogOut className="h-3 w-3" aria-hidden="true" />
+        <LogOut className="h-4 w-4" aria-hidden="true" />
         Išeiti
       </button>
     )
   }
 
+  // "Likti" is the filled button and has the focus: leaving is never the
+  // default.
   return (
-    <span role="group" aria-label="Išeiti iš komandos?" className="inline-flex flex-wrap items-center justify-center gap-2 text-xs">
-      <span className="text-steam-dark">Išeiti iš komandos? Grąžinti galės tik vedėjas.</span>
-      <button
-        type="button"
-        onClick={onLeave}
-        className="rounded px-2 py-1 font-medium text-accent-ink hover:bg-accent/10"
-      >
-        Taip, išeiti
-      </button>
-      <button
-        type="button"
-        autoFocus
-        onClick={() => setAsking(false)}
-        className="rounded px-2 py-1 font-medium text-steam-dark hover:bg-muted"
-      >
-        Likti
-      </button>
-    </span>
+    <div
+      role="group"
+      aria-label="Išeiti iš komandos?"
+      className="mx-auto mt-2 max-w-sm rounded-2xl border border-border bg-white p-4 text-center"
+    >
+      <p className="text-base text-foreground">Išeiti iš komandos? Grąžinti galės tik vedėjas.</p>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        <button
+          type="button"
+          autoFocus
+          onClick={() => setAsking(false)}
+          className="inline-flex min-h-11 items-center rounded-full bg-foreground px-6 text-base font-bold text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Likti
+        </button>
+        <button
+          type="button"
+          onClick={onLeave}
+          className="inline-flex min-h-11 items-center rounded-full px-4 text-base text-foreground underline underline-offset-4 hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Taip, išeiti
+        </button>
+      </div>
+    </div>
   )
 }

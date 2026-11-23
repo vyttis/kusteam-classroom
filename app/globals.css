@@ -2,98 +2,139 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * STEAM LT Klaipėda identity (brand book; kusteam-ai-lab/docs/DESIGN-SYSTEM.md).
+ *
+ * Five brand colours, exact:
+ *   dark blue #003B4E   pink #FF306D   blue #008CB5   green #00D99B   yellow #FFCE4E
+ * They are for the ray element and for surfaces. Text is black, white or
+ * (headings, text on a brand surface) dark blue. Ratios below are WCAG 2.x
+ * contrast, checked by tests/contrast-tokens.test.ts:
+ *
+ *   surface            text on it             ratio
+ *   green  --primary   dark blue              6.6:1   (white 1.8:1, never)
+ *   yellow --highlight dark blue              8.2:1   (white 1.5:1, never)
+ *   pink   --accent    black                  5.9:1   (white 3.6:1, large text only)
+ *   blue   --secondary black                  5.4:1   (white 3.9:1, large text only)
+ *   dark blue          white 12.1:1, green 6.6:1, yellow 8.2:1
+ *
+ * The -ink variants are darker cuts of a ray colour for the rare coloured
+ * label or icon on a light surface, and for a solid fill under white text
+ * (at least 5.7:1 on white, 4.6:1 on a 20% tint of their own colour).
+ * In a dark block they flip to light cuts that read on dark blue.
+ */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 186 100% 12%;
+    /* Body text is near-black (18.5:1); headings may use steam-dark. */
+    --foreground: 195 40% 7%;
 
     --card: 0 0% 100%;
-    --card-foreground: 186 100% 12%;
+    --card-foreground: 195 40% 7%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 186 100% 12%;
+    --popover-foreground: 195 40% 7%;
 
-    --primary: 163 100% 41%;
-    /* Navy on brand green: 6.9:1 (white was 2:1). */
-    --primary-foreground: 186 100% 12%;
-    /* Darker green for green text on light surfaces: 5.4:1 on white. */
-    --primary-ink: 163 100% 24%;
+    /* Green #00D99B under dark blue text. */
+    --primary: 162.9 100% 42.5%;
+    --primary-foreground: 194.6 100% 15.3%;
+    --primary-ink: 163 100% 23%;
 
-    --secondary: 193 100% 35%;
-    --secondary-foreground: 0 0% 100%;
-    /* Darker blue for blue text on light and blue-tinted surfaces: 5.6:1 on white. */
-    --secondary-ink: 193 100% 28%;
+    /* Blue #008CB5. */
+    --secondary: 193.6 100% 35.5%;
+    --secondary-foreground: 0 0% 0%;
+    --secondary-ink: 193 100% 27%;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 20% 38%;
+    --muted: 192 26% 95%;
+    /* 7.6:1 on white, 7.0:1 on the muted surface. */
+    --muted-foreground: 195 12% 32%;
 
-    --accent: 343 95% 57%;
-    --accent-foreground: 0 0% 100%;
-    /* Darker pink for pink text on light and pink-tinted surfaces: 5.5:1 on white. */
-    --accent-ink: 343 95% 42%;
+    /* Pink #FF306D. */
+    --accent: 342.3 100% 59.4%;
+    --accent-foreground: 0 0% 0%;
+    --accent-ink: 342 90% 40%;
 
-    --highlight: 43 95% 63%;
-    --highlight-foreground: 186 100% 12%;
-    /* Darker amber for yellow-tinted text on light surfaces (5.7:1 on white). */
-    --highlight-ink: 36 90% 30%;
+    /* Yellow #FFCE4E under dark blue text. */
+    --highlight: 43.4 100% 65.3%;
+    --highlight-foreground: 194.6 100% 15.3%;
+    --highlight-ink: 40 95% 27%;
+
+    /* Text on a solid -ink fill: white here, dark blue in a dark block. */
+    --ink-foreground: 0 0% 100%;
 
     /* Errors and destructive actions: a red of their own, apart from the
-       pink CTA accent (6.5:1 with white text, 6.2:1 on the muted surface). */
+       pink ray (6.5:1 with white text, 5.9:1 as text on the muted surface). */
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    /* Focus ring: dark, so it shows on the green buttons and on white;
-       the white ring offset keeps it visible on dark sections too. */
-    --ring: 189 100% 12%;
+    --border: 194 22% 88%;
+    /* Edge of a control (input, select, outline button): 3.1:1 on white. */
+    --input: 194 20% 55%;
+    /* Focus ring: dark blue, 12:1 on white; the white ring offset keeps it
+       visible on the dark blue and coloured surfaces. */
+    --ring: 194.6 100% 15.3%;
 
     --radius: 0.75rem;
 
-    --success: 163 100% 41%;
-    --success-foreground: 0 0% 100%;
+    --success: 162.9 100% 42.5%;
+    --success-foreground: 194.6 100% 15.3%;
+
+    /* Motion (see "Motion" below). */
+    --motion-fast: 120ms;
+    --motion-base: 220ms;
+    --motion-slow: 420ms;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   }
 
+  /* Dark block (projector, dark sections): dark blue ground, white text. */
   .dark {
-    --background: 186 100% 12%;
-    --foreground: 210 20% 98%;
+    --background: 194.6 100% 15.3%;
+    --foreground: 0 0% 100%;
 
-    --card: 187 100% 10%;
-    --card-foreground: 210 20% 98%;
+    --card: 195 100% 11%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 187 100% 10%;
-    --popover-foreground: 210 20% 98%;
+    --popover: 195 100% 11%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 163 100% 41%;
-    /* Navy on brand green: 6.9:1 (white was 2:1). */
-    --primary-foreground: 186 100% 12%;
-    /* Darker green for green text on light surfaces: 5.4:1 on white. */
-    --primary-ink: 163 100% 24%;
+    --primary: 162.9 100% 42.5%;
+    --primary-foreground: 194.6 100% 15.3%;
+    /* The green itself reads on dark blue: 6.6:1. */
+    --primary-ink: 162.9 100% 42.5%;
 
-    --secondary: 193 100% 35%;
-    --secondary-foreground: 0 0% 100%;
-    /* Darker blue for blue text on light and blue-tinted surfaces: 5.6:1 on white. */
-    --secondary-ink: 193 100% 28%;
+    --secondary: 193.6 100% 35.5%;
+    --secondary-foreground: 0 0% 0%;
+    /* Lighter blue: 6.3:1 on dark blue (the brand blue is 3.1:1). */
+    --secondary-ink: 193 80% 62%;
 
-    --muted: 186 60% 18%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 195 60% 22%;
+    /* 6.4:1 on dark blue, 5.2:1 on the muted surface. */
+    --muted-foreground: 195 25% 72%;
 
-    --accent: 343 95% 57%;
-    --accent-foreground: 0 0% 100%;
-    /* Darker pink for pink text on light and pink-tinted surfaces: 5.5:1 on white. */
-    --accent-ink: 343 95% 42%;
+    --accent: 342.3 100% 59.4%;
+    --accent-foreground: 0 0% 0%;
+    /* Lighter pink: 5.7:1 on dark blue (the brand pink is 3.4:1). */
+    --accent-ink: 342 100% 78%;
 
-    --highlight: 43 95% 63%;
-    --highlight-foreground: 186 100% 12%;
-    /* Darker amber for yellow-tinted text on light surfaces (5.7:1 on white). */
-    --highlight-ink: 36 90% 30%;
+    --highlight: 43.4 100% 65.3%;
+    --highlight-foreground: 194.6 100% 15.3%;
+    /* The yellow itself reads on dark blue: 8.2:1. */
+    --highlight-ink: 43.4 100% 65.3%;
+
+    --ink-foreground: 194.6 100% 15.3%;
 
     --destructive: 0 63% 31%;
-    --destructive-foreground: 210 20% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 186 40% 22%;
-    --input: 186 40% 22%;
-    --ring: 163 100% 41%;
+    --border: 195 45% 26%;
+    --input: 195 40% 45%;
+    /* Yellow is the action colour on dark: 8.2:1. */
+    --ring: 43.4 100% 65.3%;
+
+    --success: 162.9 100% 42.5%;
+    --success-foreground: 194.6 100% 15.3%;
   }
 }
 
@@ -104,7 +145,30 @@
 
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  /* Metropolis has two voices: Regular for text, Bold for headings. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 700;
+  }
+
+  h1,
+  h2 {
+    letter-spacing: -0.015em;
+  }
+
+  /* Every control shows keyboard focus, also the ones written without a
+     ring utility (plain links, raw buttons). Two tones, so it reads on
+     white and on the dark blue: a white band, then the ring colour.
+     :where() keeps specificity at zero; ring utilities still win. */
+  :where(a, button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px hsl(0 0% 100%);
   }
 }
 
@@ -117,63 +181,6 @@
     text-wrap: pretty;
   }
 
-  .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/20;
-  }
-
-  .glass-dark {
-    @apply bg-black/20 backdrop-blur-xl border border-white/10;
-  }
-
-  .gradient-primary {
-    @apply bg-gradient-to-r from-primary to-secondary;
-  }
-
-  .gradient-accent {
-    @apply bg-gradient-to-r from-accent to-highlight;
-  }
-
-  .gradient-hero {
-    @apply bg-gradient-to-br from-steam-dark via-steam-dark to-secondary/30;
-  }
-
-  /* Editorial primitives — display serif italic for inline emphasis */
-  .font-display-italic {
-    font-family: var(--font-display, Georgia), serif;
-    font-style: italic;
-    font-weight: 400;
-  }
-
-  /* Hand-drawn underline (educator-friendly "marker" look) */
-  .marker-underline {
-    background-image: linear-gradient(transparent 60%, hsl(var(--highlight) / 0.45) 60%, hsl(var(--highlight) / 0.45) 92%, transparent 92%);
-    background-position: 0 0.05em;
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    padding-bottom: 0.05em;
-  }
-
-  .marker-underline-pink {
-    background-image: linear-gradient(transparent 65%, hsl(var(--accent) / 0.35) 65%, hsl(var(--accent) / 0.35) 95%, transparent 95%);
-  }
-
-  .marker-underline-green {
-    background-image: linear-gradient(transparent 65%, hsl(var(--primary) / 0.3) 65%, hsl(var(--primary) / 0.3) 95%, transparent 95%);
-  }
-
-  /* Paper / notebook texture for editorial sections */
-  .paper-grid {
-    background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-
-  .paper-dots {
-    background-image: radial-gradient(hsl(var(--border) / 0.6) 1px, transparent 1px);
-    background-size: 20px 20px;
-  }
-
   /* Geometric construction lines — echoes STEAM logo's intersecting strokes */
   .construction-lines {
     background-image:
@@ -182,17 +189,10 @@
     background-size: 48px 48px;
   }
 
-  /* Numeral with optical correction for display serif weight */
+  /* Numerals that line up in columns and counters */
   .numeral-display {
-    font-family: var(--font-display, Georgia), serif;
     font-feature-settings: "tnum" 1, "lnum" 1;
     font-variant-numeric: tabular-nums lining-nums;
-  }
-
-  /* Subtle text-glow used on dark hero (replaces gradient text — more refined) */
-  .text-glow-primary {
-    color: hsl(var(--primary));
-    text-shadow: 0 0 32px hsl(var(--primary) / 0.35);
   }
 
   /* Animated underline accent — draws on viewport enter */
@@ -214,15 +214,6 @@
 
   .animate-marquee {
     animation: marquee 28s linear infinite;
-  }
-
-  @keyframes float-slow {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); }
-  }
-
-  .animate-float-slow {
-    animation: float-slow 6s ease-in-out infinite;
   }
 
   /* Entrance of the first screen. CSS only, so the content is in the page
@@ -269,11 +260,78 @@
   /* "Reduce motion": no endless or decorative movement. */
   @media (prefers-reduced-motion: reduce) {
     .animate-marquee,
-    .animate-float-slow,
     .draw-underline {
       animation: none;
     }
   }
+}
+
+/*
+ * Motion. One shared vocabulary for feedback that answers an action;
+ * DESIGN-SYSTEM.md "Judesys": one deliberate moment per page, nothing loops.
+ *
+ * Tokens (on :root):
+ *   --motion-fast 120ms   hover, press, colour change
+ *   --motion-base 220ms   an element appearing or changing state
+ *   --motion-slow 420ms   the one emphasised moment (a result, a new place)
+ *   --ease-out            things arriving          --ease-in-out  things moving
+ *   --ease-spring         a small overshoot for a confirmed result
+ *
+ * Classes (each plays once; add the class when the event happens):
+ *   .motion-pop-in    a correct answer, an earned badge: scales up into place
+ *   .motion-shake     a wrong answer or rejected input: a short sideways shake
+ *   .motion-rise-in   a new row in a list (feed, leaderboard): rises 8px, fades in
+ *   .motion-fade-in   a panel or message replacing another: fades in
+ * Stagger rows with style="animation-delay: ...". Add
+ * style="--motion-shake-distance: 4px" for a smaller shake.
+ *
+ * All of it sits inside prefers-reduced-motion: no-preference. With
+ * "reduce motion" the classes do nothing and the element is simply there.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes motion-pop-in {
+    from { opacity: 0; transform: scale(0.86); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes motion-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(calc(var(--motion-shake-distance, 6px) * -1)); }
+    40% { transform: translateX(var(--motion-shake-distance, 6px)); }
+    60% { transform: translateX(calc(var(--motion-shake-distance, 6px) * -0.6)); }
+    80% { transform: translateX(calc(var(--motion-shake-distance, 6px) * 0.4)); }
+  }
+
+  @keyframes motion-rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes motion-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .motion-pop-in {
+    animation: motion-pop-in var(--motion-slow) var(--ease-spring) both;
+  }
+
+  .motion-shake {
+    animation: motion-shake var(--motion-slow) var(--ease-in-out) both;
+  }
+
+  .motion-rise-in {
+    animation: motion-rise-in var(--motion-base) var(--ease-out) both;
+  }
+
+  .motion-fade-in {
+    animation: motion-fade-in var(--motion-base) ease-out both;
+  }
+}
+
+/* Headings are Bold: a heading marked semibold still gets the Bold cut. */
+:where(h1, h2, h3).font-semibold {
+  font-weight: 700;
 }
 
 /* Print styles for the game report (print-to-PDF) */

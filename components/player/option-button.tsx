@@ -1,12 +1,13 @@
 "use client"
 
-import { XCircle } from "lucide-react"
+import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 /**
  * One multiple-choice option. Green means correct elsewhere on the page, so
- * a choice is marked in the dark brand colour and a wrong answer in red with
- * a cross (as Quizlet and Brainly do), never in green.
+ * a choice is marked in the dark brand colour, never in green. A wrong
+ * choice keeps its place with a cross and a dashed outline: marked, not
+ * shouted at.
  */
 export function OptionButton({
   option,
@@ -31,21 +32,17 @@ export function OptionButton({
       variant="outline"
       aria-pressed={chosen}
       disabled={disabled}
-      className={`w-full justify-start items-start h-auto min-h-12 py-3 px-4 text-left whitespace-normal break-words border-2 ${
+      className={`h-auto min-h-12 w-full items-start justify-start whitespace-normal break-words rounded-xl border-2 px-4 py-3 text-left text-base font-normal shadow-none ${
         markedWrong
-          ? "border-accent bg-accent/5 text-steam-dark hover:bg-accent/10"
+          ? "border-dashed border-foreground/50 bg-muted text-foreground hover:bg-muted"
           : chosen
-            ? "border-steam-dark bg-steam-dark text-white hover:bg-steam-dark/90 hover:text-white"
-            : ""
+            ? "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+            : "border-foreground/25 bg-white text-foreground"
       }`}
       onClick={() => onChoose(option)}
     >
-      <span
-        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold mr-3 shrink-0 mt-0.5 ${
-          markedWrong ? "border-accent text-accent-ink" : ""
-        }`}
-      >
-        {markedWrong ? <XCircle className="h-4 w-4" aria-hidden /> : String.fromCharCode(65 + index)}
+      <span className="mr-3 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-current text-xs font-bold">
+        {markedWrong ? <X className="h-4 w-4" aria-hidden /> : String.fromCharCode(65 + index)}
       </span>
       <span className="flex-1 leading-relaxed">{option}</span>
       {markedWrong && <span className="sr-only"> (neteisingas atsakymas)</span>}

@@ -42,6 +42,12 @@ interface GameStatusActionsProps {
   // In the builder a task opens in the editor on the same page; elsewhere
   // the dialog links to the builder.
   onOpenTask?: (taskId: string) => void
+  /**
+   * "page" on the activity page, "bar" in the class screen's dark control
+   * bar. In both, "Baigti veiklą" is set apart from pause and resume: it
+   * comes last in the row, behind a divider, and is the quieter button.
+   */
+  variant?: "page" | "bar"
 }
 
 export function GameStatusActions({
@@ -51,7 +57,9 @@ export function GameStatusActions({
   tasksNeedingAnswer = [],
   aiTasksToReview = [],
   onOpenTask,
+  variant = "page",
 }: GameStatusActionsProps) {
+  const bar = variant === "bar"
   const [loading, setLoading] = useState(false)
   const [showActivateDialog, setShowActivateDialog] = useState(false)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
@@ -124,15 +132,25 @@ export function GameStatusActions({
     }
   }
 
+  // The wrapper is laid out by the parent's flex row (the status buttons use
+  // `display: contents`), so `order-last` moves the destructive action to
+  // the end of the whole row, away from pause and resume.
   const finishDialog = (
+    <span
+      className={`order-last flex items-center sm:border-l sm:pl-3 ${bar ? "ml-auto border-white/20" : "border-border sm:ml-1"}`}
+    >
     <Dialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
       <DialogTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           disabled={loading}
-          className="gap-2 border-accent/30 text-accent-ink hover:bg-accent/5"
+          className={
+            bar
+              ? "h-11 gap-2 rounded-full px-4 text-white/80 hover:bg-accent hover:text-white focus-visible:ring-highlight focus-visible:ring-offset-0"
+              : "h-11 gap-2 rounded-full px-4 text-foreground hover:bg-accent/10 hover:text-foreground"
+          }
         >
-          <Square className="h-4 w-4" />
+          <Square className={bar ? "h-4 w-4" : "h-4 w-4 text-accent-ink"} aria-hidden="true" />
           {status === "paused" ? "Baigti" : "Baigti veiklą"}
         </Button>
       </DialogTrigger>
@@ -163,6 +181,7 @@ export function GameStatusActions({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </span>
   )
 
   if (status === "draft") {
@@ -180,10 +199,10 @@ export function GameStatusActions({
       >
         <DialogTrigger asChild>
           <Button
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2"
+            className="h-12 gap-2 rounded-full bg-primary px-6 text-base font-bold text-primary-foreground hover:bg-primary/90"
             disabled={challengeCount === 0}
           >
-            <Rocket className="h-4 w-4" />
+            <Rocket className="h-5 w-5" aria-hidden="true" />
             Pradėti veiklą
           </Button>
         </DialogTrigger>
@@ -304,12 +323,16 @@ export function GameStatusActions({
 
   if (status === "active") {
     return (
-      <div className="flex gap-2">
+      <div className="contents">
         <Button
           variant="outline"
           onClick={() => updateStatus("paused")}
           disabled={loading}
-          className="gap-2"
+          className={
+            bar
+              ? "h-11 gap-2 rounded-full border-transparent bg-white px-5 text-base font-bold text-steam-dark hover:bg-white/90 hover:text-steam-dark focus-visible:ring-highlight focus-visible:ring-offset-0"
+              : "h-11 gap-2 rounded-full px-5"
+          }
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -325,11 +348,15 @@ export function GameStatusActions({
 
   if (status === "paused") {
     return (
-      <div className="flex gap-2">
+      <div className="contents">
         <Button
           onClick={() => updateStatus("active")}
           disabled={loading}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+          className={
+            bar
+              ? "h-11 gap-2 rounded-full bg-highlight px-5 text-base font-bold text-highlight-foreground hover:bg-highlight/90 focus-visible:ring-white focus-visible:ring-offset-0"
+              : "h-11 gap-2 rounded-full bg-primary px-5 font-bold text-primary-foreground hover:bg-primary/90"
+          }
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -343,7 +370,8 @@ export function GameStatusActions({
     )
   }
 
-  // finished
+  // finished: on the class screen the header already says so.
+  if (bar) return null
   return (
     <Badge variant="outline" className="text-sm gap-1 py-1.5 px-3 bg-secondary/10 text-secondary-ink border-secondary/20">
       <Square className="h-3 w-3" aria-hidden="true" />

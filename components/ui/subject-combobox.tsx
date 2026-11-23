@@ -62,7 +62,7 @@ export function SubjectCombobox({
           aria-label={placeholder}
           disabled={disabled}
           className={cn(
-            "h-9 w-full justify-between font-normal shadow-sm",
+            "h-11 w-full justify-between rounded-md font-normal",
             !selected && "text-muted-foreground",
             className
           )}

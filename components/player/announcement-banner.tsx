@@ -3,7 +3,7 @@
 import { realtimeSignedIn } from "@/lib/supabase/realtime-auth"
 import { useEffect, useRef, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { Megaphone, X } from "lucide-react"
 
 export interface AnnouncementItem {
@@ -68,6 +68,7 @@ export function announcementTime(createdAt: string): string {
 
 export function AnnouncementBanner({ gameId, variant = "default", latest }: AnnouncementBannerProps) {
   const large = variant === "projector"
+  const reduce = useReducedMotion()
   const fromPoll = latest !== undefined
   const [activeAnnouncement, setActiveAnnouncement] =
     useState<AnnouncementItem | null>(null)
@@ -185,27 +186,28 @@ export function AnnouncementBanner({ gameId, variant = "default", latest }: Anno
         {activeAnnouncement && (
           <motion.div
             key={activeAnnouncement.id}
-            initial={{ y: -100, opacity: 0 }}
+            initial={reduce ? false : { y: -24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            exit={reduce ? { opacity: 0 } : { y: -24, opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.25, ease: "easeOut" }}
             className="mb-3"
           >
             {/* White on secondary-ink is 5.67:1 (on secondary it was 3.9:1). */}
-            <div className="bg-secondary-ink text-white shadow-lg rounded-xl text-left">
+            <div className="bg-secondary-ink text-white shadow-lg rounded-2xl text-left">
               <div className={large ? "flex items-start gap-4 px-6 py-5" : "max-w-2xl mx-auto px-4 py-3 flex items-start gap-3"}>
                 <Megaphone className={large ? "h-8 w-8 shrink-0" : "h-5 w-5 shrink-0 mt-0.5"} aria-hidden="true" />
                 <div className="flex-1 min-w-0">
-                  <p className={large ? "text-2xl font-semibold leading-snug" : "text-sm font-medium leading-snug break-words"}>
+                  <p className={large ? "text-2xl font-semibold leading-snug" : "text-base font-medium leading-snug break-words"}>
                     <span className="sr-only">Vedėjo pranešimas: </span>
                     {activeAnnouncement.message}
                   </p>
-                  {sentAt && <p className="mt-0.5 text-xs">Išsiųsta {sentAt}</p>}
+                  {sentAt && <p className="mt-0.5 text-sm">Išsiųsta {sentAt}</p>}
                 </div>
                 <button
                   type="button"
                   onClick={dismiss}
-                  className="shrink-0 flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/20 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+                  // 32 px to look at, 44 px to tap (the ::before reaches past it).
+                  className="relative shrink-0 flex h-8 w-8 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[''] hover:bg-white/20 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
                   aria-label="Uždaryti pranešimą"
                 >
                   <X className="h-5 w-5" aria-hidden="true" />

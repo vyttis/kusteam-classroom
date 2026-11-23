@@ -31,7 +31,7 @@ function PendingBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
     <span
-      className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold leading-5 text-white"
+      className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-accent-ink px-1.5 text-xs font-semibold leading-5 text-white"
       aria-label={`${count} nauji paskyrų prašymai`}
     >
       {count}
@@ -87,7 +87,7 @@ export function TeacherNav({
     (href === "/dashboard" && (pathname.startsWith("/games") || pathname.startsWith("/paruostos-veiklos")))
 
   return (
-    <nav aria-label="Pagrindinis meniu" className="bg-white border-b border-border/50 sticky top-0 z-50 backdrop-blur-xl bg-white/80 print:hidden">
+    <nav aria-label="Pagrindinis meniu" className="sticky top-0 z-50 border-b border-border bg-white print:hidden">
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="flex items-center justify-between h-16">
           {/* Left side */}
@@ -103,10 +103,10 @@ export function TeacherNav({
                   asChild
                   variant="ghost"
                   size="sm"
-                  className={`gap-2 ${
+                  className={`gap-2 px-3 text-sm ${
                     isCurrent(link.href)
-                      ? "bg-muted text-steam-dark"
-                      : "text-muted-foreground hover:text-steam-dark"
+                      ? "bg-steam-dark text-white hover:bg-steam-dark hover:text-white"
+                      : "text-steam-dark hover:text-steam-dark"
                   }`}
                 >
                   <Link href={link.href} aria-current={isCurrent(link.href) ? "page" : undefined}>
@@ -143,14 +143,14 @@ export function TeacherNav({
                   variant="ghost"
                   size="sm"
                   aria-label={`${fullName || email}, paskyros meniu`}
-                  className="hidden lg:flex h-10 min-w-0 shrink gap-2 px-2 text-steam-dark"
+                  className="hidden lg:flex min-w-0 shrink gap-2 px-3 text-steam-dark"
                 >
                   {avatarUrl ? (
                     <Image src={avatarUrl} alt="" width={28} height={28} className="shrink-0 rounded-full" />
                   ) : (
                     <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   )}
-                  <span className="hidden xl:block max-w-32 truncate text-sm font-medium">{fullName || email}</span>
+                  <span className="hidden xl:block max-w-32 truncate text-sm font-semibold">{fullName || email}</span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </Button>
               </PopoverTrigger>
@@ -163,7 +163,7 @@ export function TeacherNav({
                   <Link
                     href="/slaptazodis"
                     onClick={() => setAccountMenuOpen(false)}
-                    className="flex min-h-10 w-full items-center gap-2 rounded px-3 py-2 text-sm text-steam-dark hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-steam-dark hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <KeyRound className="h-4 w-4" aria-hidden="true" />
                     Keisti slaptažodį
@@ -175,7 +175,7 @@ export function TeacherNav({
                     setAccountMenuOpen(false)
                     handleLogout()
                   }}
-                  className="flex min-h-10 w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-accent-ink hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-accent-ink hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                   Atsijungti
@@ -186,9 +186,9 @@ export function TeacherNav({
             {/* Mobile hamburger menu */}
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden text-muted-foreground"
+              className="lg:hidden text-steam-dark"
               aria-label="Meniu"
             >
               <Menu className="h-5 w-5" aria-hidden="true" />
@@ -207,12 +207,12 @@ export function TeacherNav({
               {avatarUrl ? (
                 <Image src={avatarUrl} alt="" width={40} height={40} className="rounded-full" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary-ink font-semibold">
+                <div className="w-10 h-10 rounded-full bg-steam-dark flex items-center justify-center text-white font-semibold">
                   {(fullName || email).charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-steam-dark">{fullName || email}</p>
+                <p className="truncate text-sm font-semibold text-steam-dark">{fullName || email}</p>
                 {secondaryLine && <p className="truncate text-xs text-muted-foreground">{secondaryLine}</p>}
               </div>
             </div>
@@ -222,7 +222,7 @@ export function TeacherNav({
               <Button
                 asChild
                 variant="outline"
-                className="w-full justify-start gap-3 h-11 border-accent/40 text-accent-ink font-semibold"
+                className="w-full justify-start gap-3 border-accent/40 text-accent-ink"
               >
                 <Link href={`/games/${activeGame.id}/live`} onClick={() => setMobileMenuOpen(false)}>
                   <LiveDot paused={activeGame.paused} />
@@ -237,7 +237,7 @@ export function TeacherNav({
                 key={link.href}
                 asChild
                 variant="ghost"
-                className={`w-full justify-start gap-3 h-11 text-steam-dark ${isCurrent(link.href) ? "bg-muted" : ""}`}
+                className={`w-full justify-start gap-3 rounded-lg text-steam-dark ${isCurrent(link.href) ? "bg-muted" : ""}`}
               >
                 <Link
                   href={link.href}
@@ -253,7 +253,7 @@ export function TeacherNav({
 
             <div className="pt-3 mt-3 border-t border-border/50">
               {canChangePassword && (
-                <Button asChild variant="ghost" className="w-full justify-start gap-3 h-11 text-steam-dark">
+                <Button asChild variant="ghost" className="w-full justify-start gap-3 rounded-lg text-steam-dark">
                   <Link href="/slaptazodis" onClick={() => setMobileMenuOpen(false)}>
                     <KeyRound className="h-4 w-4" aria-hidden="true" />
                     Keisti slaptažodį
@@ -266,7 +266,7 @@ export function TeacherNav({
                   setMobileMenuOpen(false)
                   handleLogout()
                 }}
-                className="w-full justify-start gap-3 h-11 text-accent-ink hover:text-accent-ink"
+                className="w-full justify-start gap-3 rounded-lg text-accent-ink hover:text-accent-ink"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
                 Atsijungti

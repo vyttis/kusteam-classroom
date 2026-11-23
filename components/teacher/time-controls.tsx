@@ -66,17 +66,16 @@ export function TimeControls({ gameId, currentTimeLimit, variant = "card", onExt
     if (!timeLimit) return null
     return (
       <div className="flex items-center gap-2" role="group" aria-label="Laiko pratęsimas">
-        <span className="whitespace-nowrap text-sm text-white/70">
-          Limitas <span className="font-semibold tabular-nums text-white">{timeLimit} min.</span>
+        <span className="whitespace-nowrap text-sm text-white/80">
+          Limitas <span className="font-bold tabular-nums text-white">{timeLimit} min.</span>
         </span>
         {[5, 10].map((m) => (
           <Button
             key={m}
-            size="sm"
             variant="outline"
             disabled={extending}
             onClick={() => extend(m)}
-            className="gap-1 border-white/20 bg-transparent text-white/80 hover:bg-white/10 hover:text-white"
+            className="h-11 gap-1 border-white/30 bg-transparent px-3 text-white hover:bg-white/10 hover:text-white focus-visible:ring-highlight focus-visible:ring-offset-0"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             {m} min.

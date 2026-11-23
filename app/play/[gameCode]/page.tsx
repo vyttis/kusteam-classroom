@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useId, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
-import { Users, ArrowRight, Loader2, Gamepad2, AlertCircle, ArrowLeft } from "lucide-react"
+import { ArrowLeft, ArrowRight, CloudOff, Flag, Hourglass, Loader2, SearchX } from "lucide-react"
+import { SteamRays } from "@/components/brand/steam-rays"
+import { PRIMARY_BUTTON, SCREEN, SECONDARY_BUTTON, Shake, StateScreen } from "@/components/player/play-ui"
 import type { PlayerSession } from "@/types/game"
 import { STORAGE_BLOCKED_MESSAGE, canStorePlayerSession, getPlayerSession, savePlayerSession } from "@/lib/game/session"
 import Link from "next/link"
-import Image from "next/image"
 import { PrivacyLink } from "@/components/privacy-link"
 
 type GameState =
@@ -23,7 +22,6 @@ type GameState =
 export default function JoinGamePage() {
   const params = useParams()
   const router = useRouter()
-  const { toast } = useToast()
   const gameCode = (params.gameCode as string).toUpperCase()
 
   const [teamName, setTeamName] = useState("")
@@ -32,6 +30,12 @@ export default function JoinGamePage() {
   // The browser cannot keep the team's session: joining would create a team
   // this device loses at once, so the form says why instead.
   const [storageBlocked, setStorageBlocked] = useState(false)
+  // Why joining was refused (e.g. the name is taken), shown under the field.
+  const [joinError, setJoinError] = useState<string | null>(null)
+  // Refusals so far: each one shakes the field and is announced anew.
+  const [joinAttempts, setJoinAttempts] = useState(0)
+  const nameId = useId()
+  const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     // Check existing session (with expiry validation)
@@ -119,6 +123,14 @@ export default function JoinGamePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waitingFor, gameCode])
 
+  // The reason goes under the field; the name stays, selected for a quick fix.
+  function refuseJoin(message: string) {
+    setJoinError(message)
+    setJoinAttempts((n) => n + 1)
+    nameRef.current?.focus()
+    nameRef.current?.select()
+  }
+
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
     if (!teamName.trim()) return
@@ -129,6 +141,7 @@ export default function JoinGamePage() {
       return
     }
     setStorageBlocked(false)
+    setJoinError(null)
 
     setLoading(true)
     try {
@@ -142,14 +155,15 @@ export default function JoinGamePage() {
       })
 
       if (!res.ok) {
-        let errorMsg = "Nepavyko prisijungti"
+        let errorMsg = "Nepavyko prisijungti. Bandykite dar kartą."
         try {
           const err = await res.json()
           errorMsg = err.error || errorMsg
         } catch {
           // Response was not JSON (e.g. server error)
         }
-        throw new Error(errorMsg)
+        refuseJoin(errorMsg)
+        return
       }
 
       const data = await res.json()
@@ -166,12 +180,8 @@ export default function JoinGamePage() {
       }
 
       router.push(`/play/${gameCode}/play`)
-    } catch (error: unknown) {
-      toast({
-        title: "Klaida",
-        description: error instanceof Error ? error.message : "Nepavyko prisijungti prie veiklos",
-        variant: "destructive",
-      })
+    } catch {
+      refuseJoin("Nepavyko prisijungti. Patikrinkite interneto ryšį ir bandykite dar kartą.")
     } finally {
       setLoading(false)
     }
@@ -180,63 +190,54 @@ export default function JoinGamePage() {
   // Loading
   if (gameState.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-ink" />
+      <div className={`${SCREEN} flex items-center justify-center`} role="status">
+        <Loader2 className="h-8 w-8 text-foreground motion-safe:animate-spin" aria-hidden="true" />
+        <span className="sr-only">Kraunama...</span>
       </div>
     )
   }
 
+  const otherCode = (
+    <Button asChild variant="outline" className={SECONDARY_BUTTON}>
+      <Link href="/prisijungti">
+        <ArrowLeft aria-hidden="true" />
+        Įvesti kitą kodą
+      </Link>
+    </Button>
+  )
+  const code = <span className="font-mono font-bold text-foreground">{gameCode}</span>
+
   // Network or server failure: the code may well be right
   if (gameState.status === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-sm text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-highlight/10 flex items-center justify-center">
-            <AlertCircle className="h-10 w-10 text-highlight-ink" aria-hidden="true" />
-          </div>
-          <h1 className="text-xl font-bold text-steam-dark mb-2">Nepavyko susisiekti</h1>
-          <p className="text-muted-foreground mb-6">
-            Patikrinkite interneto ryšį ir bandykite dar kartą. Kodas <span className="font-mono font-bold">{gameCode}</span> gali būti teisingas.
-          </p>
+      <StateScreen
+        icon={CloudOff}
+        tone="wait"
+        title="Nepavyko susisiekti"
+        actions={
           <Button
             onClick={() => {
               setGameState({ status: "loading" })
               void validateGame()
             }}
-            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+            className={PRIMARY_BUTTON}
           >
             Bandyti dar kartą
           </Button>
-        </div>
-      </div>
+        }
+      >
+        <p>Patikrinkite interneto ryšį ir bandykite dar kartą. Kodas {code} gali būti teisingas.</p>
+      </StateScreen>
     )
   }
 
   // Game not found
   if (gameState.status === "not_found") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rise-in w-full max-w-sm text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-            <AlertCircle className="h-10 w-10 text-accent-ink" />
-          </div>
-          <h1 className="text-xl font-bold text-steam-dark mb-2">
-            Veikla nerasta
-          </h1>
-          <p className="text-muted-foreground mb-2">
-            Kodas <span className="font-mono font-bold">{gameCode}</span> neatitinka jokios veiklos.
-          </p>
-          <p className="text-sm text-muted-foreground mb-6">
-            Patikrinkite kodą ir bandykite dar kartą.
-          </p>
-          <Link href="/prisijungti">
-            <Button variant="outline" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Įvesti kitą kodą
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <StateScreen icon={SearchX} tone="info" title="Veikla nerasta" actions={otherCode}>
+        <p>Kodas {code} neatitinka jokios veiklos.</p>
+        <p>Patikrinkite kodą ir bandykite dar kartą.</p>
+      </StateScreen>
     )
   }
 
@@ -249,133 +250,127 @@ export default function JoinGamePage() {
       closed:
         "Vedėjas uždarė prisijungimą prie šios veiklos. Jei jūsų komanda dar neprisijungė, kreipkitės į vedėją. Šis langas atsinaujins pats, jei prisijungimas vėl atsidarys.",
     }
+    const waiting =
+      gameState.gameStatus === "draft" || gameState.gameStatus === "paused" || gameState.gameStatus === "closed"
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rise-in w-full max-w-sm text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-highlight/10 flex items-center justify-center">
-            <AlertCircle className="h-10 w-10 text-highlight-ink" />
-          </div>
-          <h1 className="text-xl font-bold text-steam-dark mb-2">
-            {gameState.gameStatus === "finished"
-              ? "Veikla baigta"
-              : gameState.gameStatus === "closed"
-                ? "Prisijungimas uždarytas"
-                : "Palaukite"}
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            {messages[gameState.gameStatus] || "Veikla šiuo metu nepasiekiama."}
-          </p>
-          <div className="flex flex-col gap-2 items-center">
-            {(gameState.gameStatus === "draft" || gameState.gameStatus === "paused" || gameState.gameStatus === "closed") && (
+      <StateScreen
+        icon={gameState.gameStatus === "finished" ? Flag : Hourglass}
+        tone={waiting ? "wait" : "info"}
+        title={
+          gameState.gameStatus === "finished"
+            ? "Veikla baigta"
+            : gameState.gameStatus === "closed"
+              ? "Prisijungimas uždarytas"
+              : "Palaukite"
+        }
+        actions={
+          <>
+            {waiting && (
               <Button
                 onClick={() => {
                   setGameState({ status: "loading" })
                   validateGame()
                 }}
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                className={PRIMARY_BUTTON}
               >
                 Patikrinti dar kartą
               </Button>
             )}
-            <Link href="/prisijungti">
-              <Button variant="outline" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Įvesti kitą kodą
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
+            {otherCode}
+          </>
+        }
+      >
+        <p>{messages[gameState.gameStatus] || "Veikla šiuo metu nepasiekiama."}</p>
+      </StateScreen>
     )
   }
 
-  // Game ready — show join form with game title
+  // Game ready: the join form under the activity's title. The rays draw
+  // once: the one deliberate motion of this screen.
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -right-20 w-60 h-60 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-secondary/5 rounded-full blur-3xl" />
-      </div>
+    <div className={`${SCREEN} flex items-center justify-center px-4 py-6`}>
+      <div className="w-full max-w-sm">
+        <SteamRays draw className="mx-auto mb-4 h-24 w-auto" />
 
-      <div className="rise-in w-full max-w-sm relative z-10">
-        <div className="flex justify-center mb-6">
-          <Image
-            src="/illustrations/adventure-start.svg"
-            alt=""
-            width={192}
-            height={192}
-            className="h-28 w-28 sm:h-48 sm:w-48"
-          />
-        </div>
+        <div className="rounded-2xl border border-border bg-white p-5">
+          <p className="mb-2 text-center">
+            <span className="sr-only">Veiklos kodas </span>
+            <span className="inline-block rounded-full border-2 border-foreground/25 px-3 py-0.5 font-mono text-sm font-bold tracking-widest text-foreground">
+              {gameCode}
+            </span>
+          </p>
+          <h1 className="break-words text-center text-2xl font-bold leading-tight text-foreground">{gameState.title}</h1>
+          {/* Three lines at most: a long description pushed the team name
+              field below the fold on a phone. */}
+          {gameState.description && (
+            <p className="mt-2 line-clamp-3 text-center text-base text-muted-foreground" title={gameState.description}>
+              {gameState.description}
+            </p>
+          )}
 
-        <Card className="border-0 shadow-2xl shadow-primary/10 bg-white/90 backdrop-blur-xl">
-          <CardHeader className="text-center pb-2">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Gamepad2 className="h-5 w-5 text-primary-ink" />
-              <span className="font-mono text-sm font-bold text-primary-ink tracking-widest">
-                {gameCode}
-              </span>
+          <form onSubmit={handleJoin} className="mt-5 space-y-4" noValidate>
+            <div>
+              <label htmlFor={nameId} className="mb-1.5 block text-base font-bold text-foreground">
+                Komandos vardas
+              </label>
+              <Shake trigger={joinAttempts}>
+                <Input
+                  id={nameId}
+                  ref={nameRef}
+                  placeholder="Pvz., Smalsūs tyrėjai"
+                  value={teamName}
+                  onChange={(e) => {
+                    setTeamName(e.target.value)
+                    setJoinError(null)
+                  }}
+                  className="h-12 border-2 border-foreground/25 bg-white text-base text-foreground md:text-base"
+                  maxLength={30}
+                  required
+                  autoFocus
+                  autoComplete="off"
+                  enterKeyHint="go"
+                  aria-describedby={`${nameId}-help`}
+                  aria-invalid={joinError ? true : undefined}
+                />
+              </Shake>
+              <p id={`${nameId}-help`} className="mt-1.5 text-sm text-muted-foreground">
+                Sugalvokite komandos vardą be tikrų vardų ir pavardžių. Paskyros nereikia.
+              </p>
             </div>
-            <CardTitle className="text-xl font-bold text-steam-dark">
-              {gameState.title}
-            </CardTitle>
-            {/* Three lines at most: a long description pushed the team name
-                field below the fold on a phone. */}
-            {gameState.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-3" title={gameState.description}>
-                {gameState.description}
+
+            {joinError && (
+              <p
+                key={joinAttempts}
+                role="alert"
+                className="rounded-xl border border-highlight bg-highlight/20 p-3 text-base text-foreground"
+              >
+                {joinError}
               </p>
             )}
-          </CardHeader>
 
-          <CardContent>
-            <form onSubmit={handleJoin} className="space-y-4">
-              <div className="space-y-2">
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Komandos vardas"
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    className="pl-10 h-12 text-base bg-white"
-                    maxLength={30}
-                    required
-                    autoFocus
-                    autoComplete="off"
-                    enterKeyHint="go"
-                    aria-label="Komandos vardas"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Sugalvokite komandos vardą be tikrų vardų ir pavardžių. Paskyros nereikia.
-                </p>
-              </div>
+            {storageBlocked && (
+              <p role="alert" className="rounded-xl border border-highlight bg-highlight/20 p-3 text-base text-foreground">
+                {STORAGE_BLOCKED_MESSAGE}
+              </p>
+            )}
 
-              {storageBlocked && (
-                <p role="alert" className="rounded-lg bg-accent/10 p-3 text-sm text-steam-dark">
-                  {STORAGE_BLOCKED_MESSAGE}
-                </p>
+            <Button type="submit" disabled={loading || !teamName.trim()} aria-busy={loading} className={PRIMARY_BUTTON}>
+              {loading ? (
+                <>
+                  <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+                  Jungiamasi...
+                </>
+              ) : (
+                <>
+                  Prisijungti prie veiklos
+                  <ArrowRight aria-hidden="true" />
+                </>
               )}
+            </Button>
+          </form>
+        </div>
 
-              <Button
-                type="submit"
-                disabled={loading || !teamName.trim()}
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base shadow-lg shadow-primary/25"
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <>
-                    Prisijungti prie veiklos
-                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-xs text-muted-foreground mt-4">
+        <p className="mt-4 text-center text-sm text-muted-foreground">
           STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
         </p>
       </div>

@@ -1,10 +1,12 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
+import { useEffect, useRef, useState } from "react"
+import { motion, AnimatePresence, animate } from "framer-motion"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
 import type { LiveTeam } from "@/hooks/use-live-game"
-import { Crown, Medal, Users } from "lucide-react"
-import { pluralizeLt } from "@/lib/utils"
+import { sharedRanks } from "@/lib/game/live-board"
+import { Crown } from "lucide-react"
+import { cn, pluralizeLt } from "@/lib/utils"
 
 interface LiveLeaderboardBoardProps {
   teams: LiveTeam[]
@@ -17,17 +19,46 @@ interface LiveLeaderboardBoardProps {
   ranked?: boolean
 }
 
-const podiumStyles = [
-  "border-highlight/60 bg-highlight/10",
-  "border-white/30 bg-white/10",
-  "border-accent/50 bg-accent/10",
-]
+// Place markers: a number read from the back of the room. Only a team with
+// points has a place (lib/game/live-board.ts); teams level on points share it.
+const RANK_STYLES: Record<number, string> = {
+  1: "bg-highlight text-highlight-foreground",
+  2: "bg-white text-steam-dark",
+  3: "bg-white/25 text-white ring-2 ring-inset ring-accent",
+}
 
-const podiumIcons = [
-  <Crown key="1" className="h-7 w-7 text-highlight" />,
-  <Medal key="2" className="h-7 w-7 text-white/70" />,
-  <Medal key="3" className="h-7 w-7 text-accent" />,
-]
+const ROW_STYLES: Record<number, string> = {
+  1: "border-highlight/70 bg-highlight/10",
+  2: "border-white/35 bg-white/10",
+  3: "border-accent/60 bg-white/[0.07]",
+}
+
+/**
+ * Points that count up to their new value. With reduced motion the new
+ * value is simply shown.
+ */
+function CountUp({ value, instant }: { value: number; instant: boolean }) {
+  const [shown, setShown] = useState(value)
+  const shownRef = useRef(value)
+
+  useEffect(() => {
+    if (instant || shownRef.current === value) {
+      shownRef.current = value
+      return
+    }
+    const controls = animate(shownRef.current, value, {
+      duration: 0.7,
+      ease: "easeOut",
+      onUpdate: (latest) => {
+        shownRef.current = Math.round(latest)
+        setShown(shownRef.current)
+      },
+    })
+    return () => controls.stop()
+  }, [value, instant])
+
+  return <>{instant ? value : shown}</>
+}
 
 // Large ranked leaderboard for the projector class screen (dark background).
 export function LiveLeaderboardBoard({
@@ -37,16 +68,11 @@ export function LiveLeaderboardBoard({
   ranked = true,
 }: LiveLeaderboardBoardProps) {
   const prefersReduced = useReducedMotion()
+  const spring = prefersReduced ? { duration: 0 } : { type: "spring" as const, stiffness: 300, damping: 32 }
 
   if (teams.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-white/50">
-        <Users className="h-16 w-16 mb-4 opacity-40" />
-        <p className="text-2xl font-medium">Laukiama komandų...</p>
-        <p className="text-base mt-2 text-white/40">
-          Nuskaitykite QR kodą ir prisijunkite
-        </p>
-      </div>
+      <p className="py-24 text-center text-2xl text-white/70">Veikloje nedalyvavo nė viena komanda</p>
     )
   }
 
@@ -54,19 +80,26 @@ export function LiveLeaderboardBoard({
     const byName = [...teams].sort((a, b) => a.name.localeCompare(b.name, "lt"))
     return (
       <div>
-        <p className="mb-4 text-base text-white/60">
+        <p className="mb-4 text-lg text-white/80">
           Prisijungė {teams.length} {pluralizeLt(teams.length, "komanda", "komandos", "komandų")}. Rezultatų lentelė
           šioje veikloje nerodoma.
         </p>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {byName.map((team) => (
-            <li
-              key={team.id}
-              className="truncate rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-2xl font-bold text-white"
-            >
-              {team.name}
-            </li>
-          ))}
+          <AnimatePresence initial={false}>
+            {byName.map((team) => (
+              <motion.li
+                key={team.id}
+                layout={!prefersReduced}
+                initial={prefersReduced ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReduced ? undefined : { opacity: 0 }}
+                transition={spring}
+                className="truncate rounded-2xl border border-white/15 bg-white/[0.07] px-6 py-4 text-2xl font-bold text-white sm:text-3xl"
+              >
+                {team.name}
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       </div>
     )
@@ -75,63 +108,91 @@ export function LiveLeaderboardBoard({
   // More than six teams: compact rows, so a class of ten or more fits on
   // one projector screen.
   const compact = teams.length > 6
+  const ranks = sharedRanks(teams)
 
   return (
-    <div className={compact ? "space-y-2" : "space-y-3"}>
+    <ol className={compact ? "space-y-2" : "space-y-3"}>
       <AnimatePresence initial={false}>
         {teams.map((team, index) => {
-          const isTop3 = index < 3
+          const rank = ranks[index]
+          const podium = rank !== null && rank <= 3
           const solved = solvedCounts.get(team.id) ?? 0
 
           return (
-            <motion.div
+            <motion.li
               key={team.id}
               layout={!prefersReduced}
-              initial={prefersReduced ? false : { opacity: 0, y: 12 }}
+              initial={prefersReduced ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={prefersReduced ? undefined : { opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className={`flex items-center rounded-2xl border ${compact ? "gap-4 px-5 py-2" : "gap-5 px-6 py-4"} ${
-                isTop3
-                  ? podiumStyles[index]
-                  : "border-white/10 bg-white/5"
-              }`}
+              transition={spring}
+              className={cn(
+                "relative flex items-center overflow-hidden rounded-2xl border",
+                compact ? "gap-3 px-4 py-2 sm:gap-4 sm:px-5" : "gap-3 px-4 py-3 sm:gap-5 sm:px-6 sm:py-4",
+                podium ? ROW_STYLES[rank] : "border-white/15 bg-white/[0.05]",
+              )}
             >
+              {/* A solved task: the row lights up once and settles. */}
+              {!prefersReduced && solved > 0 && (
+                <motion.span
+                  key={solved}
+                  aria-hidden="true"
+                  initial={{ opacity: 0.55 }}
+                  animate={{ opacity: 0 }}
+                  transition={{ duration: 1.4, ease: "easeOut" }}
+                  className="pointer-events-none absolute inset-0 bg-primary"
+                />
+              )}
+
               <div
-                className={`flex shrink-0 items-center justify-center rounded-full font-bold ${compact ? "h-10 w-10 text-xl" : "h-14 w-14 text-2xl"} ${
-                  isTop3 ? "bg-white/15" : "bg-white/10 text-white/60"
-                }`}
+                className={cn(
+                  "relative flex shrink-0 items-center justify-center rounded-full font-bold tabular-nums",
+                  compact ? "h-10 w-10 text-xl" : "h-11 w-11 text-2xl sm:h-14 sm:w-14 sm:text-3xl",
+                  podium ? RANK_STYLES[rank] : "bg-white/10 text-white",
+                )}
               >
-                {isTop3 ? podiumIcons[index] : index + 1}
+                {rank !== null ? (
+                  <>
+                    <span className="sr-only">Vieta: </span>
+                    {rank}
+                  </>
+                ) : (
+                  <span className="sr-only">Dar be taškų</span>
+                )}
               </div>
 
-              <div className="min-w-0 flex-1">
+              <div className="relative min-w-0 flex-1">
                 <p
-                  className={`truncate font-bold text-white ${
-                    compact ? "text-2xl" : isTop3 ? "text-3xl" : "text-2xl"
-                  }`}
+                  className={cn(
+                    "flex items-center gap-2 font-bold text-white",
+                    compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl lg:text-4xl",
+                  )}
                 >
-                  {team.name}
+                  <span className="truncate">{team.name}</span>
+                  {rank === 1 && (
+                    <Crown className="h-7 w-7 shrink-0 text-highlight" aria-hidden="true" />
+                  )}
                 </p>
-                <p className={`text-sm text-white/60 ${compact ? "" : "mt-0.5"}`}>
+                <p className={cn("text-white/80", compact ? "text-sm" : "text-base sm:text-lg")}>
                   {solved} / {totalChallenges} užd. išspręsta
                 </p>
               </div>
 
-              <div className="shrink-0 text-right">
+              <div className="relative shrink-0 text-right">
                 <p
-                  className={`font-bold tabular-nums text-white ${
-                    compact ? "text-3xl" : isTop3 ? "text-4xl" : "text-3xl"
-                  }`}
+                  className={cn(
+                    "font-bold tabular-nums leading-none text-white",
+                    compact ? "text-3xl" : "text-4xl sm:text-5xl",
+                  )}
                 >
-                  {team.total_points}
+                  <CountUp value={team.total_points} instant={prefersReduced} />
                 </p>
-                <p className="text-xs text-white/60">taškų</p>
+                <p className="mt-1 text-sm text-white/80">taškų</p>
               </div>
-            </motion.div>
+            </motion.li>
           )
         })}
       </AnimatePresence>
-    </div>
+    </ol>
   )
 }

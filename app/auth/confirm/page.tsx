@@ -74,7 +74,7 @@ function Confirm() {
           Kvietimo nuoroda jau panaudota arba nebegalioja. Prisijungimo puslapyje įrašykite savo el. paštą ir
           spauskite „Pamiršau slaptažodį“: atsiųsime kodą.
         </p>
-        <Link href="/vedejui" className="inline-block font-medium underline underline-offset-4">
+        <Link href="/vedejui" className="inline-flex min-h-11 items-center font-semibold text-steam-dark underline underline-offset-4">
           Prisijungti
         </Link>
       </div>
@@ -90,7 +90,7 @@ function Confirm() {
         <button
           type="button"
           onClick={confirm}
-          className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-base font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="inline-flex h-12 w-full items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-primary-foreground hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Tęsti
         </button>

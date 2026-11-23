@@ -60,16 +60,18 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Text on a solid -ink fill (white on light, dark blue in a dark block).
+        "ink-foreground": "hsl(var(--ink-foreground))",
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
         },
         steam: {
-          green: "#00D296",
-          pink: "#FA2864",
-          yellow: "#FAC846",
-          blue: "#008CB4",
-          dark: "#00323C",
+          green: "#00D99B",
+          pink: "#FF306D",
+          yellow: "#FFCE4E",
+          blue: "#008CB5",
+          dark: "#003B4E",
           teal: "#004D5C",
           cyan: "#00BFA5",
         },
@@ -80,9 +82,11 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        sans: ["var(--font-metropolis)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "monospace"],
-        display: ["var(--font-display)", "Georgia", "serif"],
+        // One typeface everywhere: "display" is the same family, kept so
+        // existing font-display classes keep working.
+        display: ["var(--font-metropolis)", "system-ui", "sans-serif"],
       },
       fontSize: {
         // Editorial scale — used for landing display headlines & oversized numerals
@@ -114,8 +118,8 @@ const config: Config = {
           to: { opacity: "1", transform: "scale(1)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 0 0 rgba(0, 210, 150, 0.4)" },
-          "50%": { boxShadow: "0 0 20px 10px rgba(0, 210, 150, 0.1)" },
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(0, 217, 155, 0.4)" },
+          "50%": { boxShadow: "0 0 20px 10px rgba(0, 217, 155, 0.1)" },
         },
         shimmer: {
           from: { backgroundPosition: "0 0" },

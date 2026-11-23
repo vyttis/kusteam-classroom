@@ -99,13 +99,13 @@ export function QRScanner({ onScan }: QRScannerProps) {
           type="button"
           variant="outline"
           onClick={startScanner}
-          className="w-full h-12 gap-2 border-dashed border-2"
+          className="h-auto min-h-12 w-full gap-2 whitespace-normal rounded-full border-2 border-foreground/25 bg-white text-base font-bold text-foreground shadow-none [&_svg]:size-5"
         >
-          <Camera className="h-5 w-5" />
+          <Camera aria-hidden="true" />
           Nuskaityti QR kodą
         </Button>
         {error && (
-          <p className="text-xs text-accent-ink text-center">{error}</p>
+          <p role="alert" className="text-center text-sm text-foreground">{error}</p>
         )}
       </div>
     )
@@ -113,20 +113,20 @@ export function QRScanner({ onScan }: QRScannerProps) {
 
   return (
     <div className="space-y-3">
-      <div className="relative rounded-xl overflow-hidden border-2 border-primary/30 bg-black">
+      <div className="relative rounded-xl overflow-hidden border-2 border-foreground/25 bg-black">
         <div id="qr-reader" ref={containerRef} className="w-full" />
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={stopScanner}
-          className="absolute top-2 right-2 bg-black/50 text-white hover:bg-black/70 h-8 w-8 p-0 rounded-full z-10"
+          className="absolute top-2 right-2 bg-black/60 text-white hover:bg-black/80 hover:text-white h-11 w-11 p-0 rounded-full z-10 [&_svg]:size-5"
           aria-label="Uždaryti skenerį"
         >
-          <X className="h-4 w-4" />
+          <X aria-hidden="true" />
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground text-center">
+      <p className="text-sm text-muted-foreground text-center">
         Nukreipkite kamerą į QR kodą
       </p>
     </div>
