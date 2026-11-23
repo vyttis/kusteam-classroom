@@ -748,6 +748,8 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
           <p>
             <span className="font-semibold">Veikla vyksta.</span> Pakeistą atsakymą ir taškus sistema taiko
             iš karto naujiems bandymams, o pakeistą ar naują užduotį dalyviai pamatys per kelias sekundes.
+            Jau pateikti atsakymai iš naujo nevertinami: komandų surinkti taškai ir išspręstos užduotys
+            nesikeičia.
             Užduočių ištrinti, kopijuoti, pertvarkyti ir keisti jų atrakinimo sąlygų negalima, kol veikla
             nebaigta.
           </p>
