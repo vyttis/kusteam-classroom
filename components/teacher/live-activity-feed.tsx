@@ -9,6 +9,7 @@ import { pluralizeLt } from "@/lib/utils"
 import { LiveConnectionBanner } from "./live-connection-banner"
 import { useSubmissionFilter } from "@/hooks/use-submission-filter"
 import { motion, AnimatePresence } from "framer-motion"
+import { useReducedMotion } from "@/hooks/use-reduced-motion"
 import {
   Activity,
   CheckCircle2,
@@ -42,6 +43,16 @@ export function LiveActivityFeed({ gameId, variant = "default", hidePoints = fal
   const [degraded, setDegraded] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const isProjector = variant === "projector"
+  const prefersReduced = useReducedMotion()
+  // A new line slides in under the previous ones; with reduced motion it is simply there.
+  const rowMotion = prefersReduced
+    ? { initial: false as const, transition: { duration: 0 } }
+    : {
+        initial: { opacity: 0, height: 0, y: -10 },
+        animate: { opacity: 1, height: "auto", y: 0 },
+        exit: { opacity: 0, height: 0 },
+        transition: { duration: 0.2 },
+      }
   const maxEvents = isProjector ? 8 : 50
   const initialLoadDone = useRef(false)
 
@@ -342,43 +353,35 @@ export function LiveActivityFeed({ gameId, variant = "default", hidePoints = fal
   }
 
   if (isProjector) {
-    // The whole class sees this screen: who answered wrong is not shown.
-    const shown = events.filter((event) => event.type !== "submission_wrong")
+    // The whole class sees this screen: who answered wrong is not shown, and
+    // who joined is on the join screen. What is left is the latest solves.
+    // Until there is one the panel stays out of the way.
+    const shown = events.filter((event) => event.type === "submission_correct").slice(0, 5)
+    if (shown.length === 0) return null
     return (
-      <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-4">
-        <div className="flex items-center gap-2 text-white/70 text-sm font-medium mb-3">
-          <Activity className="h-4 w-4" />
-          Gyva veikla
-        </div>
-        {shown.length === 0 ? (
-          <p className="text-white/40 text-sm py-4 text-center">
-            Laukiama veiklos...
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            <AnimatePresence initial={false}>
-              {shown.map((event) => (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, height: 0, y: -10 }}
-                  animate={{ opacity: 1, height: "auto", y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-start gap-2.5 py-1.5 text-white/80"
-                >
-                  <div className="mt-1 shrink-0">{getIcon(event.type)}</div>
-                  <div className="flex-1 min-w-0 text-base leading-snug [&_.text-steam-dark]:text-white [&_.font-medium]:text-white/90">
-                    {getMessage(event)}
-                  </div>
-                  <span className="text-xs text-white/40 shrink-0 tabular-nums mt-1">
-                    {formatTimestamp(event.timestamp)}
-                  </span>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
+      <section aria-label="Naujausi sprendimai" className="rounded-2xl border border-white/15 bg-white/[0.05] p-4">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-white/80">
+          <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+          Naujausi sprendimai
+        </h2>
+        <ul className="space-y-1">
+          <AnimatePresence initial={false}>
+            {shown.map((event) => (
+              <motion.li key={event.id} {...rowMotion} className="overflow-hidden text-lg leading-snug text-white">
+                <span className="block py-1">
+                  <span className="font-bold">{event.team_name}</span>{" "}
+                  <span className="text-white/80">išsprendė „{event.challenge_title}“</span>
+                  {event.points && !hidePoints ? (
+                    <span className="ml-1.5 whitespace-nowrap font-bold tabular-nums text-white">
+                      +{event.points}
+                    </span>
+                  ) : null}
+                </span>
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ul>
+      </section>
     )
   }
 
@@ -411,10 +414,7 @@ export function LiveActivityFeed({ gameId, variant = "default", hidePoints = fal
                 {events.map((event) => (
                   <motion.div
                     key={event.id}
-                    initial={{ opacity: 0, height: 0, y: -10 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
+                    {...rowMotion}
                     className="flex items-start gap-2.5 py-2 px-2 rounded-lg hover:bg-muted/30 transition-colors"
                   >
                     <div className="mt-0.5 shrink-0">{getIcon(event.type)}</div>

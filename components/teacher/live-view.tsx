@@ -1,12 +1,13 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import dynamic from "next/dynamic"
+import { MotionConfig } from "framer-motion"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useLiveGame } from "@/hooks/use-live-game"
 import { LiveLeaderboardBoard } from "./live-leaderboard-board"
 import { LiveActivityFeed } from "./live-activity-feed"
+import { LiveJoinQr, LiveJoinScreen } from "./live-join-screen"
 import { AnnouncementBanner } from "@/components/player/announcement-banner"
 import { realtimeSignedIn } from "@/lib/supabase/realtime-auth"
 import { LiveConnectionBanner } from "./live-connection-banner"
@@ -15,33 +16,42 @@ import { TimeControls } from "./time-controls"
 import { getPlayUrl, getPublicUrl } from "@/lib/game/play-url"
 import { secondsLeft, secondsRunning, type GameClock } from "@/lib/game/clock"
 import { formatClock, latestTeamSecondsLeft } from "@/lib/game/team-time"
+import { boardPhase, countdownUrgency, shortAddress, COUNTDOWN_NOTE, type CountdownUrgency } from "@/lib/game/live-board"
+import { cn } from "@/lib/utils"
 import { useTeamClocks } from "@/hooks/use-team-clocks"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import type { GameStatus } from "@/types/game"
 import {
+  AlertTriangle,
   ArrowLeft,
+  BarChart3,
   Clock,
   GraduationCap,
   Eye,
   EyeOff,
+  Hourglass,
   Maximize2,
   Megaphone,
   Pause,
   Send,
-  Square,
+  TimerOff,
 } from "lucide-react"
 
-const QRCodeSVG = dynamic(
-  () => import("qrcode.react").then((mod) => mod.QRCodeSVG),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="animate-pulse bg-white/20 rounded" style={{ width: 180, height: 180 }} />
-    ),
-  }
-)
+// On the dark screen the default (dark) focus ring would not be seen.
+const DARK_FOCUS = "focus-visible:ring-highlight focus-visible:ring-offset-0"
+const QUIET_BUTTON = `h-11 text-white/80 hover:bg-white/10 hover:text-white ${DARK_FOCUS}`
+
+// The countdown changes state when little time is left: a filled plate and
+// a line of text with an icon, never colour alone.
+const URGENCY_PLATE: Record<CountdownUrgency, string> = {
+  calm: "bg-transparent text-white",
+  soon: "bg-highlight text-highlight-foreground",
+  last: "bg-accent text-white",
+  over: "bg-accent text-white",
+}
+const URGENCY_ICON = { soon: Hourglass, last: AlertTriangle, over: TimerOff } as const
 
 interface LiveViewProps {
   game: {
@@ -186,6 +196,7 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
   // The side QR shows the join code while the activity runs; the facilitator
   // can switch it to the account request QR, and after the end it shows that.
   const [showRequestQr, setShowRequestQr] = useState(false)
+  const joinAddress = useMemo(() => shortAddress(getPublicUrl("/prisijungti")), [])
   const sideQr =
     requestUrl && (showRequestQr || status === "finished")
       ? { kind: "request" as const, url: requestUrl }
@@ -232,6 +243,14 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
     }
   }, [startsAt, timed, timeLimit, pausedMs, pausedAt, nowTick, status, teamClocks])
 
+  // While the class joins, the screen is the QR code; from the first solved
+  // task the board takes over. The account request QR is a side panel, so it
+  // is shown with the board.
+  const phase = showRequestQr ? "board" : boardPhase({ status, teams, solvedCounts })
+  // The moment the lesson really ends is the last team's own deadline.
+  const urgency = countdownUrgency(clock?.countdown ? (clock.lastTeam ?? clock.value) : null)
+  const UrgencyIcon = urgency === "calm" ? null : URGENCY_ICON[urgency]
+
   const handleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
       document.exitFullscreen()
@@ -264,143 +283,156 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
   }
 
   return (
-    <div className="min-h-screen flex flex-col text-white">
-      {/* Header */}
-      <header className="flex items-center justify-between gap-4 px-6 py-4 border-b border-white/10">
-        <div className="flex items-center gap-3 min-w-0">
-          {!presentationMode && (
-            <Link href={`/games/${game.id}`}>
+    <MotionConfig reducedMotion="user">
+      <div className="flex min-h-screen flex-col text-white">
+        {/* Header */}
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 lg:flex-nowrap border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex min-w-0 flex-1 basis-64 items-center gap-2 sm:gap-3">
+            {!presentationMode && (
+              <Button asChild variant="ghost" className={`w-11 shrink-0 p-0 ${QUIET_BUTTON}`}>
+                <Link href={`/games/${game.id}`} aria-label="Grįžti į veiklą">
+                  <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                </Link>
+              </Button>
+            )}
+            <h1 className="line-clamp-2 min-w-0 text-xl font-bold leading-tight sm:text-2xl">{game.title}</h1>
+            {status === "paused" && (
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-highlight px-3 py-1 text-base font-bold text-highlight-foreground">
+                <Pause className="h-4 w-4" aria-hidden="true" />
+                Pristabdyta
+              </span>
+            )}
+            {status === "finished" && (
+              <span className="shrink-0 rounded-full border border-white/40 px-3 py-1 text-base font-bold text-white">
+                Baigta
+              </span>
+            )}
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3">
+            {clock && status !== "finished" && (
+              <div
+                className="flex flex-col-reverse items-end gap-x-4 gap-y-1 sm:flex-row sm:items-center"
+                role="timer"
+                aria-label={`${clock.label}: ${formatClock(clock.value)}`}
+              >
+                <div className="text-right">
+                  {UrgencyIcon && (
+                    <p className="flex items-center justify-end gap-1.5 text-base font-bold text-white">
+                      <UrgencyIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      {COUNTDOWN_NOTE[urgency]}
+                    </p>
+                  )}
+                  <p className="flex items-center justify-end gap-1 text-xs uppercase tracking-wide text-white/70">
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                    {clock.label}
+                  </p>
+                  {clock.countdown && (
+                    <p className="max-w-[18rem] text-xs text-white/70 lg:max-w-none">
+                      {clock.lastTeam !== null ? (
+                        <>
+                          Vėliausiai pradėjusiai komandai liko{" "}
+                          <span className="font-mono font-bold tabular-nums text-white">{formatClock(clock.lastTeam)}</span>
+                        </>
+                      ) : (
+                        "Komandos laikas skaičiuojamas nuo jos pradžios"
+                      )}
+                      {clock.joiningOver && ". Naujos komandos nebepriimamos"}
+                    </p>
+                  )}
+                </div>
+                <p
+                  className={cn(
+                    "rounded-xl px-3 py-1 font-mono text-4xl font-bold leading-none tabular-nums transition-colors duration-500 motion-reduce:transition-none sm:text-5xl",
+                    URGENCY_PLATE[urgency],
+                  )}
+                >
+                  {formatClock(clock.value)}
+                </p>
+              </div>
+            )}
+            {/* In presentation mode the two buttons stay reachable but step back. */}
+            <div
+              className={cn(
+                "flex items-center gap-1 transition-opacity motion-reduce:transition-none",
+                presentationMode && "opacity-40 focus-within:opacity-100 hover:opacity-100",
+              )}
+            >
               <Button
                 variant="ghost"
-                size="sm"
-                className="gap-2 text-white/60 hover:text-white hover:bg-white/10"
-                aria-label="Grįžti į veiklą"
+                onClick={handleFullscreen}
+                className={`w-11 p-0 ${QUIET_BUTTON}`}
+                title="Visas ekranas"
+                aria-label="Visas ekranas"
               >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                <Maximize2 className="h-5 w-5" aria-hidden="true" />
               </Button>
-            </Link>
-          )}
-          <h1 className="text-xl sm:text-2xl font-bold truncate">{game.title}</h1>
-          {status === "paused" && (
-            <span className="flex items-center gap-1.5 rounded-full bg-highlight/20 text-highlight px-3 py-1 text-sm font-medium shrink-0">
-              <Pause className="h-3.5 w-3.5" />
-              Pristabdyta
-            </span>
-          )}
-          {status === "finished" && (
-            <span className="flex items-center gap-1.5 rounded-full bg-accent/20 text-accent px-3 py-1 text-sm font-medium shrink-0">
-              <Square className="h-3.5 w-3.5" />
-              Baigta
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-4 shrink-0">
-          {clock && status !== "finished" && (
-            <div className="text-right">
-              <p
-                className={`font-mono text-3xl font-bold tabular-nums ${
-                  clock.countdown && clock.value <= 60
-                    ? "text-accent animate-pulse"
-                    : "text-white"
-                }`}
+              <Button
+                variant="ghost"
+                onClick={() => setPresentationMode((p) => !p)}
+                className={`gap-2 px-3 ${QUIET_BUTTON}`}
+                title={presentationMode ? "Rodyti valdiklius (Esc)" : "Pateikties režimas"}
+                aria-label={presentationMode ? "Rodyti valdiklius" : "Pateikties režimas"}
+                aria-pressed={presentationMode}
               >
-                {formatClock(clock.value)}
-              </p>
-              <p className="text-xs text-white/50 uppercase tracking-wide flex items-center gap-1 justify-end">
-                <Clock className="h-3 w-3" />
-                {clock.label}
-              </p>
-              {clock.countdown && (
-                <p className="text-xs text-white/60">
-                  {clock.lastTeam !== null ? (
-                    <>
-                      Vėliausiai pradėjusiai komandai liko{" "}
-                      <span className="font-mono font-semibold tabular-nums text-white">{formatClock(clock.lastTeam)}</span>
-                    </>
-                  ) : (
-                    "Komandos laikas skaičiuojamas nuo jos pradžios"
-                  )}
-                  {clock.joiningOver && ". Naujos komandos nebepriimamos"}
-                </p>
-              )}
+                {presentationMode ? (
+                  <Eye className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <EyeOff className="h-5 w-5" aria-hidden="true" />
+                )}
+                <span className="hidden sm:inline">{presentationMode ? "Valdikliai" : "Pateiktis"}</span>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Body */}
+        <main className="flex flex-1 flex-col px-4 py-5 sm:px-6 sm:py-6">
+          {connectionState === "degraded" && (
+            <div className="mb-4">
+              <LiveConnectionBanner onRetry={retry} tone="dark" />
             </div>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleFullscreen}
-            className="text-white/60 hover:text-white hover:bg-white/10"
-            title="Visas ekranas"
-            aria-label="Visas ekranas"
+
+          {/* The facilitator's announcements, for the whole class */}
+          <AnnouncementBanner gameId={game.id} variant="projector" />
+
+          {status === "finished" && (
+            <div className="mb-6 rounded-2xl border border-white/25 bg-white/[0.07] px-6 py-4 text-center">
+              <p className="text-3xl font-bold">Veikla baigta!</p>
+              <p className="mt-1 text-lg text-white/80">
+                {game.show_leaderboard ? "Galutiniai rezultatai" : "Ačiū visoms komandoms"}
+              </p>
+            </div>
+          )}
+
+          <div
+            className={cn(
+              "flex-1",
+              phase === "board" ? "grid grid-cols-1 content-start gap-6 lg:grid-cols-[1fr_300px]" : "flex flex-col",
+            )}
           >
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPresentationMode((p) => !p)}
-            className="gap-2 text-white/60 hover:text-white hover:bg-white/10"
-            title={presentationMode ? "Rodyti valdiklius (Esc)" : "Pateikties režimas"}
-            aria-label={presentationMode ? "Rodyti valdiklius" : "Pateikties režimas"}
-          >
-            {presentationMode ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-            <span className="hidden sm:inline">
-              {presentationMode ? "Valdikliai" : "Pateiktis"}
-            </span>
-          </Button>
-        </div>
-      </header>
+            {phase === "join" ? (
+              <LiveJoinScreen gameCode={game.game_code} playUrl={playUrl} joinAddress={joinAddress} teams={teams} />
+            ) : (
+              <LiveLeaderboardBoard
+                teams={teams}
+                solvedCounts={solvedCounts}
+                totalChallenges={challengeCount}
+                ranked={game.show_leaderboard}
+              />
+            )}
 
-      {/* Body */}
-      <div className="flex-1 px-6 py-6">
-        {connectionState === "degraded" && (
-          <div className="mb-4">
-            <LiveConnectionBanner onRetry={retry} tone="dark" />
-          </div>
-        )}
-
-        {/* The facilitator's announcements, for the whole class */}
-        <AnnouncementBanner gameId={game.id} variant="projector" />
-
-        {status === "finished" && (
-          <div className="mb-6 rounded-2xl border border-accent/40 bg-accent/10 px-6 py-4 text-center">
-            <p className="text-2xl font-bold">Veikla baigta!</p>
-            <p className="text-white/60 mt-1">Galutiniai rezultatai žemiau 🏆</p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-          {/* Leaderboard */}
-          <LiveLeaderboardBoard
-            teams={teams}
-            solvedCounts={solvedCounts}
-            totalChallenges={challengeCount}
-            ranked={game.show_leaderboard}
-          />
-
-          {/* Side panel: QR + activity */}
-          <div className="space-y-4">
-            {sideQr?.kind === "join" && (
-              <div className="rounded-xl border border-white/10 bg-white p-4 text-center">
-                <QRCodeSVG
-                  value={playUrl}
-                  size={180}
-                  level="H"
-                  includeMargin={false}
-                  fgColor="#00323C"
-                  className="mx-auto"
-                />
-                <p className="mt-3 font-mono text-3xl font-bold tracking-[0.25em] text-steam-dark">
-                  {game.game_code}
-                </p>
-                {/* Read from the back of the room: large, without the scheme,
-                    breaking only after a slash. */}
-                <p className="mt-2 text-lg font-semibold leading-snug text-steam-dark">
-                  {playUrl
-                    .replace(/^https?:\/\//, "")
-                    .split("/")
-                    .map((part, i, parts) => (
+            {/* Side panel: QR + latest solves. It stays mounted while the
+                class joins (the feed keeps its channel), only out of sight. */}
+            <aside className={cn("space-y-4", phase === "join" && "hidden")}>
+              {phase === "board" && sideQr?.kind === "join" && (
+                <div className="rounded-2xl bg-white p-4 text-center text-steam-dark">
+                  <LiveJoinQr url={playUrl} className="mx-auto w-44 rounded-none p-0" />
+                  <p className="mt-3 font-mono text-3xl font-bold tracking-[0.2em]">{game.game_code}</p>
+                  {/* Read from the back of the room: large, without the scheme. */}
+                  <p className="mt-1 text-lg font-bold leading-snug [overflow-wrap:anywhere]">
+                    {joinAddress.split("/").map((part, i, parts) => (
                       <Fragment key={i}>
                         {part}
                         {i < parts.length - 1 && (
@@ -410,83 +442,84 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
                         )}
                       </Fragment>
                     ))}
-                </p>
-              </div>
-            )}
-            {sideQr?.kind === "request" && (
-              <div className="rounded-xl border border-white/10 bg-white p-4 text-center">
-                <p className="mb-3 flex items-center justify-center gap-2 text-base font-semibold text-steam-dark">
-                  <GraduationCap className="h-5 w-5 text-secondary" aria-hidden="true" />
-                  Vedėjo paskyros prašymas
-                </p>
-                <QRCodeSVG
-                  value={sideQr.url}
-                  size={180}
-                  level="M"
-                  includeMargin={false}
-                  fgColor="#00323C"
-                  className="mx-auto"
-                />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Mokytojai: nuskaitykite ir pateikite prašymą. Patvirtinus gausite laišką.
-                </p>
-              </div>
-            )}
-            <LiveActivityFeed gameId={game.id} variant="projector" hidePoints={!game.show_leaderboard} />
-          </div>
-        </div>
-      </div>
-
-      {/* Control bar */}
-      {!presentationMode && (
-        <footer className="sticky bottom-0 border-t border-white/10 bg-steam-dark/95 backdrop-blur px-6 py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <GameStatusActions
-              gameId={game.id}
-              status={status}
-              challengeCount={challengeCount}
-            />
-            {requestUrl && status !== "finished" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowRequestQr((v) => !v)}
-                aria-pressed={showRequestQr}
-                className="gap-1.5 border-white/20 bg-transparent text-white/80 hover:bg-white/10 hover:text-white"
-              >
-                <GraduationCap className="h-4 w-4" aria-hidden="true" />
-                {showRequestQr ? "Rodyti prisijungimo QR" : "Rodyti prašymo QR"}
-              </Button>
-            )}
-            {(status === "active" || status === "paused") && (
-              <>
-                <TimeControls gameId={game.id} currentTimeLimit={timeLimit} variant="bar" onExtended={setTimeLimit} />
-                <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-                  <Megaphone className="h-4 w-4 text-white/40 shrink-0" />
-                  <Input
-                    value={announcement}
-                    onChange={(e) => setAnnouncement(e.target.value.slice(0, 500))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAnnounce()
-                    }}
-                    placeholder="Pranešimas komandoms..."
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 h-9"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleAnnounce}
-                    disabled={!announcement.trim() || sendingAnnouncement}
-                    className="bg-secondary-ink hover:bg-secondary-ink/90 text-white gap-1.5 shrink-0"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Siųsti
-                  </Button>
+                  </p>
                 </div>
-              </>
-            )}
+              )}
+              {sideQr?.kind === "request" && (
+                <div className="rounded-2xl bg-white p-4 text-center text-steam-dark">
+                  <p className="mb-3 flex items-center justify-center gap-2 text-base font-bold">
+                    <GraduationCap className="h-5 w-5" aria-hidden="true" />
+                    Vedėjo paskyros prašymas
+                  </p>
+                  <LiveJoinQr url={sideQr.url} level="M" className="mx-auto w-44 rounded-none p-0" />
+                  <p className="mt-3 text-sm">
+                    Mokytojai: nuskaitykite ir pateikite prašymą. Patvirtinus gausite laišką.
+                  </p>
+                </div>
+              )}
+              <LiveActivityFeed gameId={game.id} variant="projector" hidePoints={!game.show_leaderboard} />
+            </aside>
           </div>
-        </footer>
-      )}
-    </div>
+        </main>
+
+        {/* Control bar */}
+        {!presentationMode && (
+          <footer className="bottom-0 border-t border-white/10 bg-steam-dark/95 px-4 py-3 backdrop-blur sm:sticky sm:px-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <GameStatusActions gameId={game.id} status={status} challengeCount={challengeCount} variant="bar" />
+              {status === "finished" && (
+                <Button
+                  asChild
+                  className={`h-11 gap-2 rounded-full bg-highlight px-5 text-base font-bold text-highlight-foreground hover:bg-highlight/90 ${DARK_FOCUS}`}
+                >
+                  <Link href={`/games/${game.id}/analytics`}>
+                    <BarChart3 className="h-5 w-5" aria-hidden="true" />
+                    Rezultatai ir analitika
+                  </Link>
+                </Button>
+              )}
+              {(status === "active" || status === "paused") && (
+                <>
+                  <TimeControls gameId={game.id} currentTimeLimit={timeLimit} variant="bar" onExtended={setTimeLimit} />
+                  <div className="flex min-w-[240px] flex-1 items-center gap-2">
+                    <Megaphone className="h-5 w-5 shrink-0 text-white/70" aria-hidden="true" />
+                    <Input
+                      value={announcement}
+                      onChange={(e) => setAnnouncement(e.target.value.slice(0, 500))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAnnounce()
+                      }}
+                      placeholder="Pranešimas komandoms..."
+                      aria-label="Pranešimas komandoms"
+                      className="h-11 border-white/30 bg-white/10 text-base text-white placeholder:text-white/60 focus-visible:ring-highlight"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleAnnounce}
+                      disabled={!announcement.trim() || sendingAnnouncement}
+                      className={`shrink-0 gap-1.5 border-white/30 bg-transparent px-4 ${QUIET_BUTTON}`}
+                    >
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                      Siųsti
+                    </Button>
+                  </div>
+                </>
+              )}
+              {requestUrl && status !== "finished" && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRequestQr((v) => !v)}
+                  aria-pressed={showRequestQr}
+                  className={`gap-1.5 border-white/30 bg-transparent px-4 ${QUIET_BUTTON}`}
+                >
+                  <GraduationCap className="h-4 w-4" aria-hidden="true" />
+                  {showRequestQr ? "Rodyti prisijungimo QR" : "Rodyti prašymo QR"}
+                </Button>
+              )}
+            </div>
+          </footer>
+        )}
+      </div>
+    </MotionConfig>
   )
 }
