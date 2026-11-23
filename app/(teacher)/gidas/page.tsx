@@ -154,13 +154,16 @@ export default function GuidePage() {
           <li>
             <B>Laiką pratęskite,</B> jei veikla turi laiko limitą, o dauguma komandų nespėja. Klasės ekrane
             pridėsite 5 arba 10 minučių, skiltyje „Laiko valdymas“ mygtuku „Pratęsti“ pridėsite tiek, kiek
-            reikia.
+            reikia. Limitas skaičiuojamas kiekvienai komandai atskirai, nuo tada, kai ji pradeda: kiek liko,
+            matote jos kortelėje, o klasės ekrano laikmatis skaičiuoja nuo veiklos pradžios. Kai jis pasiekia
+            nulį, naujos komandos nebepriimamos, kol laiko nepratęsite.
           </li>
           <li>
             <B>Komanda prarado ryšį ar įrenginį.</B> Jei puslapis tik užsidarė, užtenka jį vėl atidaryti tame
             pačiame telefone. Jei telefonas išsikrovė, komandos kortelėje spauskite tris taškus ir rinkitės
-            „Grąžinti į komandą“. Gausite QR kodą ir nuorodą, galiojančius 10 minučių: nuskaičiusi juos kitu
-            įrenginiu, komanda tęsia su tais pačiais taškais. Kodą rodykite tik tai komandai.
+            „Grąžinti į komandą“. Gausite QR kodą ir nuorodą, galiojančius 10 minučių ir vieną kartą: nuskaičiusi
+            juos kitu įrenginiu, komanda tęsia su tais pačiais taškais, o ankstesnis jos įrenginys atjungiamas.
+            Kodą rodykite tik tai komandai.
           </li>
           <li>
             <B>Rezultatų lentelė</B> motyvuoja, bet varžymasis lengvai užgožia mokymąsi. Jei klasė linkusi
