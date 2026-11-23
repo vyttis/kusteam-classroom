@@ -48,8 +48,8 @@ const QUIET_BUTTON = `h-11 text-white/80 hover:bg-white/10 hover:text-white ${DA
 const URGENCY_PLATE: Record<CountdownUrgency, string> = {
   calm: "bg-transparent text-white",
   soon: "bg-highlight text-highlight-foreground",
-  last: "bg-accent text-white",
-  over: "bg-accent text-white",
+  last: "bg-accent text-accent-foreground",
+  over: "bg-accent text-accent-foreground",
 }
 const URGENCY_ICON = { soon: Hourglass, last: AlertTriangle, over: TimerOff } as const
 
