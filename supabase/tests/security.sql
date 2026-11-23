@@ -1185,3 +1185,141 @@ BEGIN
     NULL;
   END;
 END $$;
+
+-- 20261123130000: record_submission() writes an answer and the team's
+-- points in one transaction, for the service role only.
+INSERT INTO auth.users (id, email) VALUES ('00000000-0000-0000-0000-0000000003a1', 'rs@example.lt');
+UPDATE public.profiles SET status = 'active' WHERE id = '00000000-0000-0000-0000-0000000003a1';
+INSERT INTO public.games (id, teacher_id, title, game_code, status, settings) VALUES
+  ('10000000-0000-0000-0000-0000000003a1', '00000000-0000-0000-0000-0000000003a1', 'RS linear', 'RSLIN1', 'active', '{}'),
+  ('10000000-0000-0000-0000-0000000003a2', '00000000-0000-0000-0000-0000000003a1', 'RS free', 'RSFRE1', 'active',
+   '{"challenge_path_mode": "free"}');
+INSERT INTO public.challenges (id, game_id, title, answer_hash) VALUES
+  ('20000000-0000-0000-0000-0000000003a1', '10000000-0000-0000-0000-0000000003a1', 'RS1', '$2a$10$hashRS1'),
+  ('20000000-0000-0000-0000-0000000003a2', '10000000-0000-0000-0000-0000000003a1', 'RS2', '$2a$10$hashRS2'),
+  ('20000000-0000-0000-0000-0000000003a3', '10000000-0000-0000-0000-0000000003a2', 'RS3', '$2a$10$hashRS3');
+INSERT INTO public.teams (id, game_id, name, session_token, total_points) VALUES
+  ('30000000-0000-0000-0000-0000000003a1', '10000000-0000-0000-0000-0000000003a1', 'RS komanda', 'token-rs-1', 0),
+  ('30000000-0000-0000-0000-0000000003a2', '10000000-0000-0000-0000-0000000003a2', 'RS laisva', 'token-rs-2', 0),
+  ('30000000-0000-0000-0000-0000000003a3', '10000000-0000-0000-0000-0000000003a1', 'RS pilna', 'token-rs-3', 2147483647);
+
+DO $$
+DECLARE
+  sig constant text := 'public.record_submission(uuid, uuid, text, boolean, integer, integer)';
+  fn record;
+BEGIN
+  IF has_function_privilege('anon', sig, 'EXECUTE') OR has_function_privilege('authenticated', sig, 'EXECUTE')
+     OR has_function_privilege('public', sig, 'EXECUTE') THEN
+    RAISE EXCEPTION 'record_submission() must not be executable by anon, authenticated or PUBLIC';
+  END IF;
+  IF NOT has_function_privilege('service_role', sig, 'EXECUTE') THEN
+    RAISE EXCEPTION 'record_submission() must be executable by service_role';
+  END IF;
+  SELECT p.prosecdef, p.proconfig INTO fn FROM pg_proc p WHERE p.oid = sig::regprocedure;
+  IF fn.prosecdef OR NOT ('search_path=""' = ANY (fn.proconfig)) THEN
+    RAISE EXCEPTION 'record_submission() must run as its caller with an empty search_path';
+  END IF;
+END $$;
+
+-- A participant's browser (anon) and a signed-in facilitator cannot write
+-- answers or points through it.
+SET ROLE anon;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'anon', false);
+SELECT public.t_denied($q$SELECT public.record_submission('30000000-0000-0000-0000-0000000003a1',
+  '20000000-0000-0000-0000-0000000003a1', 'x', true, 100, 0)$q$);
+RESET ROLE;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000003a1', false);
+SELECT public.t_denied($q$SELECT public.record_submission('30000000-0000-0000-0000-0000000003a1',
+  '20000000-0000-0000-0000-0000000003a1', 'x', true, 100, 0)$q$);
+RESET ROLE;
+
+SET ROLE service_role;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+DO $$
+DECLARE
+  r jsonb;
+  t record;
+BEGIN
+  -- A wrong answer is stored without points and moves nothing.
+  r := public.record_submission('30000000-0000-0000-0000-0000000003a1', '20000000-0000-0000-0000-0000000003a1', 'ne', false, 0, 0);
+  SELECT total_points, current_challenge_index INTO t FROM public.teams WHERE id = '30000000-0000-0000-0000-0000000003a1';
+  IF r <> '{"already_solved": false, "total_points": 0}'::jsonb OR t.total_points <> 0 OR t.current_challenge_index <> 0 THEN
+    RAISE EXCEPTION 'a wrong answer must not change the team: % %', r, t;
+  END IF;
+
+  -- A correct answer: the row and the points together, linear mode moves on.
+  r := public.record_submission('30000000-0000-0000-0000-0000000003a1', '20000000-0000-0000-0000-0000000003a1', 'taip', true, 80, 1);
+  SELECT total_points, current_challenge_index INTO t FROM public.teams WHERE id = '30000000-0000-0000-0000-0000000003a1';
+  IF r <> '{"already_solved": false, "total_points": 80}'::jsonb OR t.total_points <> 80 OR t.current_challenge_index <> 1 THEN
+    RAISE EXCEPTION 'a correct answer must add its points and move a linear team on: % %', r, t;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.submissions WHERE team_id = '30000000-0000-0000-0000-0000000003a1'
+                 AND challenge_id = '20000000-0000-0000-0000-0000000003a1' AND is_correct
+                 AND points_awarded = 80 AND hints_used = 1 AND answer = 'taip') THEN
+    RAISE EXCEPTION 'the correct answer must be stored as given';
+  END IF;
+
+  -- The same task again: already solved, nothing written, no second award.
+  r := public.record_submission('30000000-0000-0000-0000-0000000003a1', '20000000-0000-0000-0000-0000000003a1', 'taip', true, 100, 0);
+  SELECT total_points, current_challenge_index INTO t FROM public.teams WHERE id = '30000000-0000-0000-0000-0000000003a1';
+  IF r <> '{"already_solved": true, "total_points": 80}'::jsonb OR t.total_points <> 80 OR t.current_challenge_index <> 1 THEN
+    RAISE EXCEPTION 'a second correct answer must not be counted: % %', r, t;
+  END IF;
+  IF (SELECT count(*) FROM public.submissions WHERE team_id = '30000000-0000-0000-0000-0000000003a1') <> 2 THEN
+    RAISE EXCEPTION 'a second correct answer must not be stored';
+  END IF;
+
+  -- Free mode adds the points and leaves the index alone.
+  r := public.record_submission('30000000-0000-0000-0000-0000000003a2', '20000000-0000-0000-0000-0000000003a3', 'taip', true, 50, 0);
+  SELECT total_points, current_challenge_index INTO t FROM public.teams WHERE id = '30000000-0000-0000-0000-0000000003a2';
+  IF r <> '{"already_solved": false, "total_points": 50}'::jsonb OR t.total_points <> 50 OR t.current_challenge_index <> 0 THEN
+    RAISE EXCEPTION 'free mode must add points without moving the index: % %', r, t;
+  END IF;
+
+  -- One transaction: when the points cannot be added, the answer is not
+  -- stored either (this team's total is at the integer limit).
+  BEGIN
+    PERFORM public.record_submission('30000000-0000-0000-0000-0000000003a3', '20000000-0000-0000-0000-0000000003a2', 'taip', true, 1, 0);
+    RAISE EXCEPTION 'adding points past the integer limit must fail';
+  EXCEPTION WHEN numeric_value_out_of_range THEN
+    NULL;
+  END;
+  IF EXISTS (SELECT 1 FROM public.submissions WHERE team_id = '30000000-0000-0000-0000-0000000003a3') THEN
+    RAISE EXCEPTION 'a failed score update must not leave the answer behind';
+  END IF;
+
+  -- A task of another activity, an unknown team and impossible values.
+  BEGIN
+    PERFORM public.record_submission('30000000-0000-0000-0000-0000000003a1', '20000000-0000-0000-0000-0000000003a3', 'taip', true, 10, 0);
+    RAISE EXCEPTION 'a task of another activity must be refused';
+  EXCEPTION WHEN no_data_found THEN
+    NULL;
+  END;
+  BEGIN
+    PERFORM public.record_submission('30000000-0000-0000-0000-0000000003ff', '20000000-0000-0000-0000-0000000003a1', 'taip', true, 10, 0);
+    RAISE EXCEPTION 'an unknown team must be refused';
+  EXCEPTION WHEN no_data_found THEN
+    NULL;
+  END;
+  BEGIN
+    PERFORM public.record_submission('30000000-0000-0000-0000-0000000003a1', '20000000-0000-0000-0000-0000000003a2', 'taip', true, -5, 0);
+    RAISE EXCEPTION 'negative points must be refused';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    NULL;
+  END;
+  BEGIN
+    PERFORM public.record_submission('30000000-0000-0000-0000-0000000003a1', '20000000-0000-0000-0000-0000000003a2', 'ne', false, 5, 0);
+    RAISE EXCEPTION 'points for a wrong answer must be refused';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    NULL;
+  END;
+  IF (SELECT count(*) FROM public.submissions WHERE team_id = '30000000-0000-0000-0000-0000000003a1') <> 2
+     OR (SELECT total_points FROM public.teams WHERE id = '30000000-0000-0000-0000-0000000003a1') <> 80 THEN
+    RAISE EXCEPTION 'refused calls must leave the team as it was';
+  END IF;
+END $$;
+RESET ROLE;
