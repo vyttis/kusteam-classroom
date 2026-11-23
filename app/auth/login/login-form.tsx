@@ -183,7 +183,7 @@ export function LoginForm() {
         {/* The rays draw once: the one deliberate motion of this screen.
             Next to the large ray element the logo is the wordmark alone. */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <SteamRays draw className="h-32 w-32" />
+          <SteamRays draw className="h-32 w-24" />
           <SteamLogo size="large" symbol={false} />
         </div>
 
