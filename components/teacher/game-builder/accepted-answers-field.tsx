@@ -46,18 +46,23 @@ export function AcceptedAnswersField({
 
   return (
     <div className="space-y-2">
-      <Label className="block text-xs font-medium" id={`${fieldId}-accepted-label`}>
+      <Label className="block text-sm font-semibold leading-snug text-foreground" id={`${fieldId}-accepted-label`}>
         Kiti priimami atsakymai (neprivaloma)
       </Label>
+      <p className="text-xs text-muted-foreground">
+        {type === "number"
+          ? "Pvz., kai tinka ir apvalintas skaičius. Iki 5."
+          : "Pvz. „Vilnius“ ir „Vilniaus miestas“. Kiekvienas tikrinamas taip pat kaip pagrindinis. Iki 5."}
+      </p>
       {savedNote && (
-        <p className="text-xs text-muted-foreground">
+        <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-foreground">
           {savedNote}
           {savedForType && !hasNew && (
             <Button
               type="button"
               variant="link"
               size="sm"
-              className="h-auto p-0 ml-1 text-xs"
+              className="ml-1 h-auto min-h-6 p-0 text-xs"
               onClick={() => onRemoveChange(!remove)}
             >
               {remove ? "Atšaukti" : "Pašalinti"}
@@ -66,7 +71,7 @@ export function AcceptedAnswersField({
         </p>
       )}
       {values.map((value, i) => (
-        <div key={i} className="flex items-center gap-2">
+        <div key={i} className="flex items-center gap-1">
           <Input
             type={type === "number" ? "number" : "text"}
             value={value}
@@ -78,12 +83,12 @@ export function AcceptedAnswersField({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-accent-ink"
+            size="icon"
+            className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground"
             aria-label={`Pašalinti ${i + 1} kitą atsakymą`}
             onClick={() => onChange(values.filter((_, j) => j !== i))}
           >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       ))}
@@ -93,18 +98,13 @@ export function AcceptedAnswersField({
           variant="outline"
           size="sm"
           onClick={() => onChange([...values, ""])}
-          className="gap-1 text-xs"
+          className="gap-1.5"
           aria-describedby={`${fieldId}-accepted-label`}
         >
-          <Plus className="h-3 w-3" aria-hidden="true" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
           Pridėti kitą atsakymą
         </Button>
       )}
-      <p className="text-xs text-muted-foreground">
-        {type === "number"
-          ? "Pvz., kai tinka ir apvalintas skaičius. Iki 5."
-          : "Pvz. „Vilnius“ ir „Vilniaus miestas“. Kiekvienas tikrinamas taip pat kaip pagrindinis. Iki 5."}
-      </p>
     </div>
   )
 }

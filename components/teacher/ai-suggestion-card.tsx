@@ -3,21 +3,21 @@
 import { useState } from "react"
 import { AiSuggestion, VerificationVerdict } from "@/lib/ai/types"
 import { proposedAcceptedAnswers } from "@/components/teacher/game-builder/suggestion-payload"
-import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { motion } from "framer-motion"
 import {
-  X,
-  Lightbulb,
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  AlertTriangle,
-  XCircle,
+  Circle,
+  HelpCircle,
+  Pencil,
+  Plus,
   ShieldCheck,
-  Edit3,
+  X,
+  XCircle,
 } from "lucide-react"
 
 const typeLabels: Record<string, string> = {
@@ -26,36 +26,42 @@ const typeLabels: Record<string, string> = {
   multiple_choice: "Pasirinkimas",
 }
 
-function VerdictBadge({ verdict }: { verdict?: VerificationVerdict }) {
-  if (!verdict) return null
-  const config = {
-    pass: {
-      label: "DI klaidų nerado",
-      // Not a guarantee: the facilitator confirms the answer.
-      title: "Tai ne garantija. Atsakymą patvirtinate jūs.",
-      className: "bg-primary/10 text-primary-ink border-primary/20",
-      Icon: ShieldCheck,
-    },
-    uncertain: {
-      label: "Reikia peržiūros",
-      title: undefined,
-      className: "bg-highlight/10 text-highlight-ink border-highlight/20",
-      Icon: AlertTriangle,
-    },
-    fail: {
-      label: "Klaida",
-      title: undefined,
-      className: "bg-accent/10 text-accent-ink border-accent/20",
-      Icon: XCircle,
-    },
-  }
-  const c = config[verdict]
-  return (
-    <Badge variant="outline" title={c.title} className={`text-xs gap-1 ${c.className}`}>
-      <c.Icon className="h-3 w-3" />
-      {c.label}
-    </Badge>
-  )
+const difficultyLabels: Record<string, string> = {
+  easy: "Lengva",
+  medium: "Vidutinė",
+  hard: "Sunki",
+}
+
+// What the DI check said, in words. The colour is only the edge of the box.
+const VERDICTS: Record<
+  VerificationVerdict | "none",
+  { label: string; note: string; edge: string; Icon: typeof ShieldCheck }
+> = {
+  pass: {
+    label: "DI klaidų nerado",
+    // Not a guarantee: the facilitator confirms the answer.
+    note: "Tai ne garantija. Atsakymą patvirtinate jūs.",
+    edge: "border-l-primary",
+    Icon: ShieldCheck,
+  },
+  uncertain: {
+    label: "Reikia peržiūros",
+    note: "DI patikra abejoja šiuo pasiūlymu. Prieš pridėdami patikrinkite atsakymą.",
+    edge: "border-l-highlight",
+    Icon: AlertTriangle,
+  },
+  fail: {
+    label: "Klaida",
+    note: "DI patikra rado klaidą, todėl šio pasiūlymo pridėti negalima.",
+    edge: "border-l-accent",
+    Icon: XCircle,
+  },
+  none: {
+    label: "DI atsakymo nepatikrino",
+    note: "Prieš pridėdami patikrinkite atsakymą patys.",
+    edge: "border-l-border",
+    Icon: HelpCircle,
+  },
 }
 
 interface AiSuggestionCardProps {
@@ -81,209 +87,181 @@ export function AiSuggestionCard({
   onEdit,
   onReject,
 }: AiSuggestionCardProps) {
-  const [showDetails, setShowDetails] = useState(false)
-
-  const isFailed = suggestion.verification?.verdict === "fail"
-  const isUncertain = suggestion.verification?.verdict === "uncertain"
+  const verdict = suggestion.verification?.verdict
+  const isFailed = verdict === "fail"
+  const isUncertain = verdict === "uncertain"
   const isDisabled = added || isFailed
   const alsoAccepted = proposedAcceptedAnswers(suggestion)
+  const issues = suggestion.verification?.issues ?? []
+  // What the check doubted is shown at once; a clean pass keeps it folded.
+  const [showDetails, setShowDetails] = useState(isFailed || isUncertain)
+  const v = VERDICTS[verdict ?? "none"]
+
+  const meta = [
+    `${suggestion.points} tšk.`,
+    typeLabels[suggestion.type] || suggestion.type,
+    suggestion.difficulty ? difficultyLabels[suggestion.difficulty] : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ delay: index * 0.1 }}
+    <div
+      className={cn(
+        "motion-rise-in space-y-3 rounded-xl border bg-white p-4",
+        added ? "border-primary" : selected ? "border-foreground/40" : "border-border",
+        isFailed && "bg-muted/40"
+      )}
+      style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
     >
-      <Card
-        className={`border-l-4 border-border/50 bg-white ${
-          isFailed
-            ? "border-l-accent/50 opacity-60"
-            : isUncertain
-            ? "border-l-highlight"
-            : added
-            ? "border-l-primary/30 opacity-70"
-            : "border-l-highlight"
-        }`}
-      >
-        <CardContent className="p-4 space-y-3">
-          {/* Header with checkbox */}
-          <div className="flex items-start gap-3">
-            <Checkbox
-              checked={selected}
-              onCheckedChange={() => onToggleSelect(index)}
-              disabled={isDisabled}
-              className="mt-1 shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="font-medium text-steam-dark text-sm leading-tight">
-                  {suggestion.title}
-                </h4>
-                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                  <Badge variant="outline" className="text-xs">
-                    {suggestion.points} taškų
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {typeLabels[suggestion.type] || suggestion.type}
-                  </Badge>
-                </div>
-              </div>
+      {/* Title and facts */}
+      <div className="flex items-start gap-1">
+        <label className="-ml-3 -mt-3 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={() => onToggleSelect(index)}
+            disabled={isDisabled}
+            aria-label={`Pažymėti pasiūlymą „${suggestion.title}“`}
+          />
+        </label>
+        <div className="min-w-0 flex-1 pr-8">
+          <h4 className="break-words text-base font-bold leading-snug text-steam-dark">{suggestion.title}</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>
+        </div>
+      </div>
 
-              {/* Verification badge */}
-              {suggestion.verification && (
-                <div className="mt-1.5">
-                  <VerdictBadge verdict={suggestion.verification.verdict} />
-                </div>
-              )}
+      {/* Question */}
+      {suggestion.description && (
+        <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{suggestion.description}</p>
+      )}
 
-              {/* Added badge */}
-              {added && (
-                <div className="mt-1.5">
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-primary/10 text-primary-ink border-primary/20 gap-1"
-                  >
-                    <CheckCircle2 className="h-3 w-3" />
-                    Pridėta
-                  </Badge>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Description */}
-          {suggestion.description && (
-            <p className="text-xs text-muted-foreground leading-relaxed pl-7">
-              {suggestion.description}
-            </p>
-          )}
-
-          {/* Answer */}
-          <div className="flex items-center gap-1.5 p-2 rounded-md bg-primary/5 border border-primary/10 ml-7">
-            <CheckCircle2 className="h-3.5 w-3.5 text-primary-ink shrink-0" />
-            <span className="text-xs font-medium text-steam-dark">
-              Atsakymas: {suggestion.correct_answer}
-            </span>
-          </div>
-
-          {/* Other spellings the DI proposes; added with the task */}
-          {alsoAccepted.length > 0 && (
-            <p className="text-xs text-muted-foreground pl-7">
-              Taip pat tinka: {alsoAccepted.join(", ")}
-            </p>
-          )}
-
-          {/* Options (for multiple choice) */}
-          {suggestion.type === "multiple_choice" && suggestion.options && (
-            <div className="space-y-1 pl-7">
-              <p className="text-xs text-muted-foreground font-medium">
-                Variantai:
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {suggestion.options.map((opt, i) => (
-                  <Badge
-                    key={i}
-                    variant={
-                      opt === suggestion.correct_answer ? "default" : "outline"
-                    }
-                    className="text-xs"
-                  >
-                    {opt}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Hints */}
-          {suggestion.hints.length > 0 && (
-            <div className="flex items-start gap-1.5 pl-7">
-              <Lightbulb className="h-3.5 w-3.5 text-highlight-ink shrink-0 mt-0.5" />
-              <div className="text-xs text-muted-foreground">
-                {suggestion.hints.map((hint, i) => (
-                  <span key={i}>
-                    {hint}
-                    {i < suggestion.hints.length - 1 && " • "}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Verification details (collapsible) */}
-          {suggestion.verification?.issues &&
-            suggestion.verification.issues.length > 0 && (
-              <div className="pl-7">
-                <button
-                  type="button"
-                  onClick={() => setShowDetails(!showDetails)}
-                  className="text-xs text-muted-foreground hover:text-steam-dark flex items-center gap-1"
-                >
-                  {showDetails ? (
-                    <ChevronUp className="h-3 w-3" />
+      {/* Options (multiple choice): the correct one is marked and named */}
+      {suggestion.type === "multiple_choice" && suggestion.options && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">Variantai</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {suggestion.options.map((opt, i) => {
+              const correct = opt === suggestion.correct_answer
+              return (
+                <li key={i} className={cn("flex items-start gap-2", correct && "font-bold text-foreground")}>
+                  {correct ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden="true" />
                   ) : (
-                    <ChevronDown className="h-3 w-3" />
+                    <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   )}
-                  Rodyti patikros detales
-                </button>
-                {showDetails && (
-                  <div className="mt-2 p-2 rounded bg-muted/30 text-xs space-y-1">
-                    {suggestion.verification.issues.map((issue, i) => (
-                      <p key={i} className="text-muted-foreground">
-                        • {issue}
-                      </p>
-                    ))}
-                    {suggestion.verification.confidence !== undefined && (
-                      <p className="text-muted-foreground mt-1">
-                        Patikros tikimybė:{" "}
-                        {Math.round(suggestion.verification.confidence * 100)}%
-                      </p>
-                    )}
-                  </div>
+                  <span className="min-w-0 break-words">
+                    {opt}
+                    {correct && <span className="sr-only"> (teisingas)</span>}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Answer, and the other spellings the DI proposes (added with the task) */}
+      <div className="rounded-lg border border-border px-3 py-2 text-sm">
+        <p className="flex items-start gap-2 font-bold text-foreground">
+          {/* No tick on an answer the check rejected. */}
+          {!isFailed && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden="true" />}
+          <span className="min-w-0 break-words">Atsakymas: {suggestion.correct_answer}</span>
+        </p>
+        {alsoAccepted.length > 0 && (
+          <p className={cn("mt-1 break-words text-muted-foreground", !isFailed && "pl-6")}>
+            Taip pat tinka: {alsoAccepted.join(", ")}
+          </p>
+        )}
+      </div>
+
+      {/* Hints */}
+      {suggestion.hints.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">Užuominos</p>
+          <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-sm text-foreground">
+            {suggestion.hints.map((hint, i) => (
+              <li key={i}>{hint}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {/* What the DI check found */}
+      <div className={cn("rounded-lg border border-l-4 border-border bg-muted/40 px-3 py-2 text-sm", v.edge)}>
+        <p className="flex items-start gap-2 text-foreground">
+          <v.Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-bold">{v.label}.</span> {v.note}
+          </span>
+        </p>
+        {issues.length > 0 && (
+          <div className="pl-6">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              aria-expanded={showDetails}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              {showDetails ? (
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              )}
+              {showDetails ? "Slėpti patikros detales" : "Rodyti patikros detales"}
+            </button>
+            {showDetails && (
+              <div className="pb-1 text-sm text-foreground">
+                <ul className="list-disc space-y-0.5 pl-5">
+                  {issues.map((issue, i) => (
+                    <li key={i}>{issue}</li>
+                  ))}
+                </ul>
+                {suggestion.verification?.confidence !== undefined && (
+                  <p className="mt-1 text-muted-foreground">
+                    Patikros tikimybė: {Math.round(suggestion.verification.confidence * 100)}%
+                  </p>
                 )}
               </div>
             )}
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-1 pl-7">
-            {!added && !isFailed && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onAdd(index)}
-                disabled={adding}
-                className="text-primary-ink hover:text-primary-ink/80 gap-1.5 text-xs h-8"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Pridėti
-              </Button>
-            )}
-            {onEdit && !added && !isFailed && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onEdit(index)}
-                className="text-secondary-ink hover:text-secondary-ink/80 gap-1.5 text-xs h-8"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                Redaguoti
-              </Button>
-            )}
-            {!added && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onReject(index)}
-                className="text-muted-foreground hover:text-accent-ink gap-1.5 text-xs h-8"
-              >
-                <X className="h-3.5 w-3.5" />
-                Atmesti
-              </Button>
-            )}
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+        )}
+      </div>
+
+      {/* Actions */}
+      {added ? (
+        <p className="motion-pop-in flex items-center gap-1.5 text-sm font-bold text-foreground">
+          <CheckCircle2 className="h-4 w-4 text-primary-ink" aria-hidden="true" />
+          Pridėta
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {!isFailed && (
+            <Button
+              variant="outline"
+              onClick={() => onAdd(index)}
+              disabled={adding}
+              className="gap-1.5 border-2 border-primary bg-white font-bold text-foreground hover:bg-primary/10"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Pridėti
+            </Button>
+          )}
+          {onEdit && !isFailed && (
+            <Button variant="outline" onClick={() => onEdit(index)} className="gap-1.5">
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Redaguoti
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            onClick={() => onReject(index)}
+            className="ml-auto gap-1.5 px-3 text-muted-foreground"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+            Atmesti
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

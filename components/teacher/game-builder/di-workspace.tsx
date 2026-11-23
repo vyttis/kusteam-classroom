@@ -3,9 +3,9 @@
 import { Challenge } from "@/types/game"
 import { AiSuggestion, ScenarioPreset } from "@/lib/ai/types"
 import { SuggestionsPanel } from "./suggestions-panel"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 import {
+  Check,
   Zap,
   Search,
   DoorOpen,
@@ -97,85 +97,63 @@ export function DiWorkspace({
   onImportedSuggestions,
 }: DiWorkspaceProps) {
   return (
-    <div className="space-y-4">
-      {/* Scenario presets */}
-      {suggestions.length === 0 && !loading && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            Pasirinkite scenarijų (neprivaloma)
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {scenarios.map((s) => (
-              <Card
-                key={s.id}
-                className={`cursor-pointer transition-all hover:border-highlight/40 ${
-                  selectedScenario === s.id
-                    ? "border-highlight ring-1 ring-highlight/20 bg-highlight/5"
-                    : "border-border/50"
-                }`}
-                onClick={() =>
-                  onScenarioChange(selectedScenario === s.id ? null : s.id)
-                }
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-start gap-2">
-                    <div
-                      className={`shrink-0 ${
-                        selectedScenario === s.id
-                          ? "text-highlight-ink"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {s.icon}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-steam-dark">
-                        {s.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.description}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {selectedScenario && (
-            <Badge
-              variant="outline"
-              className="text-xs text-highlight-ink border-highlight/30"
-            >
-              Scenarijus: {scenarios.find((s) => s.id === selectedScenario)?.label}
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Suggestions Panel */}
-      <SuggestionsPanel
-        gameTitle={gameTitle}
-        gameDescription={gameDescription}
-        existingChallenges={challenges}
-        suggestions={suggestions}
-        selectedIds={selectedIds}
-        addedIds={addedIds}
-        adding={adding}
-        loading={loading}
-        error={error}
-        teacherPrompt={teacherPrompt}
-        onTeacherPromptChange={onTeacherPromptChange}
-        onGenerate={onGenerate}
-        onToggleSelect={onToggleSelect}
-        onSelectAll={onSelectAll}
-        onDeselectAll={onDeselectAll}
-        onAdd={onAdd}
-        onEdit={onEdit}
-        onBulkAdd={onBulkAdd}
-        onReject={onReject}
-        generationSuccess={generationSuccess}
-        onImportedSuggestions={onImportedSuggestions}
-      />
-    </div>
+    <SuggestionsPanel
+      gameTitle={gameTitle}
+      gameDescription={gameDescription}
+      existingChallenges={challenges}
+      suggestions={suggestions}
+      selectedIds={selectedIds}
+      addedIds={addedIds}
+      adding={adding}
+      loading={loading}
+      error={error}
+      teacherPrompt={teacherPrompt}
+      onTeacherPromptChange={onTeacherPromptChange}
+      onGenerate={onGenerate}
+      onToggleSelect={onToggleSelect}
+      onSelectAll={onSelectAll}
+      onDeselectAll={onDeselectAll}
+      onAdd={onAdd}
+      onEdit={onEdit}
+      onBulkAdd={onBulkAdd}
+      onReject={onReject}
+      generationSuccess={generationSuccess}
+      onImportedSuggestions={onImportedSuggestions}
+      scenarioPicker={
+        /* Scenario presets: an optional choice made before the first request */
+        suggestions.length === 0 && !loading ? (
+          <fieldset>
+            <legend className="text-sm font-semibold text-foreground">
+              Scenarijus <span className="font-normal text-muted-foreground">(neprivaloma)</span>
+            </legend>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {scenarios.map((s) => {
+                const chosen = selectedScenario === s.id
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    aria-pressed={chosen}
+                    onClick={() => onScenarioChange(chosen ? null : s.id)}
+                    className={cn(
+                      "flex min-h-14 items-start gap-2.5 rounded-xl border bg-white p-3 text-left transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      chosen ? "border-2 border-primary bg-primary/5 p-[calc(0.75rem-1px)]" : "border-border hover:border-foreground/30"
+                    )}
+                  >
+                    <span className="mt-0.5 shrink-0 text-steam-dark [&_svg]:h-5 [&_svg]:w-5" aria-hidden="true">
+                      {chosen ? <Check /> : s.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-steam-dark">{s.label}</span>
+                      <span className="block text-xs text-muted-foreground">{s.description}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+        ) : null
+      }
+    />
   )
 }

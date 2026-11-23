@@ -3,16 +3,12 @@
 import { useState, useEffect } from "react"
 import { LibraryItem } from "@/types/game"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import {
-  BookOpen,
   Loader2,
   Search,
   Plus,
-  Puzzle,
   ChevronDown,
   ChevronUp,
 } from "lucide-react"
@@ -94,151 +90,127 @@ export function LibraryWorkspace({ gameId, onTaskAdded }: LibraryWorkspaceProps)
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <BookOpen className="h-5 w-5 text-secondary-ink" />
-        <h2 className="font-semibold text-steam-dark">Biblioteka</h2>
+      <div>
+        <h2 className="text-xl font-bold leading-tight text-steam-dark">Biblioteka</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Atverkite patvirtintą veiklą ir pridėkite iš jos tinkamas užduotis.
+        </p>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Naršykite patvirtintas veiklas ir pridėkite užduotis
-      </p>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Search
+          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
         <Input
           placeholder="Ieškoti..."
+          aria-label="Ieškoti bibliotekoje"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-white"
+          className="bg-white pl-10"
         />
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
+        <p role="status" className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-4 text-sm text-foreground">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-steam-dark motion-reduce:animate-none" aria-hidden="true" />
+          Įkeliama biblioteka...
+        </p>
       )}
 
       {!loading && error && (
-        <div className="text-center py-8">
-          <BookOpen className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">
-            Nepavyko įkelti bibliotekos.
-          </p>
-          <Button variant="outline" size="sm" onClick={fetchItems}>
+        <div
+          role="alert"
+          className="rounded-xl border border-border border-l-[6px] border-l-accent bg-white px-4 py-3"
+        >
+          <p className="text-sm font-bold text-foreground">Nepavyko įkelti bibliotekos.</p>
+          <Button variant="outline" size="sm" onClick={fetchItems} className="mt-2">
             Bandyti dar kartą
           </Button>
         </div>
       )}
 
       {!loading && !error && filtered.length === 0 && (
-        <div className="text-center py-8">
-          <BookOpen className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {items.length === 0
-              ? "Bibliotekoje dar nėra patvirtintų veiklų"
-              : "Nerasta rezultatų"}
-          </p>
-        </div>
+        <p className="rounded-xl border border-dashed border-foreground/25 px-4 py-8 text-center text-sm text-muted-foreground">
+          {items.length === 0
+            ? "Bibliotekoje dar nėra patvirtintų veiklų"
+            : "Nerasta rezultatų"}
+        </p>
       )}
 
       {/* Library items */}
-      <div className="space-y-2">
-        {filtered.map((item) => (
-          <Card key={item.id} className="border-border/50">
-            <CardContent className="p-3">
+      <ul className="space-y-2">
+        {filtered.map((item) => {
+          const expanded = expandedId === item.id
+          const count = item.challenge_data?.length || 0
+          return (
+            <li key={item.id} className="rounded-xl border border-border bg-white">
               <button
                 type="button"
-                className="w-full text-left"
-                onClick={() =>
-                  setExpandedId(expandedId === item.id ? null : item.id)
-                }
+                aria-expanded={expanded}
+                className="flex min-h-14 w-full items-start justify-between gap-3 rounded-xl p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                onClick={() => setExpandedId(expanded ? null : item.id)}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-medium text-steam-dark">
-                      {item.title}
-                    </h3>
-                    {item.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                        {item.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <Badge variant="outline" className="text-xs">
-                        <Puzzle className="h-2.5 w-2.5 mr-1" />
-                        {item.challenge_data?.length || 0} užd.
-                      </Badge>
-                      {item.subject && (
-                        <Badge variant="secondary" className="text-xs">
-                          {item.subject}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  {expandedId === item.id ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-steam-dark">{item.title}</span>
+                  {item.description && (
+                    <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">
+                      {item.description}
+                    </span>
                   )}
-                </div>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {[`${count} užd.`, item.subject].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                {expanded ? (
+                  <ChevronUp className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                )}
               </button>
 
-              {expandedId === item.id && item.challenge_data && (
-                <div className="mt-3 space-y-2 border-t border-border/30 pt-3">
+              {expanded && item.challenge_data && (
+                <ul className="motion-fade-in divide-y divide-border border-t border-border px-3">
                   {item.challenge_data.map((snap, i) => {
                     const key = `${item.id}-${i}`
                     return (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/20"
-                      >
+                      <li key={i} className="flex items-center justify-between gap-3 py-2">
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-steam-dark truncate">
-                            {snap.title}
+                          <p className="line-clamp-2 break-words text-sm font-bold text-steam-dark">{snap.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {snap.points} tšk. &middot;{" "}
+                            {snap.type === "text"
+                              ? "Tekstas"
+                              : snap.type === "number"
+                              ? "Skaičius"
+                              : "Pasirinkimas"}
                           </p>
-                          <div className="flex gap-1.5 mt-0.5">
-                            <Badge
-                              variant="outline"
-                              className="text-xs px-1 py-0"
-                            >
-                              {snap.points} tšk.
-                            </Badge>
-                            <Badge
-                              variant="secondary"
-                              className="text-xs px-1 py-0"
-                            >
-                              {snap.type === "text"
-                                ? "Tekstas"
-                                : snap.type === "number"
-                                ? "Skaičius"
-                                : "Pasirinkimas"}
-                            </Badge>
-                          </div>
                         </div>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs gap-1 shrink-0"
+                          className="shrink-0 gap-1.5"
+                          aria-label={`Pridėti „${snap.title}“`}
                           disabled={addingIds.has(key)}
                           onClick={() => addChallengeFromLibrary(item, snap, i)}
                         >
                           {addingIds.has(key) ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                           ) : (
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-4 w-4" aria-hidden="true" />
                           )}
                           Pridėti
                         </Button>
-                      </div>
+                      </li>
                     )
                   })}
-                </div>
+                </ul>
               )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

@@ -112,8 +112,8 @@ export function ImportDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-          <Upload className="h-3.5 w-3.5" />
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Upload className="h-4 w-4" aria-hidden="true" />
           Importuoti
         </Button>
       </DialogTrigger>
@@ -133,7 +133,7 @@ export function ImportDialog({
             onClick={() => fileRef.current?.click()}
           >
             <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm font-medium text-steam-dark mb-1">
+            <p className="text-sm font-bold text-steam-dark mb-1">
               Pasirinkite failą
             </p>
             <p className="text-xs text-muted-foreground">
@@ -151,12 +151,12 @@ export function ImportDialog({
 
         {step === "processing" && (
           <div className="py-8 text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-primary-ink mx-auto mb-3" />
-            <p className="text-sm font-medium text-steam-dark mb-1">
+            <Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin text-steam-dark motion-reduce:animate-none" aria-hidden="true" />
+            <p className="text-sm font-bold text-steam-dark mb-1">
               Apdorojama...
             </p>
             <p className="text-xs text-muted-foreground">
-              {fileName} &mdash; generuojamos užduotys
+              {fileName}: generuojamos užduotys
             </p>
           </div>
         )}
@@ -164,7 +164,7 @@ export function ImportDialog({
         {step === "done" && (
           <div className="py-8 text-center">
             <CheckCircle2 className="h-10 w-10 text-primary-ink mx-auto mb-3" />
-            <p className="text-sm font-medium text-steam-dark">
+            <p className="text-sm font-bold text-steam-dark">
               Užduotys sugeneruotos!
             </p>
           </div>
@@ -173,7 +173,7 @@ export function ImportDialog({
         {step === "error" && (
           <div className="py-8 text-center">
             <AlertCircle className="h-10 w-10 text-accent-ink mx-auto mb-3" />
-            <p className="text-sm font-medium text-accent-ink mb-1">Klaida</p>
+            <p className="mb-1 text-sm font-bold text-foreground">Klaida</p>
             <p className="text-xs text-muted-foreground mb-4">
               {errorMessage}
             </p>

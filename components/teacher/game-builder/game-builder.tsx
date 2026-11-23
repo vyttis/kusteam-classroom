@@ -56,7 +56,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { AlertTriangle, Sparkles } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { isLiveStatus } from "@/lib/game/live-edit"
 import { aiTasksToReview } from "@/lib/game/ai-review"
@@ -183,6 +183,16 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
   // Generation success feedback
   const [generationSuccess, setGenerationSuccess] = useState<number | null>(null)
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // The row of the task saved in the editor a moment ago shows "Išsaugota".
+  const [savedTaskId, setSavedTaskId] = useState<string | null>(null)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    },
+    []
+  )
 
   // Delete confirmation
   const [deletingChallenge, setDeletingChallenge] = useState<Challenge | null>(null)
@@ -431,6 +441,24 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
     setRestoredSuggestions(null)
   }
 
+  // Opens the DI or the library mode: from the empty list and, on a phone,
+  // from the buttons above the list.
+  function handleOpenMode(mode: "di" | "library") {
+    if (editingChallenge || isCreatingNew) {
+      if (!confirmDiscard()) return
+      handleEditorCancel()
+    }
+    setSelectedChallengeId(null)
+    setPreviewChallenge(null)
+    setActiveTab(mode)
+    if (!isDesktop) {
+      setMobileSheetOpen(true)
+    } else if (mode === "di") {
+      // The mode is already on screen: put the cursor where the work starts.
+      window.setTimeout(() => document.getElementById("di-prompt")?.focus(), 0)
+    }
+  }
+
   // ========== Challenge actions ==========
   function handleSelectChallenge(challenge: Challenge) {
     if (editingChallenge?.id !== challenge.id && !confirmDiscard()) return
@@ -543,6 +571,11 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         next.delete(index)
         return next
       })
+    }
+    if (editingChallenge) {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+      setSavedTaskId(editingChallenge.id)
+      savedTimerRef.current = setTimeout(() => setSavedTaskId(null), 2500)
     }
     setEditingSuggestionIndex(null)
     setEditingChallenge(null)
@@ -691,14 +724,12 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
     : -1
   const activeChallenge =
     activeChallengeIndex >= 0 ? challenges[activeChallengeIndex] : null
-  const totalPoints = challenges.reduce((sum, c) => sum + (c.points || 0), 0)
 
   return (
-    <div className="min-h-screen bg-muted/20">
+    <div className="space-y-4">
       <BuilderHeader
         game={game}
         challengeCount={challenges.length}
-        totalPoints={totalPoints}
         tasksNeedingAnswer={challenges
           .filter((c) => c.needs_answer)
           .map((c) => ({ id: c.id, title: c.title }))}
@@ -710,16 +741,16 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {session.expired && <SessionExpiredNotice className="mx-4 sm:mx-6 lg:mx-8 mt-4" />}
+      {session.expired && <SessionExpiredNotice />}
 
       {restoredSuggestions && suggestions.length > 0 && (
         <div
           role="status"
-          className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-highlight/40 bg-highlight/10 px-4 py-3 text-sm text-steam-dark"
+          className="flex flex-wrap items-center gap-3 rounded-xl border border-border border-l-[6px] border-l-highlight bg-white px-4 py-3 text-sm text-foreground"
         >
-          <Sparkles className="h-4 w-4 shrink-0 text-highlight-ink" aria-hidden="true" />
+          <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
           <p className="min-w-0 flex-1 basis-64">
-            <span className="font-semibold">Atkurti dar nepridėti DI pasiūlymai: {restoredSuggestions.count}.</span>{" "}
+            <span className="font-bold">Atkurti dar nepridėti DI pasiūlymai: {restoredSuggestions.count}.</span>{" "}
             Sugeneruoti{" "}
             {new Date(restoredSuggestions.savedAt).toLocaleString("lt-LT", {
               timeZone: "Europe/Vilnius",
@@ -742,11 +773,11 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
       {live && (
         <div
           role="status"
-          className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex items-start gap-3 rounded-lg border border-highlight/40 bg-highlight/10 px-4 py-3 text-sm text-steam-dark"
+          className="flex items-start gap-3 rounded-xl border border-border border-l-[6px] border-l-highlight bg-white px-4 py-3 text-sm text-foreground"
         >
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-highlight-ink" aria-hidden="true" />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
-            <span className="font-semibold">Veikla vyksta.</span> Pakeistą atsakymą ir taškus sistema taiko
+            <span className="font-bold">Veikla vyksta.</span> Pakeistą atsakymą ir taškus sistema taiko
             iš karto naujiems bandymams, o pakeistą ar naują užduotį dalyviai pamatys per kelias sekundes.
             Jau pateikti atsakymai iš naujo nevertinami: komandų surinkti taškai ir išspręstos užduotys
             nesikeičia.
@@ -784,6 +815,9 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
       </p>
 
       <DndContext
+        // A fixed id keeps the screen reader instruction ids the same on the
+        // server and in the browser.
+        id="builder-dnd"
         sensors={sensors}
         collisionDetection={closestCenter}
         accessibility={{
@@ -794,42 +828,34 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
-            {/* Left panel: Task list */}
-            <div className="lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto rounded-lg border border-border/50 bg-white p-4">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,22.5rem)_minmax(0,1fr)] lg:gap-6">
+            {/* Left panel: Task list. On a wide screen it stays in view and
+                only the list scrolls, so "Nauja" is always at hand. */}
+            <div className="flex min-w-0 flex-col rounded-2xl border border-border bg-white p-3 shadow-sm sm:p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
               <TaskListPanel
                 challenges={challenges}
-                selectedId={selectedChallengeId}
+                // Marked only while the task is open in the editor.
+                selectedId={editingChallenge ? selectedChallengeId : null}
                 onSelect={handleSelectChallenge}
                 onDelete={handleDeleteChallenge}
                 onDuplicate={handleDuplicateChallenge}
                 onMove={handleMoveChallenge}
                 onAddNew={handleAddNew}
+                onOpenMode={handleOpenMode}
+                savedId={savedTaskId}
                 locked={live}
                 isOverPanel={
                   isOverChallengeList &&
                   activeId?.startsWith("suggestion-") === true
                 }
               />
-              {/* Mobile: open DI sheet */}
-              <div className="lg:hidden mt-4">
-                <button
-                  type="button"
-                  className="w-full p-3 rounded-lg border border-highlight/30 bg-highlight/5 text-sm font-medium text-highlight-ink flex items-center justify-center gap-2"
-                  onClick={() => setMobileSheetOpen(true)}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  DI Padėjėjas / Redagavimas
-                </button>
-              </div>
             </div>
 
             {/* Right panel: Workspace (desktop only — mobile uses the sheet
                 below, so the editor never mounts twice) */}
             {isDesktop && (
-            <div className="hidden lg:block">
-              <div className="rounded-lg border border-border/50 bg-white p-4">
+            <div className="hidden min-w-0 lg:block">
+              <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
                 <TaskWorkspace
                   gameId={game.id}
                   pathMode={pathMode}
@@ -864,13 +890,13 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
                   generationSuccess={generationSuccess}
                   onImportedSuggestions={handleImported}
                   onTaskAdded={refreshChallenges}
+                  onAddNew={handleAddNew}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                 />
               </div>
             </div>
             )}
-          </div>
         </div>
 
         {/* Mobile: Workspace as Sheet — only mounted below lg, so it can't
@@ -885,17 +911,28 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
         >
           <SheetContent
             side="right"
-            className="w-full sm:w-[440px] sm:max-w-[440px] flex flex-col overflow-hidden p-0"
+            className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:w-[30rem] sm:max-w-[30rem]"
           >
-            <SheetHeader className="px-6 pt-6 pb-4 border-b border-border/30 shrink-0">
-              <SheetTitle className="text-steam-dark">
-                Darbo erdvė
-              </SheetTitle>
-              <SheetDescription>
+            <SheetHeader className="shrink-0 space-y-0 border-b border-border px-2 py-2 text-left">
+              <SheetTitle className="sr-only">Darbo erdvė</SheetTitle>
+              <SheetDescription className="sr-only">
                 Kurkite, redaguokite arba generuokite užduotis
               </SheetDescription>
+              {/* The way back to the list; asks first when a task has
+                  unsaved changes, like the close button does. */}
+              <Button
+                type="button"
+                variant="ghost"
+                className="gap-1.5 self-start px-3 text-foreground"
+                onClick={() => {
+                  if (confirmDiscardTask()) setMobileSheetOpen(false)
+                }}
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Užduočių sąrašas
+              </Button>
             </SheetHeader>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto p-5">
               <TaskWorkspace
                 gameId={game.id}
                 pathMode={pathMode}
@@ -936,6 +973,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
                 generationSuccess={generationSuccess}
                 onImportedSuggestions={handleImported}
                 onTaskAdded={refreshChallenges}
+                onAddNew={handleAddNew}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
               />
@@ -952,7 +990,7 @@ export function GameBuilder({ initialGame, initialChallenges, initialTaskId = nu
             />
           )}
           {activeSuggestion && activeSuggestionIndex !== null && (
-            <div className="w-[360px] opacity-90 shadow-lg rounded-lg">
+            <div className="w-[360px] rounded-xl opacity-95 shadow-lg">
               <AiSuggestionCard
                 suggestion={activeSuggestion}
                 index={activeSuggestionIndex}
