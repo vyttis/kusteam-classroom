@@ -15,7 +15,8 @@ export const metadata: Metadata = {
 // sentence and a link. Sources, legal basis reasoning and technical detail:
 // docs/privacy-review.md. "Kiek saugome" states what happens today: the
 // terms in docs/data-retention.md go on this page only once the nightly job
-// runs with RETENTION_MODE=delete in production.
+// runs with RETENTION_MODE=delete in production. When that mode is switched
+// on, the two "šiuo metu" items in that section must change with it.
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -65,9 +66,19 @@ export default function PrivacyPage() {
             įkeltą medžiagą. Taip pat apskaitome DI pagalbos naudojimą ir administratorių veiksmus.
           </p>
           <p>
-            <strong>Dalyvių:</strong> paskyros nereikia. Tvarkome komandos pavadinimą, atsakymus, taškus ir
-            refleksiją. Komandos pavadinime ir atsakymuose nerašykite vardų, pavardžių ar kitos asmeninės
-            informacijos.
+            <strong>Prisijungimas:</strong> vedėjas jungiasi el. paštu ir slaptažodžiu, per Google arba vienkartiniu
+            kodu iš laiško. Slaptažodį saugo prisijungimo paslauga (Supabase) ne atviru tekstu, o negrįžtamai
+            pakeistą, todėl platformos administratoriai jo nemato. Jungiantis per Google, iš Google gauname el. pašto
+            adresą, vardą ir profilio nuotraukos adresą.
+          </p>
+          <p>
+            <strong>Dalyvių:</strong> paskyros nereikia. Tvarkome komandos pavadinimą, visus pateiktus atsakymus
+            (teisingus ir neteisingus), panaudotas užuominas, taškus ir refleksiją. Komandos pavadinime ir
+            atsakymuose nerašykite vardų, pavardžių ar kitos asmeninės informacijos.
+          </p>
+          <p>
+            <strong>Techniniai duomenys:</strong> įrenginio interneto (IP) adresą naudojame tik bandymų skaičiui
+            riboti ir į platformos duomenų bazę jo neįrašome. Paslaugų teikėjai jį gali matyti savo žurnaluose.
           </p>
         </Section>
 
@@ -82,17 +93,33 @@ export default function PrivacyPage() {
 
         <Section title="Kas mato ir kam perduodame">
           <p>
-            Vedėjas mato savo veiklų rezultatus. Klasės ekrane rodomi komandų pavadinimai ir taškai. Patvirtintus
-            bibliotekos šablonus mato kiti prisijungę vedėjai. Užduočių paveikslėliai pasiekiami pagal nuorodą.
+            Vedėjas mato savo veiklų rezultatus. Platformos administratoriai mato visų veiklų sąrašą (pavadinimą,
+            kodą, vedėją) ir, prižiūrėdami platformą, gali peržiūrėti veiklų rezultatus. Klasės ekrane rodomi komandų
+            pavadinimai ir taškai. Patvirtintus bibliotekos šablonus mato kiti prisijungę vedėjai. Užduočių
+            paveikslėliai pasiekiami pagal nuorodą.
           </p>
           <p>
-            Platforma veikia naudodama šių paslaugų teikėjų paslaugas: Supabase (duomenų bazė ir prisijungimas,
-            duomenys laikomi ES), Vercel (svetainė), Resend (el. laiškai) ir Anthropic (DI pagalba vedėjams).
-            Anthropic gauna tik vedėjų rengiamą užduočių ir pamokų turinį, ne dalyvių atsakymus. Jei vedėjas
-            jungiasi per Google, prisijungimą atlieka Google. Šių teikėjų duomenų tvarkymo sąlygose perdavimams už
-            Europos ekonominės erdvės ribų numatytos ES standartinės sutarčių sąlygos. Duomenų neparduodame ir
-            reklamai nenaudojame.
+            Platforma veikia naudodama šių paslaugų teikėjų paslaugas: Supabase (duomenų bazė, įkelti failai ir
+            prisijungimas, duomenys laikomi ES), Vercel (svetainės talpinimas), Resend (el. laiškai) ir Anthropic (DI
+            pagalba vedėjams). Jei vedėjas jungiasi per Google, prisijungimą atlieka Google. Šių teikėjų duomenų
+            tvarkymo sąlygose perdavimams už Europos ekonominės erdvės ribų numatytos ES standartinės sutarčių
+            sąlygos. Duomenų neparduodame ir reklamai nenaudojame.
           </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <strong>DI pagalba.</strong> Kai vedėjas naudoja DI pagalbą, Anthropic gauna tai, ką vedėjas pateikia:
+              temą, dalyką ir klasę, veiklos ir užduočių tekstus su teisingais atsakymais, įkelto dokumento tekstą.
+              Vedėjo vardo ir el. pašto, dalyvių komandų pavadinimų ir dalyvių atsakymų Anthropic nesiunčiame.
+            </li>
+            <li>
+              <strong>El. laiškai.</strong> Resend gauna gavėjo el. pašto adresą ir laiško turinį: prisijungimo kodą,
+              kvietimą ar pranešimą apie paskyrą.
+            </li>
+            <li>
+              <strong>Žemėlapis.</strong> Jei užduotyje yra žemėlapis, iš Google jis įkeliamas tik paspaudus „Rodyti
+              žemėlapį“. Tada Google gauna įrenginio interneto adresą ir gali įrašyti savo slapukus.
+            </li>
+          </ul>
         </Section>
 
         <Section title="Kiek saugome">
@@ -103,7 +130,15 @@ export default function PrivacyPage() {
               taškai ir refleksijos.
             </li>
             <li>Kitų duomenų, taip pat paskyros, ištrynimo galite paprašyti el. paštu (žr. „Jūsų teisės“).</li>
-            <li>Automatinio senų duomenų trynimo pagal terminą šiuo metu nėra.</li>
+            <li>
+              Kiekvieną naktį platforma užbaigia po pamokos paliktas vykstančias veiklas (jų rezultatai lieka) ir
+              suskaičiuoja duomenis, kurių vidaus saugojimo terminas praėjęs. Automatinis trynimas pagal terminą
+              veikia tik atskirai jį įjungus. Šiuo metu jis neįjungtas, todėl pagal terminą duomenys netrinami.
+            </li>
+            <li>
+              Įkelti dokumentai ir užduočių paveikslėliai šiuo metu automatiškai netrinami, taip pat ir ištrynus
+              užduotį ar veiklą.
+            </li>
             <li>Duomenų bazės atsargines kopijas paslaugos teikėjas daro kasdien ir saugo ribotą laiką.</li>
           </ul>
         </Section>
@@ -121,6 +156,12 @@ export default function PrivacyPage() {
             Naudojame tik būtinus vedėjo prisijungimo slapukus. Dalyvio naršyklėje išsaugomas komandos žetonas, kad
             perkrovus puslapį būtų galima tęsti. Po 24 valandų jis nebenaudojamas ir ištrinamas, kai veiklos puslapis
             vėl atidaromas. Analitikos ir reklamos slapukų nėra.
+          </p>
+          <p>
+            Žetonas laikomas ne slapuke, o naršyklės vietinėje atmintyje. Kartu su juo ten laikomas veiklos pradžios
+            laikas ir žyma, kad refleksija pateikta. Kol atidarytas skirtukas, naršyklė taip pat įsimena, kurį vedėjo
+            pranešimą dalyvis užvėrė. Vedėjo naršyklėje iki 7 dienų laikomas neišsaugotas pamokos plano juodraštis
+            ir dar nepriimti DI pasiūlymai. Atsijungiant jie ištrinami.
           </p>
         </Section>
 
