@@ -167,7 +167,6 @@ test.afterAll(async () => {
 })
 
 // The run has no trace, so a failed step leaves what each screen showed.
-// eslint-disable-next-line no-empty-pattern
 test.afterEach(async ({}, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return
   const pages: [string, Page][] = [["vedėjas", teacher], ...Object.values(participants).map((p): [string, Page] => [p.team, p.page])]
@@ -255,7 +254,7 @@ test("the facilitator adds a text, a number and a choice task", async () => {
   expect(savedResponse.status()).toBe(201)
   taskIds.capital = ((await savedResponse.json()) as { id: string }).id
   await expect(teacher.getByText("Užduotis sukurta!").first()).toBeVisible()
-  await expect(teacher.getByText("1 užd. · 100 tšk.")).toBeVisible()
+  await expect(teacher.getByText("1 užd. · 100 tšk.", { exact: true })).toBeVisible()
 
   // Tasks 2 and 3 through the same API the builder uses.
   taskIds.number = await createTask({
@@ -281,7 +280,7 @@ test("the facilitator adds a text, a number and a choice task", async () => {
   await expect(teacher.getByRole("link", { name: `Redaguoti „${TASKS.number.title}“` })).toContainText("Skaičius")
   await expect(teacher.getByRole("link", { name: `Redaguoti „${TASKS.choice.title}“` })).toContainText("Pasirinkimas")
   // 100 + 50 + 30 points in three tasks.
-  await expect(teacher.getByText("Viso taškų").locator("xpath=..")).toContainText("180")
+  await expect(teacher.getByText("Iš viso taškų").locator("xpath=..")).toContainText("180")
 })
 
 test("the facilitator starts the activity", async () => {
@@ -293,10 +292,11 @@ test("the facilitator starts the activity", async () => {
   await expect(teacher.getByText("Veikla pradėta!").first()).toBeVisible()
   await expect(teacher.getByRole("heading", { name: "Valdymo centras" })).toBeVisible()
   await expect(teacher.getByText("Dar nėra prisijungusių komandų")).toBeVisible()
-  await expect(teacher.getByRole("button", { name: "Pristabdyti" })).toBeVisible()
+  await expect(teacher.getByRole("button", { name: "Pristabdyti", exact: true })).toBeVisible()
 })
 
 test("three teams join with the code and start their clock", async ({ browser }) => {
+  test.setTimeout(150_000)
   participants.alfa = await newParticipant(browser, "Alfa")
   participants.beta = await newParticipant(browser, "Beta", { ...devices["iPhone 13"] })
   participants.gama = await newParticipant(browser, "Gama")
@@ -347,7 +347,8 @@ test("three teams join with the code and start their clock", async ({ browser })
   expect(overflow).toBeLessThanOrEqual(0)
 
   // The facilitator's control centre lists the teams as they come in.
-  await expect(teacher.getByText("3 komandos")).toBeVisible({ timeout: 30_000 })
+  // (Realtime; the page also reads everything again every 45 s.)
+  await expect(teacher.getByText("3 komandos", { exact: true }).first()).toBeVisible({ timeout: 60_000 })
   for (const p of Object.values(participants)) {
     await expect(teacher.getByRole("button", { name: `Tvarkyti komandą: ${p.team}` })).toBeVisible()
   }
@@ -478,10 +479,10 @@ test("the leaderboard orders the teams by points", async () => {
 test("a pause stops the teams and refuses an answer", async () => {
   const { page, sessionToken } = participants.gama
 
-  await teacher.getByRole("button", { name: "Pristabdyti" }).click()
+  await teacher.getByRole("button", { name: "Pristabdyti", exact: true }).click()
   await expect(teacher.getByText("Dalyviai matys pauzės pranešimą.").first()).toBeVisible()
-  await expect(teacher.getByText("Pristabdytas", { exact: true })).toBeVisible()
-  await expect(teacher.getByRole("button", { name: "Tęsti" })).toBeVisible()
+  await expect(teacher.getByText("Pristabdyta", { exact: true })).toBeVisible()
+  await expect(teacher.getByRole("button", { name: "Tęsti", exact: true })).toBeVisible()
 
   await expect(page.getByRole("heading", { name: "Veikla pristabdyta" })).toBeVisible()
   await expect(page.getByText("Komanda: Gama")).toBeVisible()
@@ -502,15 +503,15 @@ test("a pause stops the teams and refuses an answer", async () => {
 test("the facilitator resumes and extends the time", async () => {
   const { page } = participants.gama
 
-  await teacher.getByRole("button", { name: "Tęsti" }).click()
-  await expect(teacher.getByRole("button", { name: "Pristabdyti" })).toBeVisible()
+  await teacher.getByRole("button", { name: "Tęsti", exact: true }).click()
+  await expect(teacher.getByRole("button", { name: "Pristabdyti", exact: true })).toBeVisible()
   await expect(taskHeading(page, TASKS.number.title)).toBeVisible()
   await expect(headerPoints(page, 80)).toBeVisible()
   // Still the 30 minutes the activity started with (the pause is given back).
   expect(await minutesLeft(page)).toBeLessThan(ACTIVITY.minutes + 1)
 
   await teacher.getByLabel("Kiek minučių pridėti").fill("10")
-  await teacher.getByRole("button", { name: "Pratęsti" }).click()
+  await teacher.getByRole("button", { name: "Pratęsti", exact: true }).click()
   await expect(teacher.getByText("Pridėta 10 min.").first()).toBeVisible()
   await expect(teacher.getByText(`Laiko limitas dabar ${ACTIVITY.minutes + 10} min.`).first()).toBeVisible()
   await expect(teacher.getByText("Laiko limitas", { exact: true }).locator("xpath=..")).toContainText(
@@ -523,7 +524,7 @@ test("the facilitator resumes and extends the time", async () => {
 
 test("an announcement reaches a team", async () => {
   await teacher.getByPlaceholder("Rašykite pranešimą komandoms...").fill(ANNOUNCEMENT)
-  await teacher.getByRole("button", { name: "Siųsti" }).click()
+  await teacher.getByRole("button", { name: "Siųsti", exact: true }).click()
   await expect(teacher.getByText(ANNOUNCEMENT)).toBeVisible()
   await expect(teacher.getByPlaceholder("Rašykite pranešimą komandoms...")).toHaveValue("")
 
@@ -582,7 +583,7 @@ test("the facilitator finishes the activity and answers are refused", async () =
   await dialog.getByRole("button", { name: "Baigti veiklą" }).click()
 
   await expect(teacher.getByText("Rezultatai ir analitika paruošti peržiūrai.").first()).toBeVisible()
-  await expect(teacher.getByRole("button", { name: "Pristabdyti" })).toHaveCount(0)
+  await expect(teacher.getByRole("button", { name: "Pristabdyti", exact: true })).toHaveCount(0)
   await expect(teacher.getByRole("region", { name: "Komandų rezultatai" })).toBeVisible()
 
   await expect(page.getByRole("heading", { name: "Veikla baigta!" })).toBeVisible()

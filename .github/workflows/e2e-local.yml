@@ -1,0 +1,122 @@
+name: E2E full lesson (local stack)
+
+# The whole lesson (facilitator builds and runs an activity, three teams join
+# and answer) against a throwaway Supabase stack started in this job. Nothing
+# here knows a production address or key, and no AI key is set: the spec
+# presses no DI button. See docs/e2e-local.md.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-local-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  full-lesson:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # supabase/config.toml enables Google sign-in and reads these two; the
+      # local Auth server only needs them to be set. They are not credentials.
+      GOOGLE_OAUTH_CLIENT_ID: e2e-local-placeholder
+      GOOGLE_OAUTH_CLIENT_SECRET: e2e-local-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.2.0
+
+      # Auth, PostgREST, Realtime and Storage (with the gateway and the
+      # database) are enough. `supabase start` applies supabase/migrations.
+      # It runs while the dependencies install.
+      - name: Start the local Supabase stack (in the background)
+        run: |
+          (supabase start -x studio,imgproxy,edge-runtime,logflare,vector,postgres-meta,mailpit,supavisor \
+            > supabase-start.log 2>&1; echo $? > supabase-start.exit) &
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Wait for the stack
+        run: |
+          for _ in $(seq 1 180); do
+            [ -f supabase-start.exit ] && break
+            sleep 2
+          done
+          cat supabase-start.log
+          [ "$(cat supabase-start.exit 2>/dev/null)" = "0" ] || { echo "supabase start failed or timed out"; exit 1; }
+
+      - name: Read the local address and keys
+        run: |
+          supabase status -o env | grep -E '^[A-Z0-9_]+=' > "$RUNNER_TEMP/supabase.env"
+          echo "status variables: $(cut -d= -f1 "$RUNNER_TEMP/supabase.env" | tr '\n' ' ')"
+          set -a; . "$RUNNER_TEMP/supabase.env"; set +a
+          : "${API_URL:?}" "${DB_URL:?}" "${ANON_KEY:?}" "${SERVICE_ROLE_KEY:?}"
+          case "$API_URL" in
+            http://127.0.0.1:*|http://localhost:*) ;;
+            *) echo "Not a local Supabase address: $API_URL"; exit 1 ;;
+          esac
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "LOCAL_DB_URL=$DB_URL"
+          } >> "$GITHUB_ENV"
+
+      # Production also has the KU STEAM TEAM sign-in schema, which is not a
+      # migration file yet (docs/migration-history.md, TEAM-006).
+      - name: Apply the TEAM-006 schema, as in production
+        run: |
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -q -X -f supabase/proposals/team-006-sso/up.sql
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -X -A -t -c \
+            "select 'migrations applied: ' || count(*) from supabase_migrations.schema_migrations" || true
+
+      - name: Seed the facilitator account
+        run: node e2e/local/seed.mjs
+
+      - run: npm run build
+
+      - name: Start the app
+        run: |
+          npm start > app.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null 2>&1; then
+              curl -sS http://localhost:3000/api/health; echo
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "The app did not answer /api/health"; cat app.log; exit 1
+
+      - run: npm run test:e2e:local -- --trace off
+
+      - name: Supabase container logs
+        if: failure()
+        run: |
+          docker ps -a --format '{{.Names}}\t{{.Status}}' || true
+          for c in $(docker ps -a --format '{{.Names}}' | grep -E 'auth|rest|realtime|kong' || true); do
+            echo "=== $c"; docker logs --tail 60 "$c" 2>&1 || true
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-local-report
+          path: |
+            playwright-report-local/
+            test-results-local/
+            app.log
+            supabase-start.log
+          if-no-files-found: ignore
+          retention-days: 7
