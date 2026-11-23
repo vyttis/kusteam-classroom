@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
+import { isDatabaseStreamReady } from "@/hooks/live-channel"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -267,6 +268,10 @@ export function LiveActivityFeed({ gameId, variant = "default", hidePoints = fal
           if (!cancelled && typeof count === "number") setTeamCount(count)
         }
       )
+      // The database stream is ready a moment after SUBSCRIBED: read again.
+      .on("system", {}, (payload) => {
+        if (!cancelled && isDatabaseStreamReady(payload)) loadRecent().catch(() => {})
+      })
       .subscribe(handleStatus)
 
     // Events missed while the laptop slept or the network was down: read the

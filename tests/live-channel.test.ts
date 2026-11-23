@@ -57,3 +57,34 @@ describe("activity feed wiring", () => {
     expect(handler).toMatch(/status === "SUBSCRIBED"[\s\S]*loadRecent\(\)/)
   })
 })
+
+describe("the gap between joining the channel and the database stream", () => {
+  it("recognises the message that the database stream is ready", async () => {
+    const { isDatabaseStreamReady } = await import("@/hooks/live-channel")
+    expect(isDatabaseStreamReady({ extension: "postgres_changes", status: "ok", message: "Subscribed to PostgreSQL" })).toBe(true)
+    expect(isDatabaseStreamReady({ extension: "postgres_changes", status: "error" })).toBe(false)
+    expect(isDatabaseStreamReady({ extension: "presence", status: "ok" })).toBe(false)
+    expect(isDatabaseStreamReady(null)).toBe(false)
+  })
+
+  it("keeps a team that realtime delivered while an older read was on its way", async () => {
+    const { mergeRowsAfterRead } = await import("@/hooks/live-channel")
+    const beta = { id: "b" }
+    const alfa = { id: "a" }
+    // The read started at 1000 and holds only Beta; Alfa came over realtime at 1200.
+    expect(mergeRowsAfterRead([beta], [{ row: alfa, at: 1200 }], 1000)).toEqual([beta, alfa])
+    // A team from before the read that the read does not hold was deleted: not brought back.
+    expect(mergeRowsAfterRead([beta], [{ row: alfa, at: 900 }], 1000)).toEqual([beta])
+    // A team the read already holds is not doubled.
+    const read = [beta, alfa]
+    expect(mergeRowsAfterRead(read, [{ row: alfa, at: 1200 }], 1000)).toBe(read)
+  })
+
+  it("both live screens read again when the database stream is ready", async () => {
+    const { readFileSync } = await import("node:fs")
+    for (const file of ["hooks/use-live-game.ts", "components/teacher/live-activity-feed.tsx"]) {
+      const src = readFileSync(file, "utf8")
+      expect(src).toMatch(/\.on\("system", \{\}, \(payload\) => \{\s*if \(!cancelled && isDatabaseStreamReady\(payload\)\)/)
+    }
+  })
+})
