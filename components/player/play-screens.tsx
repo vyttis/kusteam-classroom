@@ -9,7 +9,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
-import { AlertTriangle, BarChart3, Clock, Loader2, Play, Star, Trophy } from "lucide-react"
+import { AlertTriangle, BarChart3, Clock, Loader2, Play, Smartphone, Star, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AnnouncementBanner, type AnnouncementItem } from "@/components/player/announcement-banner"
@@ -68,6 +68,38 @@ export function PlayLoading() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-primary-ink" />
+    </div>
+  )
+}
+
+/**
+ * The facilitator's "Grąžinti į komandą" link was used on another device:
+ * the team's session moved there and this device no longer has it. Not an
+ * error and nothing to retry, so the screen only says what happened and how
+ * to come back.
+ */
+export function PlaySessionMoved({ teamName, gameCode }: { teamName: string; gameCode: string }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-sm text-center" role="status">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-highlight/10 flex items-center justify-center">
+          <Smartphone className="h-8 w-8 text-highlight-ink" aria-hidden="true" />
+        </div>
+        <h1 className="text-xl font-bold text-steam-dark mb-2">Komanda tęsia kitame įrenginyje</h1>
+        <p className="text-sm text-muted-foreground mb-2">
+          {teamName ? `Komanda „${teamName}“` : "Jūsų komanda"} perkelta į kitą įrenginį su vedėjo nuoroda
+          „Grąžinti į komandą“. Šiame įrenginyje atsakymų pateikti nebegalima, o komandos taškai ir išspręstos
+          užduotys išliko.
+        </p>
+        <p className="text-sm text-muted-foreground mb-6">
+          Jei norite tęsti šiame įrenginyje, paprašykite vedėjo naujos nuorodos arba QR kodo.
+        </p>
+        <Link href={`/play/${gameCode}`}>
+          <Button variant="outline" className="w-full">
+            Į prisijungimo puslapį
+          </Button>
+        </Link>
+      </div>
     </div>
   )
 }

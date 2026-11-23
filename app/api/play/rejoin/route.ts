@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAiRateLimitAsync } from "@/lib/ai/rate-limit"
-import { verifyRejoinToken } from "@/lib/game/rejoin-token"
+import { rejoinTokenUnused, verifyRejoinToken } from "@/lib/game/rejoin-token"
+import { generateSessionToken } from "@/lib/game/code-generator"
 import { clientKey } from "@/lib/client-address"
 import { retryLater } from "@/lib/api/retry-later"
 
@@ -11,10 +12,24 @@ const rejoinSchema = z.object({
   token: z.string().min(1).max(200),
 })
 
+// A response body is read once, so every request gets its own.
+const used = () =>
+  NextResponse.json(
+    { error: "Ši nuoroda jau panaudota. Paprašykite vedėjo naujos.", code: "used" },
+    { status: 410, headers: { "Cache-Control": "no-store" } }
+  )
+
 /**
  * POST — exchange a rejoin link from the facilitator for the team's session
- * on this device. The link is signed and expires after ten minutes; the team
- * must still exist and its activity must still run.
+ * on this device. The link is signed, expires after ten minutes and works
+ * once; the team must still exist and its activity must still run.
+ *
+ * The team gets a new session token here, so its session moves: the device
+ * that had it before is signed out (its next request finds no team, and
+ * /api/play/state tells it the team continues elsewhere), and the link,
+ * which is tied to the old token, cannot be used again. The swap is one
+ * conditional update, so of two devices opening the same link at once only
+ * one gets the session.
  */
 export async function POST(request: Request) {
   const client = clientKey(request)
@@ -51,8 +66,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Veikla jau baigta.", code: "not_live" }, { status: 409 })
   }
 
+  // The team's session changed since the link was made: it was used.
+  const current = team.session_token as string
+  if (!rejoinTokenUnused(check.binding, current)) return used()
+
+  // Only while the team still has the token the link was made for: of two
+  // requests with the same link, one changes the row and the other finds
+  // nothing to change.
+  const sessionToken = generateSessionToken()
+  const { data: moved, error: moveError } = await supabase
+    .from("teams")
+    .update({ session_token: sessionToken })
+    .eq("id", team.id)
+    .eq("session_token", current)
+    .select("id")
+  // Nothing was changed: the link still works, the page may try again.
+  if (moveError) return retryLater("play/rejoin move", moveError)
+  if (!moved || moved.length === 0) return used()
+
   return NextResponse.json(
-    { team_id: team.id, team_name: team.name, session_token: team.session_token },
+    { team_id: team.id, team_name: team.name, session_token: sessionToken },
     { headers: { "Cache-Control": "no-store" } }
   )
 }

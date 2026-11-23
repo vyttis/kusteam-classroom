@@ -24,20 +24,25 @@ import {
   PlayPaused,
   PlayPreparing,
   PlayReadyToStart,
+  PlaySessionMoved,
   TeamFooter,
 } from "@/components/player/play-screens"
 
 // Stamp the team's server-side start (idempotent) and return it with the
 // pause offset, so the countdown runs on the same deadline the server
 // enforces. null when the request fails; the page keeps asking (see the
-// effect that confirms the run).
-async function stampGameStart(token: string): Promise<{ startedAtMs: number; offsetMs: number } | null> {
+// effect that confirms the run). "no-team": the server does not know this
+// session (the team was removed, or moved to another device).
+async function stampGameStart(
+  token: string
+): Promise<{ startedAtMs: number; offsetMs: number } | "no-team" | null> {
   try {
     const res = await fetch("/api/play/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_token: token }),
     })
+    if (res.status === 404) return "no-team"
     if (!res.ok) return null
     const data = (await res.json()) as { started_at?: string | null; pause_offset_ms?: number }
     if (!data.started_at) return null
@@ -82,6 +87,12 @@ export default function PlayPage() {
   const tasksLoadedRef = useRef(false)
   const [endedByTeacher, setEndedByTeacher] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  // The facilitator's rejoin link moved this team to another device: its
+  // name, shown on the screen that says so (null: not moved).
+  const [movedTeamName, setMovedTeamName] = useState<string | null>(null)
+  // Raised when a request finds no team for this session: the state is read
+  // again, which tells a moved or removed team from a failed read.
+  const [sessionCheck, setSessionCheck] = useState(0)
   // Automatic retries of a failed load made so far (components/player/connection.tsx).
   const [loadRetries, setLoadRetries] = useState(0)
   // "No connection" notice: two failed status polls in a row, or the browser
@@ -172,7 +183,7 @@ export default function PlayPage() {
   const sessionToken = session?.session_token
   const runConfirmed = run?.confirmed ?? true
   useEffect(() => {
-    if (runConfirmed || !sessionToken || gameFinished) return
+    if (runConfirmed || !sessionToken || gameFinished || movedTeamName !== null) return
     let cancelled = false
     let inFlight = false
     const confirm = async () => {
@@ -180,7 +191,9 @@ export default function PlayPage() {
       inFlight = true
       const server = await stampGameStart(sessionToken)
       inFlight = false
-      if (!cancelled && server) setRun({ ...server, confirmed: true })
+      if (cancelled) return
+      if (server === "no-team") setSessionCheck((n) => n + 1)
+      else if (server) setRun({ ...server, confirmed: true })
     }
     void confirm()
     const interval = setInterval(confirm, 5000)
@@ -188,7 +201,7 @@ export default function PlayPage() {
       cancelled = true
       clearInterval(interval)
     }
-  }, [runConfirmed, sessionToken, gameFinished])
+  }, [runConfirmed, sessionToken, gameFinished, movedTeamName])
 
   useEffect(() => {
     const s = getPlayerSession(gameCode)
@@ -201,6 +214,13 @@ export default function PlayPage() {
     loadChallenges(s)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameCode, router])
+
+  // A request found no team for this session: read the state again.
+  useEffect(() => {
+    if (sessionCheck === 0 || !session || movedTeamName !== null) return
+    void loadChallenges(session, true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCheck])
 
   // The tasks of a timed activity come once the server has the team's start.
   useEffect(() => {
@@ -219,13 +239,17 @@ export default function PlayPage() {
       busy = true
       try {
         const res = await fetch(`/api/play/state?game_code=${encodeURIComponent(gameCode)}`, {
-          headers: { "x-session-token": session.session_token },
+          headers: { "x-session-token": session.session_token, "x-team-id": session.team_id },
           cache: "no-store",
         })
         if (!res.ok) return
-        const state = (await res.json()) as { team_started_at?: string | null; challenge_count?: number }
+        const state = (await res.json()) as {
+          team_started_at?: string | null
+          challenge_count?: number
+          session_moved?: boolean
+        }
         if (typeof state.challenge_count === "number") setTaskCount(state.challenge_count)
-        if (state.team_started_at) void loadChallenges(session)
+        if (state.team_started_at || state.session_moved) void loadChallenges(session, state.session_moved === true)
       } catch {
         // Network hiccup: the next round retries.
       } finally {
@@ -252,12 +276,14 @@ export default function PlayPage() {
       awaiting_start?: boolean
       team_started_at?: string | null
       team_pause_offset_ms?: number
+      /** The team continues on another device (a rejoin link was used). */
+      session_moved?: boolean
     }
     const fetchState = async (): Promise<PlayState | null> => {
       try {
         const res = await fetch(
           `/api/play/state?game_code=${encodeURIComponent(gameCode)}`,
-          { headers: { "x-session-token": s.session_token }, cache: "no-store" }
+          { headers: { "x-session-token": s.session_token, "x-team-id": s.team_id }, cache: "no-store" }
         )
         if (!res.ok) return null
         return (await res.json()) as PlayState
@@ -286,7 +312,10 @@ export default function PlayPage() {
       }
       if (again.team === null && again.game.status !== "draft") {
         clearPlayerSession(gameCode)
-        router.replace(`/play/${gameCode}`)
+        // Moved to another device by the facilitator's rejoin link: say so
+        // here. A removed team goes back to the join page.
+        if (again.session_moved) setMovedTeamName(s.team_name || "")
+        else router.replace(`/play/${gameCode}`)
         return
       }
       state = again
@@ -403,6 +432,8 @@ export default function PlayPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_token: s.session_token, challenge_id: challengeId, hint_index: index }),
         })
+        // 401: the server did not find the team; the state is read again.
+        if (res.status === 401) setSessionCheck((n) => n + 1)
         if (!res.ok) return false
         const data = (await res.json()) as { hint?: unknown }
         if (typeof data.hint !== "string") return false
@@ -429,17 +460,22 @@ export default function PlayPage() {
     reloadingTasksRef.current = true
     try {
       const res = await fetch(`/api/play/state?game_code=${encodeURIComponent(gameCode)}`, {
-        headers: { "x-session-token": s.session_token },
+        headers: { "x-session-token": s.session_token, "x-team-id": s.team_id },
         cache: "no-store",
       })
       if (!res.ok) return
       const state = (await res.json()) as {
+        session_moved?: boolean
         challenges?: PlayerChallenge[]
         solved?: { challenge_id: string; points_awarded?: number }[]
         team?: { total_points?: number } | null
         tasks_version?: string | null
         awaiting_start?: boolean
         challenge_count?: number
+      }
+      if (state.session_moved) {
+        setSessionCheck((n) => n + 1)
+        return
       }
       if (typeof state.challenge_count === "number") setTaskCount(state.challenge_count)
       // Tasks held back until the team's start (on the ready screen, or a
@@ -830,6 +866,11 @@ export default function PlayPage() {
   const leaveTeam = () => {
     clearPlayerSession(gameCode)
     router.replace(`/play/${gameCode}`)
+  }
+
+  // The team continues on another device: nothing else applies here.
+  if (movedTeamName !== null) {
+    return <PlaySessionMoved teamName={movedTeamName} gameCode={gameCode} />
   }
 
   // Load error state (network failure or game unavailable). The screen says

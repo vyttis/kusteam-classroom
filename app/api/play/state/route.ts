@@ -18,6 +18,9 @@ export async function GET(request: Request) {
   const gameCode = searchParams.get("game_code")?.toUpperCase()
   const sessionToken =
     request.headers.get("x-session-token") || searchParams.get("session_token")
+  // The team this device joined as: only used to tell "your team continues
+  // on another device" from "your team is gone" (withSessionMoved below).
+  const teamId = request.headers.get("x-team-id")
 
   if (!gameCode || gameCode.length < 6) {
     return NextResponse.json({ error: "Netinkamas veiklos kodas" }, { status: 400 })
@@ -67,7 +70,8 @@ export async function GET(request: Request) {
   })
 
   if (!error) {
-    return NextResponse.json(forParticipant(data, reveals, tasks_version, start), {
+    const body = await withSessionMoved(supabase, forParticipant(data, reveals, tasks_version, start), sessionToken, teamId)
+    return NextResponse.json(body, {
       headers: { "Cache-Control": "private, max-age=0, must-revalidate" },
     })
   }
@@ -84,9 +88,36 @@ export async function GET(request: Request) {
   console.warn("get_player_game_state RPC unavailable — falling back to raw queries. Apply migration 00018.")
   const fallback = await fetchPlayerStateRaw(supabase, gameCode, sessionToken)
   if ("failed" in fallback) return retryLater(`play/state ${fallback.where}`, fallback.failed)
-  return NextResponse.json(forParticipant(fallback, reveals, tasks_version, start), {
+  const body = await withSessionMoved(supabase, forParticipant(fallback, reveals, tasks_version, start), sessionToken, teamId)
+  return NextResponse.json(body, {
     headers: { "Cache-Control": "private, max-age=0, must-revalidate" },
   })
+}
+
+/**
+ * A session that finds no team although the team it names (x-team-id, what
+ * the phone stored when it joined) is still in this activity: the
+ * facilitator's rejoin link moved the team to another device and gave it a
+ * new session token (/api/play/rejoin). The page then says so instead of
+ * sending the participant to the join form as if the team were removed.
+ *
+ * Only "the team exists" is told, which the leaderboard shows anyway (team
+ * ids are public there); nothing of the team is returned, and without a
+ * valid session the answer carries no tasks either. A failed read adds
+ * nothing: the page then treats the session as it did before.
+ */
+async function withSessionMoved<T>(
+  supabase: SupabaseClient,
+  body: T,
+  sessionToken: string | null,
+  teamId: string | null
+): Promise<T | (T & { session_moved: true })> {
+  if (!sessionToken || !teamId || !/^[0-9a-f-]{36}$/i.test(teamId)) return body
+  const state = body as { game?: { id?: unknown; status?: unknown } | null; team?: unknown } | null
+  if (!state || typeof state !== "object" || state.team || typeof state.game?.id !== "string") return body
+  if (state.game.status === "draft") return body
+  const { data } = await supabase.from("teams").select("id").eq("id", teamId).eq("game_id", state.game.id).maybeSingle()
+  return data ? { ...body, session_moved: true as const } : body
 }
 
 async function fetchPlayerStateRaw(
