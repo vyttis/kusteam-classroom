@@ -1,4 +1,19 @@
-export function SteamLogo({ className = "", size = "default" }: { className?: string; size?: "small" | "default" | "large" }) {
+const WORDMARK_FONT = "var(--font-metropolis), system-ui, -apple-system, sans-serif"
+
+/**
+ * STEAM LT Klaipėda logo. `symbol={false}` draws the wordmark alone: the
+ * brand book asks for that next to a large ray element, so the rays are
+ * not shown twice.
+ */
+export function SteamLogo({
+  className = "",
+  size = "default",
+  symbol = true,
+}: {
+  className?: string
+  size?: "small" | "default" | "large"
+  symbol?: boolean
+}) {
   const sizes = {
     small: { width: 174, height: 48 },
     default: { width: 232, height: 64 },
@@ -6,12 +21,15 @@ export function SteamLogo({ className = "", size = "default" }: { className?: st
   }
 
   const { width, height } = sizes[size]
+  // Without the symbol the box is cropped to the wordmark, at the same scale.
+  const box = symbol ? { x: 0, y: 0, w: 290, h: 80 } : { x: 70, y: 16, w: 200, h: 38 }
+  const scale = width / 290
 
   return (
     <svg
-      viewBox="0 0 290 80"
-      width={width}
-      height={height}
+      viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
+      width={box.w * scale}
+      height={box.h * scale}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
@@ -19,28 +37,29 @@ export function SteamLogo({ className = "", size = "default" }: { className?: st
       role="img"
       aria-label="STEAM LT Klaipėda"
     >
-      {/* X shape made of colored lines */}
-      <g transform="translate(10, 10)">
-        {/* Blue line (top-left to center) */}
-        <line x1="0" y1="10" x2="25" y2="35" stroke="#008CB4" strokeWidth="4" strokeLinecap="round" />
-        {/* Dark line (center going down-right) */}
-        <line x1="15" y1="20" x2="40" y2="55" stroke="#00323C" strokeWidth="4" strokeLinecap="round" />
-        {/* Green line (horizontal through center) */}
-        <line x1="5" y1="35" x2="55" y2="35" stroke="#00D296" strokeWidth="4" strokeLinecap="round" />
-        {/* Pink line (going up-right from center) */}
-        <line x1="25" y1="35" x2="45" y2="15" stroke="#FA2864" strokeWidth="4" strokeLinecap="round" />
-        {/* Yellow line (going down-left from center) */}
-        <line x1="15" y1="40" x2="5" y2="58" stroke="#FAC846" strokeWidth="4" strokeLinecap="round" />
-      </g>
-      {/* STEAM text */}
-      <text x="72" y="48" fontFamily="system-ui, -apple-system, sans-serif" fontSize="36" fontWeight="900" fill="#00323C" letterSpacing="-1">
+      {symbol && (
+        <g transform="translate(10, 10)">
+          {/* Blue line (top-left to center) */}
+          <line x1="0" y1="10" x2="25" y2="35" stroke="#008CB5" strokeWidth="4" strokeLinecap="round" />
+          {/* Dark line (center going down-right) */}
+          <line x1="15" y1="20" x2="40" y2="55" stroke="#003B4E" strokeWidth="4" strokeLinecap="round" />
+          {/* Green line (horizontal through center) */}
+          <line x1="5" y1="35" x2="55" y2="35" stroke="#00D99B" strokeWidth="4" strokeLinecap="round" />
+          {/* Pink line (going up-right from center) */}
+          <line x1="25" y1="35" x2="45" y2="15" stroke="#FF306D" strokeWidth="4" strokeLinecap="round" />
+          {/* Yellow line (going down-left from center) */}
+          <line x1="15" y1="40" x2="5" y2="58" stroke="#FFCE4E" strokeWidth="4" strokeLinecap="round" />
+        </g>
+      )}
+      {/* STEAM text: textLength pins the width, whatever font has loaded */}
+      <text x="72" y="48" style={{ fontFamily: WORDMARK_FONT }} fontSize="37" fontWeight="700" fill="#003B4E" textLength="128" lengthAdjust="spacingAndGlyphs">
         STEAM
       </text>
       {/* LT Klaipeda */}
-      <text x="208" y="30" fontFamily="system-ui, -apple-system, sans-serif" fontSize="13" fontWeight="700" fill="#00323C" letterSpacing="0.5">
+      <text x="208" y="30" style={{ fontFamily: WORDMARK_FONT }} fontSize="13" fontWeight="600" fill="#003B4E" letterSpacing="0.3">
         LT
       </text>
-      <text x="208" y="48" fontFamily="system-ui, -apple-system, sans-serif" fontSize="13" fontWeight="600" fill="#00323C" letterSpacing="0.5">
+      <text x="208" y="48" style={{ fontFamily: WORDMARK_FONT }} fontSize="13" fontWeight="600" fill="#003B4E" letterSpacing="0.3">
         Klaipėda
       </text>
     </svg>

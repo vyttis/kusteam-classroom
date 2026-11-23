@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { SteamLogo } from "@/components/steam-logo"
+import { SteamRays } from "@/components/brand/steam-rays"
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
 import { Mail, KeyRound, Lock, ArrowRight, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 import { PrivacyLink } from "@/components/privacy-link"
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -178,34 +178,21 @@ export function LoginForm() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-white via-white to-primary/5">
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary/5 rounded-full blur-3xl" />
-        <div className="absolute top-1/4 left-1/4 w-60 h-60 bg-highlight/5 rounded-full blur-3xl" />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md relative z-10"
-      >
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <SteamLogo size="large" />
+    <main className="flex min-h-screen items-center justify-center bg-muted px-4 py-10">
+      <div className="w-full max-w-md">
+        {/* The rays draw once: the one deliberate motion of this screen.
+            Next to the large ray element the logo is the wordmark alone. */}
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <SteamRays draw className="h-32 w-32" />
+          <SteamLogo size="large" symbol={false} />
         </div>
 
-        <Card className="border-0 shadow-2xl shadow-primary/10 bg-white/80 backdrop-blur-xl">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto mb-4 w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center">
-              <Image src="/illustrations/hero-hacker.svg" alt="" width={56} height={56} />
-            </div>
-            <h1 className="text-2xl font-bold leading-none tracking-tight text-steam-dark">
+        <Card className="rounded-2xl border-0 bg-white shadow-sm">
+          <CardHeader className="space-y-2 pb-4 text-center">
+            <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight text-steam-dark">
               {step === "email" ? "Prisijungimas" : "Patvirtinkite kodą"}
             </h1>
-            <CardDescription className="text-muted-foreground">
+            <CardDescription className="text-sm leading-relaxed text-muted-foreground">
               {step === "email"
                 ? "Prisijunkite el. paštu ir slaptažodžiu arba su Google"
                 : purpose === "reset"
@@ -215,7 +202,7 @@ export function LoginForm() {
           </CardHeader>
 
           <CardContent>
-            <div className="mb-5 space-y-2 rounded-xl bg-muted p-4 text-sm leading-relaxed text-steam-dark">
+            <div className="mb-6 space-y-2 rounded-xl bg-muted p-4 text-sm leading-relaxed text-foreground">
               <p>Mokytojui reikia KU STEAM centro patvirtintos CLASSROOM paskyros. Prisijungimas naujos paskyros nesukuria. Dėl prieigos rašykite <a href="mailto:steam@ku.lt" className="font-semibold underline underline-offset-4">steam@ku.lt</a>.</p>
               <p>KU STEAM darbuotojams: <a href="https://komanda.kusteam.app" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">prisijungti per TEAM</a>.</p>
             </div>
@@ -234,7 +221,7 @@ export function LoginForm() {
                     variant="outline"
                     onClick={handleGoogleLogin}
                     disabled={googleLoading}
-                    className="w-full h-12 border-border/60 bg-white hover:bg-muted/50 text-steam-dark font-medium text-base gap-3 transition-all"
+                    className="h-12 w-full gap-3 bg-white text-base text-steam-dark"
                   >
                     {googleLoading ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -249,10 +236,10 @@ export function LoginForm() {
                   {/* Separator */}
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border/50" />
+                      <span className="w-full border-t border-border" />
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-white px-3 text-muted-foreground">
+                      <span className="bg-white px-3 font-semibold tracking-wide text-muted-foreground">
                         arba
                       </span>
                     </div>
@@ -261,7 +248,7 @@ export function LoginForm() {
                   {/* Email OTP Form */}
                   <form onSubmit={handlePasswordLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-steam-dark font-medium">
+                      <Label htmlFor="email" className="font-semibold text-steam-dark">
                         El. paštas
                       </Label>
                       <div className="relative">
@@ -273,14 +260,14 @@ export function LoginForm() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           autoComplete="username"
-                          className="pl-10 h-12 text-base bg-white border-border/50 focus:border-primary focus:ring-primary/20"
+                          className="h-12 bg-white pl-10 text-base md:text-base"
                           required
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-steam-dark font-medium">
+                      <Label htmlFor="password" className="font-semibold text-steam-dark">
                         Slaptažodis
                       </Label>
                       <div className="relative">
@@ -291,7 +278,7 @@ export function LoginForm() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           autoComplete="current-password"
-                          className="pl-10 h-12 text-base bg-white border-border/50 focus:border-primary focus:ring-primary/20"
+                          className="h-12 bg-white pl-10 text-base md:text-base"
                           required
                         />
                       </div>
@@ -300,14 +287,15 @@ export function LoginForm() {
                     <Button
                       type="submit"
                       disabled={loading || !email || !password}
-                      className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
+                      size="lg"
+                    className="w-full"
                     >
                       {loading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
                         <>
                           Prisijungti
-                          <ArrowRight className="ml-2 h-4 w-4" />
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
                         </>
                       )}
                     </Button>
@@ -318,7 +306,7 @@ export function LoginForm() {
                       type="button"
                       onClick={() => sendCode("reset")}
                       disabled={loading}
-                      className="inline-flex min-h-11 items-center font-medium text-steam-dark underline underline-offset-4"
+                      className="inline-flex min-h-11 items-center font-semibold text-steam-dark underline underline-offset-4"
                     >
                       Pamiršau slaptažodį
                     </button>
@@ -326,7 +314,7 @@ export function LoginForm() {
                       type="button"
                       onClick={() => sendCode("signin")}
                       disabled={loading}
-                      className="inline-flex min-h-11 items-center font-medium text-steam-dark underline underline-offset-4"
+                      className="inline-flex min-h-11 items-center font-semibold text-steam-dark underline underline-offset-4"
                     >
                       Prisijungti su kodu iš laiško
                     </button>
@@ -342,7 +330,7 @@ export function LoginForm() {
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <Label htmlFor="otp" className="text-steam-dark font-medium">
+                    <Label htmlFor="otp" className="font-semibold text-steam-dark">
                       Patvirtinimo kodas
                     </Label>
                     <div className="relative">
@@ -356,7 +344,7 @@ export function LoginForm() {
                         value={otp}
                         // Supabase sends 6 to 10 digits (the project uses 8).
                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, OTP_MAX))}
-                        className="pl-10 h-12 text-center text-2xl tracking-[0.35em] font-mono bg-white border-border/50 focus:border-primary focus:ring-primary/20"
+                        className="h-12 bg-white pl-10 text-center font-mono text-2xl tracking-[0.35em]"
                         maxLength={OTP_MAX}
                         required
                         autoFocus
@@ -367,14 +355,15 @@ export function LoginForm() {
                   <Button
                     type="submit"
                     disabled={loading || otp.length < OTP_MIN}
-                    className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
+                    size="lg"
+                    className="w-full"
                   >
                     {loading ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <>
                         Patvirtinti
-                        <ArrowRight className="ml-2 h-4 w-4" />
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </>
                     )}
                   </Button>
@@ -396,7 +385,7 @@ export function LoginForm() {
                       setStep("email")
                       setOtp("")
                     }}
-                    className="w-full text-muted-foreground hover:text-steam-dark"
+                    className="w-full text-steam-dark"
                   >
                     Grįžti atgal
                   </Button>
@@ -407,18 +396,18 @@ export function LoginForm() {
         </Card>
 
         <div className="flex flex-col items-center gap-3 mt-6">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-steam-dark">
-              <ArrowLeft className="h-4 w-4" />
+          <Button asChild variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-steam-dark">
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Grįžti į titulinį
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <a href="https://kusteam.app/veiklos" className="inline-flex min-h-11 items-center text-sm font-medium text-steam-dark underline underline-offset-4">Grįžti į veiklų katalogą</a>
           <p className="text-xs text-muted-foreground">
             STEAM LT Klaipėda &middot; Klaipėdos universitetas &middot; <PrivacyLink />
           </p>
         </div>
-      </motion.div>
+      </div>
     </main>
   )
 }

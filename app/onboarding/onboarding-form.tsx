@@ -193,14 +193,14 @@ export function OnboardingForm({ initial }: { initial: OnboardingInitial }) {
       <Button
         type="submit"
         disabled={saving}
-        className="h-12 w-full bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
+        size="lg" className="w-full"
       >
         {saving ? (
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
         ) : (
           <>
             Pradėti naudotis
-            <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </>
         )}
       </Button>
