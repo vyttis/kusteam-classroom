@@ -1078,6 +1078,21 @@ išbandyta atskirai ją pašalinus: testai krenta (išskyrus atskiras politikas
 lentelėse, kurias jau uždaro `games` politika, žr. 1 punkto pastabą).
 `scripts/test-data-api.sh` (PostgREST) lokaliai nepaleistas, jį paleidžia CI.
 
+Realtime (vedėjo tiesioginis vaizdas): `security.sql` kartoja tai, ką daro
+`realtime.apply_rls()`: paruošta užklausa „ar ši eilutė matoma prenumeratoriui“,
+vykdoma kelis kartus perjungus rolę, žetonas tik `request.jwt.claims`. Aktyvus
+savininkas eilutę mato kiekvieną kartą (`games`, `teams`, `challenges`,
+`submissions`, `announcements`, `achievements`), kitas vedėjas, `pending` ir
+užblokuotas savininkas nemato. Tas pats patikrinta su tikru Realtime 2.167
+vietiniame Supabase: 90 iš 90 komandų įterpimų pasiekė abu vedėjo kanalus.
+`E2E full lesson (local stack)` pirmą kartą PR #144 krito žingsnyje „three
+teams join“, pakartotas tam pačiam commit praėjo: tai ne migracija, o
+lenktynės, kai komanda prisijungia, kol vedėjo Realtime prenumerata dar
+kuriama (šaltas Realtime; vietoje pakartota ir be šios migracijos). Įvykiai iki
+„Subscribed to PostgreSQL“ neateina, o `hooks/use-live-game.ts` po pirmo
+`SUBSCRIBED` visko iš naujo neperskaito, todėl komanda atsiranda tik po 45 s
+saugos skaitymo. Tai programos ir testo darbas, ne šios migracijos.
+
 Atspaudas, tik pasikeitusios sritys (kitos penkios nepakito):
 
 | kind | be TEAM-006: buvo | be TEAM-006: tapo (`schema-fingerprint.expected`) | su TEAM-006: buvo (produkcija dabar) | su TEAM-006: tapo (`fingerprint-after.expected`) |

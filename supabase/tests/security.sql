@@ -965,6 +965,79 @@ SELECT public.t_sh('00000000-0000-0000-0000-0000000002a1', '1 1 1 1 1 1 1 1 2 ot
 SELECT public.t_ok($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a1')$q$);
 SELECT public.t_sh('00000000-0000-0000-0000-0000000002a4', '3 3 3 3 3 3 3 3 0 others some own 1');
 RESET ROLE;
+
+-- The facilitator's live board gets its rows over Supabase Realtime, which
+-- decides who may see a changed row the way realtime.apply_rls() does: one
+-- prepared "does this row exist for the subscriber" statement per change,
+-- run once per subscription after switching to the subscriber's role, with
+-- the token only in request.jwt.claims (no request.jwt.claim.sub, which the
+-- checks above use). The read policies must give the same answers there:
+-- the active owner sees the row every time the statement runs, another
+-- facilitator, a pending and a blocked owner never do.
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', '', false);
+CREATE FUNCTION public.t_walrus_sees(tbl text, row_id uuid, subscriber uuid) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE seen boolean;
+BEGIN
+  PERFORM set_config('role', 'authenticated', true),
+          set_config('request.jwt.claims', json_build_object('sub', subscriber, 'role', 'authenticated',
+            'session_id', gen_random_uuid(), 'aud', 'authenticated')::text, true);
+  EXECUTE 'EXECUTE t_walrus_stmt' INTO seen;
+  PERFORM set_config('role', 'none', true);
+  RETURN CASE WHEN seen THEN 'yes' ELSE 'no' END;
+END $$;
+DO $$
+DECLARE
+  owner_id constant uuid := '00000000-0000-0000-0000-0000000002a1';
+  other_id constant uuid := '00000000-0000-0000-0000-0000000002a3';
+  v_game constant uuid := '10000000-0000-0000-0000-0000000002a1';
+  v_team constant uuid := '30000000-0000-0000-0000-0000000002a1';
+  pending_id constant uuid := '00000000-0000-0000-0000-0000000002a2';
+  rec record;
+  got text;
+BEGIN
+  -- Every table of the realtime publication, each with a row of the owner's
+  -- activity, and the pending account's own activity row.
+  FOR rec IN
+    SELECT * FROM (VALUES
+      ('games', v_game),
+      ('teams', v_team),
+      ('challenges', '20000000-0000-0000-0000-0000000002a1'::uuid),
+      ('submissions', (SELECT s.id FROM public.submissions s WHERE s.team_id = v_team)),
+      ('announcements', (SELECT a.id FROM public.announcements a WHERE a.game_id = v_game)),
+      ('achievements', (SELECT a.id FROM public.achievements a WHERE a.game_id = v_game))
+    ) v(tbl, row_id)
+  LOOP
+    IF rec.row_id IS NULL THEN
+      RAISE EXCEPTION 'no % row to check', rec.tbl;
+    END IF;
+    EXECUTE format('PREPARE t_walrus_stmt AS SELECT EXISTS (SELECT 1 FROM public.%I WHERE id = %L)', rec.tbl, rec.row_id);
+    -- Owner three times around the others: the cached plan must not keep
+    -- an earlier subscriber's answer.
+    got := concat_ws(' ',
+      public.t_walrus_sees(rec.tbl, rec.row_id, owner_id),
+      public.t_walrus_sees(rec.tbl, rec.row_id, other_id),
+      public.t_walrus_sees(rec.tbl, rec.row_id, owner_id),
+      public.t_walrus_sees(rec.tbl, rec.row_id, pending_id),
+      public.t_walrus_sees(rec.tbl, rec.row_id, owner_id));
+    UPDATE public.profiles SET status = 'blocked' WHERE id = owner_id;
+    got := got || ' blocked ' || public.t_walrus_sees(rec.tbl, rec.row_id, owner_id);
+    UPDATE public.profiles SET status = 'active' WHERE id = owner_id;
+    got := got || ' unblocked ' || public.t_walrus_sees(rec.tbl, rec.row_id, owner_id);
+    DEALLOCATE t_walrus_stmt;
+    IF got <> 'yes no yes no yes blocked no unblocked yes' THEN
+      RAISE EXCEPTION 'Realtime visibility of % for owner, other, owner, pending, owner, blocked owner, unblocked owner: %', rec.tbl, got;
+    END IF;
+  END LOOP;
+  -- The pending account's own activity stays hidden from it there too.
+  PREPARE t_walrus_stmt AS SELECT EXISTS (SELECT 1 FROM public.games WHERE id = '10000000-0000-0000-0000-0000000002a2');
+  IF public.t_walrus_sees('games', '10000000-0000-0000-0000-0000000002a2', pending_id) <> 'no' THEN
+    RAISE EXCEPTION 'a pending account must not get its activity over Realtime';
+  END IF;
+  DEALLOCATE t_walrus_stmt;
+END $$;
+DROP FUNCTION public.t_walrus_sees(text, uuid, uuid);
+
 -- The service role is not an account and keeps the statistics functions.
 SET ROLE service_role;
 SELECT set_config('request.jwt.claim.sub', '', false);
