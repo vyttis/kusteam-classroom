@@ -1,36 +1,39 @@
 /**
- * Player route skeleton — mirrors the play page layout so students don't
- * see a jarring spinner-to-content flash on iOS Safari.
+ * Player route skeleton: mirrors the play page layout so participants do
+ * not see a jarring spinner-to-content flash on iOS Safari. It pulses only
+ * when motion is allowed.
  */
 export default function PlayLoading() {
+  const block = "rounded-full bg-foreground/10 motion-safe:animate-pulse"
   return (
-    <div className="min-h-screen p-4 pb-8">
-      <div className="max-w-lg mx-auto space-y-4">
-        {/* Top progress bar placeholder */}
-        <div className="h-1.5 rounded-full bg-muted animate-pulse" />
-
+    <div className="min-h-screen px-4 pb-8 pt-3 supports-[min-height:100dvh]:min-h-dvh" role="status">
+      <span className="sr-only">Kraunama...</span>
+      <div className="mx-auto max-w-lg space-y-4" aria-hidden="true">
         {/* Header row */}
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-24 rounded bg-muted animate-pulse" />
-          <div className="h-6 w-20 rounded bg-muted animate-pulse" />
+        <div className="flex min-h-11 items-center justify-between">
+          <div className={`h-9 w-24 ${block}`} />
+          <div className={`h-9 w-24 ${block}`} />
         </div>
 
-        {/* Challenge card skeleton */}
-        <div className="rounded-lg border border-border/40 bg-white p-5 space-y-3">
+        {/* Progress */}
+        <div className={`h-2 ${block}`} />
+
+        {/* Task card */}
+        <div className="space-y-3 rounded-2xl border border-border bg-white p-5">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-muted animate-pulse" />
+            <div className={`h-10 w-10 ${block}`} />
             <div className="flex-1 space-y-2">
-              <div className="h-5 w-3/4 rounded bg-muted animate-pulse" />
-              <div className="h-4 w-20 rounded bg-muted/60 animate-pulse" />
+              <div className={`h-5 w-3/4 ${block}`} />
+              <div className={`h-4 w-20 ${block}`} />
             </div>
           </div>
-          <div className="space-y-2 mt-4">
-            <div className="h-4 w-full rounded bg-muted/60 animate-pulse" />
-            <div className="h-4 w-5/6 rounded bg-muted/60 animate-pulse" />
-            <div className="h-4 w-2/3 rounded bg-muted/60 animate-pulse" />
+          <div className="space-y-2 pt-2">
+            <div className={`h-4 w-full ${block}`} />
+            <div className={`h-4 w-5/6 ${block}`} />
+            <div className={`h-4 w-2/3 ${block}`} />
           </div>
-          <div className="h-12 w-full rounded bg-muted animate-pulse mt-4" />
-          <div className="h-12 w-full rounded bg-primary/30 animate-pulse" />
+          <div className={`h-12 w-full ${block}`} />
+          <div className={`h-12 w-full ${block}`} />
         </div>
       </div>
     </div>
