@@ -1350,9 +1350,23 @@ SHA-256 sutapo su nurodytais viršuje.
   srautą (`Subscribed to PostgreSQL`, `ok`); komanda ir jos 100 taškų matomi
   gyvame ekrane; analitika atsidaro. `E2E smoke (production)` paleistas
   rankiniu būdu.
-- **Neatlikta:** schemos atspaudo palyginimas (8 punktas ir atspaudas po
-  taikymo) bei trijų funkcijų tekstų md5. Administratoriaus bibliotekos
-  moderavimas ir „Pateikti į biblioteką“ gyvai netikrinti.
+- **Schemos atspaudas po abiejų migracijų** (Vytis, 2026-11-23, užklausa iš
+  `main` `db1cee6`): 10 sričių sutampa su
+  `supabase/proposals/team-006-sso/fingerprint-after.expected` ir skaičiumi,
+  ir md5 (`grant.function` `70|cf4206849a25564d1f8365185090fcd1`). `function`
+  skaičius 42 kaip laukta, md5 `cd3245d09d87af07ae36093abc406eb4` vietoje
+  `31c110127efddc4989888c529d9b7943`: skiriasi tik `handle_new_user()`
+  (produkcijoje `7484db38acc2b34a94587b8e0bc2682e`, repozitorijoje
+  `8d3f56b8167a54f271f41b97e3fb7db0`, CLS-011). Detaliu režimu keturios šių
+  migracijų funkcijos sutampa su vietine Postgres 17 kopija:
+  `get_game_reflections(uuid)` `c492650369c4169eddea5a338cf9e84c`,
+  `get_game_stats(uuid)` `104e16294ba0e4ff4c7911b0ab2bfac5`,
+  `library_items_source_rules()` `f525af9f992438b9cdc59a65e827a2f6`,
+  `record_submission(uuid,uuid,text,boolean,integer,integer)`
+  `d58e19c9346407db1e5a17f1146821e2`.
+- **Neatlikta:** atspaudas prieš taikymą (8 punktas) nelygintas.
+  Administratoriaus bibliotekos moderavimas ir „Pateikti į biblioteką“ gyvai
+  netikrinti.
 
 ## 2026-11-23: atsakymas ir taškai viena transakcija (`record_submission`, auditas R-13)
 
@@ -1549,8 +1563,10 @@ Vykdė Vytis per SQL Editor iškart po `20261123120000`, tikrino Claude Code.
   todėl `/api/submissions` nuo šiol rašo per ją. Sintetinėje veikloje DU9JWU:
   neteisingas atsakymas 0 taškų, teisingas 100, pakartotas „Ši užduotis jau
   išspręsta!“, komandos suma 100.
-- **Neatlikta:** schemos atspaudo palyginimas; `teams_with_gap` po taikymo
-  dar kartą neskaičiuotas (prieš taikymą 0).
+- **Schemos atspaudas:** žr. `20261123120000` skyriaus įrašą (lyginta po abiejų
+  migracijų, sutampa).
+- **Neatlikta:** `teams_with_gap` po taikymo dar kartą neskaičiuotas (prieš
+  taikymą 0).
 
 ## Konvencija toliau
 
