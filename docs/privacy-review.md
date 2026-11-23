@@ -144,3 +144,24 @@ Vytis 2026-11-08 nurodė paskelbti, jei nėra esminių neatitikimų, ir nežadė
 - Slapukų sakinys: žetonas po 24 val. nebenaudojamas ir ištrinamas, kai puslapis vėl atidaromas (`lib/game/session.ts`), o ne ištrinamas savaime.
 
 Lieka KU sprendimui, pranešimo teisingumo nekeičia: paskyros pas teikėjus yra Vyčio Radvilos, ne KU vardu sudarytos sutartys.
+
+## Papildyta 2026-11-23 (audito radinys R-18)
+
+Puslapis papildytas tuo, ką platforma daro, bet pranešimas neminėjo. Teisinis pagrindas, valdytojas, kontaktai ir terminai nekeisti. Kiekvienas naujas teiginys ir jo šaltinis:
+
+| Teiginys | Šaltinis |
+| --- | --- |
+| Trys prisijungimo būdai: slaptažodis, Google, kodas iš laiško | `app/auth/login/login-form.tsx` (`signInWithPassword`, `signInWithOAuth`, `signInWithOtp`) |
+| Slaptažodį saugo Supabase, ne atviru tekstu | Platforma slaptažodį tik perduoda Supabase Auth (`app/api/account/password`, `supabase.auth.updateUser`); savo lentelėse jo neturi. Kaip Supabase Auth jį saugo, yra teikėjo savybė, ne šios repozitorijos kodas |
+| Iš Google gaunamas el. paštas, vardas ir nuotraukos adresas | `handle_new_user()` (`00002_rbac_library_analytics.sql`): `full_name`, `avatar_url` |
+| Dalyvių: visi atsakymai (ir neteisingi), užuominos | `app/api/submissions/route.ts` įrašo `answer` kiekvienam bandymui; `hint_reveals` |
+| IP adresas tik ribojimui, į DB neįrašomas | Skyrius „IP adresas ir identifikatorius“ aukščiau |
+| Administratoriai mato visų veiklų sąrašą ir gali peržiūrėti rezultatus | `app/(teacher)/admin/veiklos/page.tsx`; `can_read_game()` (`20261106120000`) |
+| Ką gauna Anthropic ir ko negauna | `app/api/di/generate`, `app/api/di/verify`, `app/api/ai/suggest-game`, `app/api/lessons/generate`, `app/api/lesson-plans/generate`, `app/api/lesson-plans/[planId]/convert`, `app/api/import/process` (dokumento tekstas). Dalyvių maršrutai Anthropic nekviečia (saugo `tests/privacy-notice.test.ts`) |
+| Ką gauna Resend | `lib/email/send.ts`, `lib/email/templates.ts`; prisijungimo kodą siunčia Supabase Auth per Resend SMTP (`docs/access-and-email.md`) |
+| Žemėlapis iš Google tik po paspaudimo | `components/shared/maps-embed.tsx` |
+| Naktinis darbas: užbaigia paliktas veiklas, skaičiuoja; trina tik įjungus | `app/api/cron/finish-stale-activities/route.ts`, `lib/retention.ts` (`retentionMode`). Kad produkcijoje `RETENTION_MODE` nenustatytas, patikrinta audite 2026-11-22, ne kode |
+| Dokumentai ir paveikslėliai netrinami | `removeImportDocument` trina tik `delete` režimu; paveikslėliams `storage.remove` kvietimo nėra |
+| Naršyklės atmintis: žetonas, pradžios laikas, refleksijos žyma, užvertas pranešimas, vedėjo juodraščiai | `lib/game/session.ts`, `components/player/announcement-banner.tsx`, `components/teacher/lesson-plan-generator.tsx`, `components/teacher/game-builder/pending-suggestions.ts`, `clearLocalWork` (`hooks/use-leave-warning.ts`) |
+
+Neįtraukta, laukia sprendimo: žr. PR aprašymą (klausimai savininkui). `PRIVACY_NOTICE_STATUS` paliktas `approved`; naują tekstą Vytis tvirtina sujungdamas PR.
