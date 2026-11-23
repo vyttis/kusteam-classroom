@@ -88,3 +88,25 @@ describe("the gap between joining the channel and the database stream", () => {
     }
   })
 })
+
+describe("channels joined right after the page loads", () => {
+  it("wait for the facilitator's token before joining", async () => {
+    const { readFileSync } = await import("node:fs")
+    for (const file of ["components/teacher/live-view.tsx", "components/player/announcement-banner.tsx"]) {
+      const src = readFileSync(file, "utf8")
+      const wait = src.indexOf("realtimeSignedIn(supabase).then(")
+      const join = src.indexOf(".channel(`")
+      expect(wait, file).toBeGreaterThan(-1)
+      expect(join, file).toBeGreaterThan(wait)
+    }
+  })
+
+  it("realtimeSignedIn never throws", async () => {
+    const { realtimeSignedIn } = await import("@/lib/supabase/realtime-auth")
+    const failing = { realtime: { setAuth: async () => { throw new Error("no session") } } }
+    await expect(realtimeSignedIn(failing as never)).resolves.toBeUndefined()
+    let called = 0
+    await realtimeSignedIn({ realtime: { setAuth: async () => { called++ } } } as never)
+    expect(called).toBe(1)
+  })
+})
