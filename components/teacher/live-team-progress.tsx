@@ -17,8 +17,11 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useLiveGame } from "@/hooks/use-live-game"
 import { LiveConnectionBanner } from "./live-connection-banner"
-import { Users, Trophy, Clock, AlertTriangle, MoreHorizontal, Loader2, Pencil, Trash2, Smartphone } from "lucide-react"
+import { Users, Trophy, Clock, AlertTriangle, MoreHorizontal, Loader2, Pencil, Trash2, Smartphone, Timer } from "lucide-react"
 import { TeamRejoinDialog } from "./team-rejoin-dialog"
+import { useTeamClocks } from "@/hooks/use-team-clocks"
+import { joiningTimeOver } from "@/lib/game/clock"
+import { teamTime, teamTimeLabel } from "@/lib/game/team-time"
 
 interface LiveTeamProgressProps {
   gameId: string
@@ -28,6 +31,8 @@ interface LiveTeamProgressProps {
   resumedAt?: string | null
   /** Number of tasks; a team that solved them all is done, not stuck. */
   challengeCount?: number
+  /** The activity's time limit in minutes: each team's own time left is shown. */
+  timeLimit?: number | null
 }
 
 function formatTimeSince(timestamp: string): string {
@@ -51,10 +56,21 @@ function teamLabel(n: number): string {
   return "komandų"
 }
 
-export function LiveTeamProgress({ gameId, paused = false, resumedAt: serverResumedAt = null, challengeCount }: LiveTeamProgressProps) {
+export function LiveTeamProgress({
+  gameId,
+  paused = false,
+  resumedAt: serverResumedAt = null,
+  challengeCount,
+  timeLimit = null,
+}: LiveTeamProgressProps) {
+  const timed = !!timeLimit
   const { teams, solvedCounts, lastSubmissions, historyLoaded, connectionState, retry } =
     useLiveGame(gameId)
-  const [, setTick] = useState(0)
+  // The limit runs for each team from its own "Pradėti" (audit R-12): the
+  // server's team starts, read again when a team joins, the pause changes
+  // or the limit is extended.
+  const teamClocks = useTeamClocks(gameId, timed, `${teams.length}:${paused}:${timeLimit}`)
+  const [now, setNow] = useState(() => Date.now())
   const { toast } = useToast()
   // When the activity was last resumed: nobody could answer during the
   // pause, so the 5 minutes count from here at the earliest. The server's
@@ -98,11 +114,15 @@ export function LiveTeamProgress({ gameId, paused = false, resumedAt: serverResu
     }
   }
 
-  // Tick every 30s to update relative times
+  // Tick every 30s to update relative times; every second while team
+  // countdowns are shown.
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 30000)
+    const interval = setInterval(() => setNow(Date.now()), timed ? 1000 : 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [timed])
+  const serverNow = now + teamClocks.skewMs
+  const closedByTime =
+    !paused && teamClocks.clock !== null && joiningTimeOver(teamClocks.clock, teamClocks.startsAt, serverNow)
 
   // No answer for 5 minutes, counted from the last answer or, for a team
   // that has not answered yet, from joining, and never from before the last
@@ -157,12 +177,23 @@ export function LiveTeamProgress({ gameId, paused = false, resumedAt: serverResu
         </span>
       </div>
 
+      {timed && (
+        <p className="text-xs text-muted-foreground">
+          Laiko limitas skaičiuojamas kiekvienai komandai atskirai, nuo tada, kai ji pradeda, todėl komandų laikas
+          gali skirtis nuo klasės ekrano laikmačio.
+          {closedByTime &&
+            " Nuo veiklos pradžios limitas jau praėjo, todėl naujos komandos nebepriimamos. Jei norite priimti naują komandą, pratęskite laiką."}
+        </p>
+      )}
+
       {/* At most two columns: this area is a third of the page width at
           most, and three cards cut team names to a few letters. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {teams.map((team, index) => {
           const lastSub = lastSubmissions.get(team.id)
           const stuck = isStuck(team)
+          const ownClock = teamClocks.teams.get(team.id)
+          const time = teamClocks.clock && ownClock ? teamTime(teamClocks.clock, ownClock, serverNow) : null
 
           return (
             <Card
@@ -244,8 +275,26 @@ export function LiveTeamProgress({ gameId, paused = false, resumedAt: serverResu
                   </div>
                 </div>
 
+                {time && (
+                  <div
+                    className={`mt-3 pt-2 border-t border-border/40 flex items-center gap-1.5 text-xs ${
+                      time.kind === "over" ? "font-medium text-accent-ink" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Timer className="h-3 w-3" aria-hidden="true" />
+                    <span className="tabular-nums">
+                      {teamTimeLabel(time)}
+                      {time.kind === "running" && paused ? " (pauzė)" : ""}
+                    </span>
+                  </div>
+                )}
+
                 {lastSub && (
-                  <div className="mt-3 pt-2 border-t border-border/40 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <div
+                    className={`flex items-center gap-1.5 text-xs text-muted-foreground ${
+                      time ? "mt-1.5" : "mt-3 pt-2 border-t border-border/40"
+                    }`}
+                  >
                     <Clock className="h-3 w-3" />
                     <span>Paskutinis atsakymas: {formatTimeSince(lastSub)}</span>
                   </div>

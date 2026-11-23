@@ -79,3 +79,19 @@ export function serverNowMs(nowIso: string | null | undefined, ageHeader: string
   // A cached answer lives a few seconds; anything else is not ours to trust.
   return now + (Number.isFinite(age) && age > 0 && age <= 60 ? age * 1000 : 0)
 }
+
+/**
+ * Whether a timed activity has run out of time for teams that have not
+ * joined yet: the limit, counted from the activity's own start with the
+ * pauses added back, has passed. This is the moment the class screen's
+ * countdown reaches zero. Teams that joined before it keep their own full
+ * time from their "Pradėti"; an extension moves this moment too. false
+ * without a limit or before the activity has started.
+ */
+export function joiningTimeOver(clock: GameClock, activityStartIso: string | null | undefined, nowMs: number): boolean {
+  if (!activityStartIso) return false
+  const startMs = Date.parse(activityStartIso)
+  if (!Number.isFinite(startMs)) return false
+  const end = deadlineMs(clock, startMs, 0, nowMs)
+  return end !== null && nowMs > end
+}

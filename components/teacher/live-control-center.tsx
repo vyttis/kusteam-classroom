@@ -59,6 +59,7 @@ export function LiveControlCenter({
             paused={gameStatus === "paused"}
             resumedAt={resumedAt}
             challengeCount={challengeCount}
+            timeLimit={settings.time_limit_minutes}
           />
         </div>
 
