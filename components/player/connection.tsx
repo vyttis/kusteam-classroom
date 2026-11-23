@@ -92,7 +92,7 @@ export function ConnectionBanner({ offline }: { offline: boolean }) {
       className="pointer-events-none fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 flex justify-center px-4"
     >
       {offline && (
-        <p className="flex items-center gap-2 rounded-xl bg-highlight px-4 py-2.5 text-sm font-medium text-highlight-foreground shadow-lg">
+        <p className="flex items-center gap-2 rounded-full bg-highlight px-4 py-2.5 text-sm font-medium text-highlight-foreground shadow-lg">
           <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
           {OFFLINE_TEXT}
         </p>

@@ -3,7 +3,6 @@
 import { useState, useEffect, useId } from "react"
 import { readStored, writeStored } from "@/lib/game/session"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -13,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, CheckCircle2, MessageCircle } from "lucide-react"
-import { motion } from "framer-motion"
+import { Loader2, CheckCircle2 } from "lucide-react"
+import { PRIMARY_BUTTON, TEXT_BUTTON } from "@/components/player/play-ui"
 
 interface ReflectionFormProps {
   challenges: { id: string; title: string }[]
@@ -60,16 +59,13 @@ export function ReflectionForm({
   if (submitted || skipped) {
     if (submitted) {
       return (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6"
-        >
-          <div className="flex items-center justify-center gap-2 text-primary-ink text-sm font-medium">
-            <CheckCircle2 className="h-4 w-4" />
-            Refleksija išsaugota
+        <div role="status" className="mt-4 flex items-start gap-3 rounded-2xl border-2 border-primary bg-primary/10 p-4 text-left">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-foreground" aria-hidden="true" />
+          <div>
+            <p className="font-bold text-foreground">Refleksija išsaugota</p>
+            <p className="text-sm text-foreground">Ačiū. Jūsų mintis matys vedėjas.</p>
           </div>
-        </motion.div>
+        </div>
       )
     }
     return null
@@ -127,128 +123,112 @@ export function ReflectionForm({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className="mt-8"
-    >
-      <Card className="border-border/50 bg-white shadow-md">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <MessageCircle className="h-4 w-4 text-primary-ink" />
-            </div>
-            <h3 className="font-semibold text-steam-dark text-base">
-              Trumpa refleksija
-            </h3>
-          </div>
-          <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-            Skirkite minutę apmąstyti veiklą. Tai padės geriau įsivertinti,
-            kaip sekėsi.
+    <section aria-labelledby={`${formId}-title`} className="mt-4 rounded-2xl border border-border bg-white p-5 text-left">
+      <h2 id={`${formId}-title`} className="text-lg font-bold text-foreground">
+        Trumpa refleksija
+      </h2>
+      <p className="mb-5 mt-1 text-base leading-relaxed text-muted-foreground">
+        Skirkite minutę apmąstyti veiklą. Tai padės geriau įsivertinti,
+        kaip sekėsi.
+      </p>
+
+      <div className="space-y-5">
+        {/* Q1: Hardest challenge */}
+        <div className="space-y-1.5">
+          <Label htmlFor={hardestId} className="text-base font-bold text-foreground">
+            Kuri užduotis buvo sudėtingiausia?
+          </Label>
+          <Select
+            value={hardestChallengeId ?? "none"}
+            onValueChange={(val) =>
+              setHardestChallengeId(val === "none" ? null : val)
+            }
+          >
+            <SelectTrigger id={hardestId} className="h-12 border-2 border-foreground/25 bg-white text-base">
+              <SelectValue placeholder="Pasirinkite užduotį..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" className="min-h-11 text-base">
+                Nepamenu / nenoriu rinktis
+              </SelectItem>
+              {challenges.map((c) => (
+                <SelectItem key={c.id} value={c.id} className="min-h-11 text-base">
+                  {c.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Q2: Improvement */}
+        <div className="space-y-1.5">
+          <Label htmlFor={improvementId} className="text-base font-bold text-foreground">
+            Ką kitą kartą darytumėte kitaip?
+          </Label>
+          <Textarea
+            id={improvementId}
+            aria-describedby={`${improvementId}-count`}
+            value={improvementText}
+            onChange={(e) =>
+              setImprovementText(e.target.value.slice(0, 500))
+            }
+            placeholder="Pvz., daugiau tartumėmės komandoje, atidžiau skaitytume sąlygas…"
+            className="min-h-[88px] resize-none border-2 border-foreground/25 bg-white text-base md:text-base"
+          />
+          <p id={`${improvementId}-count`} className="text-right text-sm text-muted-foreground">
+            <span className="sr-only">Įvesta ženklų: </span>
+            {improvementText.length}/500
           </p>
+        </div>
 
-          <div className="space-y-4">
-            {/* Q1: Hardest challenge */}
-            <div className="space-y-1.5">
-              <Label htmlFor={hardestId} className="text-sm font-medium text-steam-dark">
-                Kuri užduotis buvo sudėtingiausia?
-              </Label>
-              <Select
-                value={hardestChallengeId ?? "none"}
-                onValueChange={(val) =>
-                  setHardestChallengeId(val === "none" ? null : val)
-                }
-              >
-                <SelectTrigger id={hardestId} className="bg-white">
-                  <SelectValue placeholder="Pasirinkite užduotį..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    Nepamenu / nenoriu rinktis
-                  </SelectItem>
-                  {challenges.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Q3: What liked (optional) */}
+        <div className="space-y-1.5">
+          <Label htmlFor={likedId} className="text-base font-bold text-foreground">
+            Kas labiausiai patiko?{" "}
+            <span className="font-normal text-muted-foreground">
+              (neprivaloma)
+            </span>
+          </Label>
+          <Textarea
+            id={likedId}
+            aria-describedby={`${likedId}-count`}
+            value={likedText}
+            onChange={(e) => setLikedText(e.target.value.slice(0, 300))}
+            placeholder="Pvz., buvo smagu dirbti komandoje, patiko mįslės…"
+            className="min-h-[64px] resize-none border-2 border-foreground/25 bg-white text-base md:text-base"
+          />
+          <p id={`${likedId}-count`} className="text-right text-sm text-muted-foreground">
+            <span className="sr-only">Įvesta ženklų: </span>
+            {likedText.length}/300
+          </p>
+        </div>
 
-            {/* Q2: Improvement */}
-            <div className="space-y-1.5">
-              <Label htmlFor={improvementId} className="text-sm font-medium text-steam-dark">
-                Ką kitą kartą darytumėte kitaip?
-              </Label>
-              <Textarea
-                id={improvementId}
-                aria-describedby={`${improvementId}-count`}
-                value={improvementText}
-                onChange={(e) =>
-                  setImprovementText(e.target.value.slice(0, 500))
-                }
-                placeholder="Pvz., daugiau tartumėmės komandoje, atidžiau skaitytume sąlygas…"
-                className="bg-white min-h-[80px] resize-none"
-              />
-              <p id={`${improvementId}-count`} className="text-xs text-muted-foreground text-right">
-                <span className="sr-only">Įvesta ženklų: </span>
-                {improvementText.length}/500
-              </p>
-            </div>
+        {error && (
+          <p role="alert" className="rounded-xl border border-highlight bg-highlight/20 p-3 text-sm text-foreground">
+            {error}
+          </p>
+        )}
 
-            {/* Q3: What liked (optional) */}
-            <div className="space-y-1.5">
-              <Label htmlFor={likedId} className="text-sm font-medium text-steam-dark">
-                Kas labiausiai patiko?{" "}
-                <span className="text-muted-foreground font-normal">
-                  (neprivaloma)
-                </span>
-              </Label>
-              <Textarea
-                id={likedId}
-                aria-describedby={`${likedId}-count`}
-                value={likedText}
-                onChange={(e) => setLikedText(e.target.value.slice(0, 300))}
-                placeholder="Pvz., buvo smagu dirbti komandoje, patiko mįslės…"
-                className="bg-white min-h-[60px] resize-none"
-              />
-              <p id={`${likedId}-count`} className="text-xs text-muted-foreground text-right">
-                <span className="sr-only">Įvesta ženklų: </span>
-                {likedText.length}/300
-              </p>
-            </div>
-
-            {error && (
-              <p role="alert" className="text-sm text-accent-ink font-medium">{error}</p>
+        {/* One main action; skipping is a quiet text button under it. */}
+        <div className="flex flex-col items-center gap-1">
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !improvementText.trim()}
+            aria-busy={loading}
+            className={PRIMARY_BUTTON}
+          >
+            {loading ? (
+              <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+            ) : (
+              <CheckCircle2 aria-hidden="true" />
             )}
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-1">
-              <Button
-                onClick={handleSubmit}
-                disabled={loading || !improvementText.trim()}
-                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Išsaugoti refleksiją
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSkip}
-                disabled={loading}
-                className="text-muted-foreground"
-              >
-                Praleisti
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+            Išsaugoti refleksiją
+          </Button>
+          <button type="button" onClick={handleSkip} disabled={loading} className={TEXT_BUTTON}>
+            Praleisti
+          </button>
+        </div>
+      </div>
+    </section>
   )
 }

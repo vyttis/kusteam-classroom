@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { Crown, Zap, Brain, Trophy, Flame, X, type LucideIcon } from "lucide-react"
 import { ACHIEVEMENT_CONFIG, type AchievementType } from "@/lib/game/achievements"
 
@@ -35,6 +35,7 @@ export function AchievementToast({
 }: AchievementToastProps) {
   const config = ACHIEVEMENT_CONFIG[achievement.type]
   const Icon = ICON_MAP[config.icon]
+  const reduce = useReducedMotion()
 
   useEffect(() => {
     const timer = setTimeout(onDismiss, 5000)
@@ -52,16 +53,17 @@ export function AchievementToast({
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={reduce ? false : { opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        exit={{ opacity: 0 }}
+        transition={reduce ? { duration: 0 } : { duration: 0.25, ease: "easeOut" }}
+        role="status"
         // Inline on mobile (pushes content down — no overlap with title);
         // fixed top-right on desktop (out of the way).
         className="relative z-[60] mb-3 w-full sm:fixed sm:right-4 sm:top-4 sm:mb-0 sm:w-auto sm:max-w-sm"
       >
         <div
-          className="flex items-start gap-3 rounded-xl border border-highlight/30 bg-gradient-to-r from-highlight/15 to-highlight/5 px-4 py-3 shadow-lg backdrop-blur-sm"
+          className="flex items-center gap-3 rounded-2xl border border-highlight bg-white px-4 py-2 shadow-lg"
         >
           <div
             className="flex shrink-0 items-center justify-center rounded-full"
@@ -71,24 +73,26 @@ export function AchievementToast({
               backgroundColor: `${config.color}1A`,
             }}
           >
-            <Icon size={22} style={{ color: config.color }} strokeWidth={2.5} />
+            <Icon size={22} style={{ color: config.color }} strokeWidth={2.5} aria-hidden="true" />
           </div>
 
           <div className="min-w-0 flex-1 pr-1">
-            <p className="text-sm font-semibold text-steam-dark leading-tight">
-              🏆 {config.name}
+            <p className="text-base font-bold leading-tight text-foreground">
+              <span className="sr-only">Pasiekimas: </span>
+              {config.name}
             </p>
-            <p className="text-xs text-steam-dark/70 leading-snug mt-0.5">
+            <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
               {description}
             </p>
           </div>
 
           <button
             onClick={onDismiss}
-            className="shrink-0 rounded-md p-1 text-steam-dark/40 transition-colors hover:bg-steam-dark/5 hover:text-steam-dark/70"
-            aria-label="Uždaryti"
+            type="button"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Uždaryti pasiekimo pranešimą"
           >
-            <X size={16} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
       </motion.div>

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import type { PlayerSession, GameSettings, AchievementType } from "@/types/game"
 import { getPlayerSession, clearPlayerSession, readStored, savePlayerSession } from "@/lib/game/session"
@@ -14,6 +13,9 @@ import { AnnouncementBanner, type AnnouncementItem } from "@/components/player/a
 import { AchievementToast } from "@/components/player/achievement-toast"
 import { ChallengeGrid } from "@/components/player/challenge-grid"
 import { ChallengeDetailModal } from "@/components/player/challenge-detail-modal"
+import type { AnswerNotice } from "@/components/player/answer-feedback"
+import { taskSegments } from "@/components/player/play-progress"
+import { SCREEN, SegmentedProgress } from "@/components/player/play-ui"
 import { LinearTask, type ExtendedSubmissionResult, type PlayerChallenge } from "@/components/player/linear-task"
 import {
   PlayEnd,
@@ -64,6 +66,12 @@ export default function PlayPage() {
   const [answer, setAnswer] = useState("")
   const [loading, setLoading] = useState(false)
   const [feedback, setFeedback] = useState<ExtendedSubmissionResult | null>(null)
+  // Wrong answers so far (each one shakes the field), and the reply to an
+  // answer that was not checked at all (time over, pause, no connection).
+  const [wrongAttempts, setWrongAttempts] = useState(0)
+  const [notice, setNotice] = useState<AnswerNotice | null>(null)
+  // One answer on its way at a time, whatever the button's state says.
+  const submittingRef = useRef(false)
   const [totalPoints, setTotalPoints] = useState(0)
   const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set())
   const [showExplanation, setShowExplanation] = useState(false)
@@ -530,6 +538,7 @@ export default function PlayPage() {
         if (shapeChanged) {
           setAnswer("")
           setFeedback(null)
+          setNotice(null)
         }
       } else {
         const index = firstUnsolved >= 0 ? firstUnsolved : next.length
@@ -537,6 +546,7 @@ export default function PlayPage() {
         currentIndexRef.current = index
         setAnswer("")
         setFeedback(null)
+        setNotice(null)
         setShowExplanation(false)
         setCurrentExplanation(null)
       }
@@ -679,9 +689,14 @@ export default function PlayPage() {
   }
 
   // Free mode: handle submission from challenge detail modal
-  async function handleFreeSubmit(submittedAnswer: string, hintsUsed: number): Promise<{ is_correct: boolean; points_awarded: number; message: string; explanation?: string | null }> {
+  // An answer that was not checked comes back with `notice`, so the sheet
+  // does not show it as a wrong answer.
+  async function handleFreeSubmit(
+    submittedAnswer: string,
+    hintsUsed: number
+  ): Promise<ExtendedSubmissionResult & { notice?: AnswerNotice["kind"] }> {
     if (!session || selectedChallengeIndex === null) {
-      return { is_correct: false, points_awarded: 0, message: "Klaida" }
+      return { is_correct: false, points_awarded: 0, message: "Nepavyko pateikti atsakymo. Bandykite dar kartą.", notice: "connection" }
     }
     const challenge = challenges[selectedChallengeIndex]
     try {
@@ -700,7 +715,7 @@ export default function PlayPage() {
       })
 
       if (res.status === 429) {
-        return { is_correct: false, points_awarded: 0, message: "Per daug bandymų. Palaukite minutę." }
+        return { is_correct: false, points_awarded: 0, message: "Per daug bandymų. Palaukite minutę.", notice: "wait" }
       }
 
       // Error responses carry { error } — surface the message instead of an
@@ -715,6 +730,7 @@ export default function PlayPage() {
           points_awarded: 0,
           message:
             (res.status !== 401 && err?.error) || "Nepavyko pateikti atsakymo. Bandykite dar kartą.",
+          notice: res.status === 403 ? "wait" : "connection",
         }
       }
 
@@ -739,29 +755,31 @@ export default function PlayPage() {
         const solvedNow = new Set(solvedIdsRef.current)
         solvedNow.add(challenge.id)
         if (challengesRef.current.every((c) => solvedNow.has(c.id))) {
-          setTimeout(() => {
-            // A task added in these two seconds keeps the team playing.
-            if (!challengesRef.current.every((c) => solvedIdsRef.current.has(c.id))) return
-            setSelectedChallengeIndex(null)
-            setGameFinished(true)
-          }, 2000)
+          // The sheet shows the result; closing it ends the activity
+          // (closeFreeTask), so the team is not pulled away while reading.
         }
       }
 
       return result
     } catch {
-      return { is_correct: false, points_awarded: 0, message: "Tinklo klaida. Bandykite dar kartą." }
+      return {
+        is_correct: false,
+        points_awarded: 0,
+        message: "Nepavyko pateikti atsakymo. Patikrinkite interneto ryšį ir bandykite dar kartą.",
+        notice: "connection",
+      }
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    // Close the phone keyboard so the result below the button is visible.
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    if (submittingRef.current) return
     if (!answer.trim() || !session || !challenges[currentIndex] || timeExpired) return
 
+    submittingRef.current = true
     setLoading(true)
     setFeedback(null)
+    setNotice(null)
     const task = challenges[currentIndex]
 
     try {
@@ -780,28 +798,27 @@ export default function PlayPage() {
       })
 
       if (res.status === 429) {
-        toast({
+        setNotice({
+          kind: "wait",
           title: "Per daug bandymų",
-          description: "Palaukite minutę ir bandykite dar kartą.",
-          variant: "destructive",
+          text: "Palaukite minutę ir bandykite dar kartą.",
         })
-        setLoading(false)
         return
       }
 
-      // Error responses carry { error }, not a SubmissionResult — showing
-      // them as feedback rendered an empty red box with no message.
+      // Error responses carry { error }, not a SubmissionResult: the answer
+      // was not checked, so it is not shown as a wrong one.
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null
         // 401: the server did not find the team. The reload asks again and
         // drops the session only when the team is really gone.
         if (res.status === 401) void loadChallenges(session, true)
-        toast({
-          title: "Nepavyko pateikti atsakymo",
-          description: (res.status !== 401 && err?.error) || "Bandykite dar kartą.",
-          variant: "destructive",
+        setNotice({
+          // 403: paused, finished or out of time; nothing is broken.
+          kind: res.status === 403 ? "wait" : "connection",
+          title: res.status === 403 ? "Atsakymas nepriimtas" : "Nepavyko pateikti atsakymo",
+          text: (res.status !== 401 && err?.error) || "Bandykite dar kartą.",
         })
-        setLoading(false)
         return
       }
 
@@ -830,6 +847,8 @@ export default function PlayPage() {
       }
 
       if (result.is_correct) {
+        // The form goes away: close the phone keyboard with it.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
         setTotalPoints(result.total_points || totalPoints + result.points_awarded)
         setSolvedIds((prev) => {
           const next = new Set(Array.from(prev))
@@ -838,27 +857,41 @@ export default function PlayPage() {
         })
         setAnswer("")
 
-        // Show explanation if available
+        // With an explanation the team reads it and presses the button;
+        // without one the result moves on by itself (LinearTask).
         if (result.explanation) {
           setCurrentExplanation(result.explanation)
           setShowExplanation(true)
-          // Don't auto-advance — wait for user to click "Toliau"
-        } else {
-          setTimeout(() => {
-            setFeedback(null)
-            goToNextTask()
-          }, 2000)
         }
+      } else {
+        // The typed answer stays; LinearTask shakes the field and selects it.
+        setWrongAttempts((n) => n + 1)
       }
     } catch {
-      toast({
+      setNotice({
+        kind: "connection",
         title: "Nepavyko pateikti atsakymo",
-        description: "Patikrinkite interneto ryšį ir bandykite dar kartą.",
-        variant: "destructive",
+        text: "Patikrinkite interneto ryšį ir bandykite dar kartą.",
       })
     } finally {
+      submittingRef.current = false
       setLoading(false)
     }
+  }
+
+  // Editing the answer after a wrong one starts a new attempt: the note and
+  // the mark on the wrong choice go away.
+  function changeAnswer(value: string) {
+    setAnswer(value)
+    setNotice(null)
+    setFeedback((current) => (current && !current.is_correct ? null : current))
+  }
+
+  // Free mode: the sheet closed. If that was the last task, finish.
+  function closeFreeTask() {
+    setSelectedChallengeIndex(null)
+    const list = challengesRef.current
+    if (list.length > 0 && list.every((c) => solvedIdsRef.current.has(c.id))) setGameFinished(true)
   }
 
   // Only from "Išeiti" in the footer, which asks first (LeaveTeamButton):
@@ -928,9 +961,12 @@ export default function PlayPage() {
     total: challenges.length,
     totalPoints,
     teamName: session.team_name,
+    teamId: session.team_id,
     gameCode,
     sessionToken: session.session_token,
     challenges: challenges.map((c) => ({ id: c.id, title: c.title })),
+    solvedIds,
+    final: endedByTeacher,
     showLeaderboard,
     showReflection: !reflectionDone,
     // The form shows its own "Refleksija išsaugota" (or nothing after
@@ -986,15 +1022,23 @@ export default function PlayPage() {
       )}
     </>
   )
+  // Points, time and progress stay in sight while the team scrolls a long
+  // task, so the count-up after a correct answer is seen. Not on a screen
+  // too low for it (a phone held sideways).
+  const stickyTop =
+    "top-0 z-40 -mx-4 mb-4 bg-muted/95 px-4 pb-3 pt-3 backdrop-blur [@media(min-height:560px)]:sticky"
+  const solvedCount = challenges.filter((c) => solvedIds.has(c.id)).length
 
   // Free mode: show challenge grid
   if (pathMode === "free") {
     const selected = selectedChallengeIndex !== null ? challenges[selectedChallengeIndex] : undefined
     return withConnection(
-      <div className="min-h-screen p-4 pb-8">
+      <div className={`${SCREEN} px-4 pb-24`}>
         <div className="max-w-2xl mx-auto">
-          {banners}
-          {header}
+          <div className={stickyTop}>
+            {banners}
+            {header}
+          </div>
 
           <ChallengeGrid
             challenges={challenges}
@@ -1006,55 +1050,66 @@ export default function PlayPage() {
             key={sheetKey(selected)}
             challenge={selected ?? null}
             open={selectedChallengeIndex !== null}
-            onOpenChange={(open) => { if (!open) setSelectedChallengeIndex(null) }}
+            onOpenChange={(open) => { if (!open) closeFreeTask() }}
             onSubmit={handleFreeSubmit}
             isSolved={selected ? solvedIds.has(selected.id) : false}
+            lastTask={solvedCount >= challenges.length}
             onRevealHint={(idx) => (selected ? revealHint(selected.id, idx) : Promise.resolve(false))}
           />
 
-          <TeamFooter teamName={session.team_name} onLeave={leaveTeam} className="mt-4" />
+          <TeamFooter teamName={session.team_name} gameCode={gameCode} onLeave={leaveTeam} className="mt-6" />
         </div>
       </div>
     )
   }
 
   const currentChallenge = challenges[currentIndex]
-  const progressValue = (solvedIds.size / challenges.length) * 100
 
   return withConnection(
-    <div className="min-h-screen p-4 pb-8">
+    <div className={`${SCREEN} px-4 pb-24`}>
       <div className="max-w-lg mx-auto">
-        {banners}
-        {header}
+        <div className={stickyTop}>
+          {banners}
+          {header}
 
-        {/* Progress */}
-        <div className="mb-6">
-          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-            <span>Užduotis {currentIndex + 1} iš {challenges.length}</span>
-            <span>{solvedIds.size} išspręsta</span>
+          {/* Progress: which task is open and how many are solved */}
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
+              <h1 className="font-bold text-foreground">Užduotis {currentIndex + 1} iš {challenges.length}</h1>
+              <span className="text-muted-foreground">{solvedCount} išspręsta</span>
+            </div>
+            <SegmentedProgress
+              segments={taskSegments(challenges.map((c) => c.id), solvedIds, currentChallenge.id).map((state, i) => ({
+                id: challenges[i].id,
+                state,
+              }))}
+            />
           </div>
-          <Progress value={Math.round(progressValue)} className="h-2" aria-label="Išspręstos užduotys" />
         </div>
 
         <LinearTask
           challenge={currentChallenge}
           index={currentIndex}
           answer={answer}
-          onAnswerChange={setAnswer}
+          onAnswerChange={changeAnswer}
           loading={loading}
           feedback={feedback}
+          wrongAttempts={wrongAttempts}
+          notice={notice}
           explanation={showExplanation ? currentExplanation : null}
+          lastTask={solvedCount >= challenges.length}
           onSubmit={handleSubmit}
           onRevealHint={(index) => revealHint(currentChallenge.id, index)}
           onNext={() => {
             setFeedback(null)
+            setNotice(null)
             setShowExplanation(false)
             setCurrentExplanation(null)
             goToNextTask()
           }}
         />
 
-        <TeamFooter teamName={session.team_name} onLeave={leaveTeam} />
+        <TeamFooter teamName={session.team_name} gameCode={gameCode} onLeave={leaveTeam} />
       </div>
     </div>
   )

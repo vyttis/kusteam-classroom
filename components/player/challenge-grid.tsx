@@ -1,10 +1,9 @@
 "use client"
 
 import { useMemo } from "react"
-import { motion } from "framer-motion"
-import { Lock, Unlock, CheckCircle2, FileText, Hash, List } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Check, ChevronRight, Lock } from "lucide-react"
+import { taskSegments } from "@/components/player/play-progress"
+import { SegmentedProgress } from "@/components/player/play-ui"
 
 interface ChallengeGridProps {
   challenges: Array<{
@@ -33,32 +32,11 @@ const typeLabels: Record<string, string> = {
   multiple_choice: "Pasirinkimas",
 }
 
-const typeIcons: Record<string, React.ReactNode> = {
-  text: <FileText className="h-3.5 w-3.5" />,
-  number: <Hash className="h-3.5 w-3.5" />,
-  multiple_choice: <List className="h-3.5 w-3.5" />,
-}
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.06,
-    },
-  },
-}
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { type: "spring" as const, stiffness: 300, damping: 24 },
-  },
-}
-
+/**
+ * Free mode: every task as a card, in any order. Three states that look
+ * different without relying on colour alone: open (a button with an
+ * arrow), solved (a check) and locked (a lock and what to do first).
+ */
 export function ChallengeGrid({
   challenges,
   solvedIds,
@@ -81,49 +59,35 @@ export function ChallengeGrid({
     return map
   }, [challenges, solvedIds])
 
-  const solvedCount = solvedIds.size
+  const solvedCount = challenges.filter((c) => solvedIds.has(c.id)).length
   const totalCount = challenges.length
 
   return (
     <div className="space-y-4">
-      {/* Progress header */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-steam-dark">
+      {/* Progress */}
+      <div>
+        <h1 className="mb-1.5 text-sm font-bold text-foreground">
           Išspręsta {solvedCount} iš {totalCount} užduočių
-        </p>
-        <div className="h-2 flex-1 max-w-[160px] ml-3 rounded-full bg-muted overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-primary"
-            initial={{ width: 0 }}
-            animate={{
-              width: totalCount > 0 ? `${(solvedCount / totalCount) * 100}%` : "0%",
-            }}
-            transition={{ type: "spring", stiffness: 100, damping: 20 }}
-          />
-        </div>
+        </h1>
+        <SegmentedProgress
+          segments={taskSegments(challenges.map((c) => c.id), solvedIds).map((state, i) => ({
+            id: challenges[i].id,
+            state,
+          }))}
+        />
       </div>
 
-      {/* Grid */}
-      <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 gap-3"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {challenges.map((challenge) => {
-          const status = statusMap.get(challenge.id) ?? "locked"
-          const index = challenges.findIndex((c) => c.id === challenge.id)
-
-          return (
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {challenges.map((challenge, index) => (
+          <li key={challenge.id}>
             <ChallengeCard
-              key={challenge.id}
               challenge={challenge}
-              status={status}
+              status={statusMap.get(challenge.id) ?? "locked"}
               onSelect={() => onSelectChallenge(index)}
             />
-          )
-        })}
-      </motion.div>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -137,112 +101,52 @@ function ChallengeCard({
   status: ChallengeStatus
   onSelect: () => void
 }) {
-  const isLocked = status === "locked"
-  const isSolved = status === "solved"
-  const isUnlocked = status === "unlocked"
+  const meta = `${challenge.points} tšk. · ${typeLabels[challenge.type] ?? challenge.type}`
 
-  return (
-    <motion.div variants={cardVariants}>
-      <Card
-        className={`relative overflow-hidden transition-all duration-200 ${
-          isLocked
-            ? "bg-gray-50 border-gray-200 cursor-not-allowed"
-            : isSolved
-            ? "bg-primary/5 border-primary/30 cursor-default"
-            : "bg-white border-l-4 border-l-primary border-t border-r border-b border-gray-200 cursor-pointer hover:shadow-md hover:border-l-primary hover:-translate-y-0.5"
-        }`}
-        onClick={isUnlocked ? onSelect : undefined}
-        role={isUnlocked ? "button" : undefined}
-        tabIndex={isUnlocked ? 0 : undefined}
-        onKeyDown={
-          isUnlocked
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  onSelect()
-                }
-              }
-            : undefined
-        }
-        aria-label={
-          isLocked
-            ? `${challenge.title}: pirmiausia išspręskite reikalingas užduotis`
-            : isSolved
-            ? `${challenge.title}: išspręsta`
-            : challenge.title
-        }
+  if (status === "unlocked") {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-h-[72px] w-full items-center gap-3 rounded-2xl border-2 border-foreground/25 bg-white p-4 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
-        <CardHeader className="pb-2 pt-4 px-4">
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className={`text-sm font-semibold leading-tight line-clamp-2 ${isLocked ? "text-muted-foreground" : ""}`}>
-              {challenge.title}
-            </CardTitle>
-            <StatusIcon status={status} />
-          </div>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge
-              variant="outline"
-              className={`text-xs font-bold tabular-nums ${
-                isSolved
-                  ? "bg-primary/10 text-primary-ink border-primary/20"
-                  : isLocked
-                  ? "bg-gray-100 text-muted-foreground border-gray-200"
-                  : "bg-highlight/10 text-steam-dark border-highlight/30"
-              }`}
-            >
-              {challenge.points} tšk.
-            </Badge>
-            <Badge
-              variant="outline"
-              className={`text-xs gap-1 ${
-                isLocked
-                  ? "text-muted-foreground border-gray-200"
-                  : "text-secondary-ink border-secondary/20"
-              }`}
-            >
-              {typeIcons[challenge.type]}
-              {typeLabels[challenge.type] ?? challenge.type}
-            </Badge>
-          </div>
-
-          {/* Locked tooltip */}
-          {isLocked && (
-            <p className="mt-2 text-xs text-muted-foreground leading-tight">
-              Pirmiausia išspręskite reikalingas užduotis
-            </p>
-          )}
-        </CardContent>
-
-        {/* Solved overlay */}
-        {isSolved && (
-          <div className="absolute inset-0 bg-primary/[0.03] pointer-events-none" />
-        )}
-      </Card>
-    </motion.div>
-  )
-}
-
-function StatusIcon({ status }: { status: ChallengeStatus }) {
-  switch (status) {
-    case "locked":
-      return (
-        <div className="shrink-0 rounded-full bg-gray-100 p-1.5">
-          <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
-      )
-    case "solved":
-      return (
-        <div className="shrink-0 rounded-full bg-primary/10 p-1.5">
-          <CheckCircle2 className="h-3.5 w-3.5 text-primary-ink" />
-        </div>
-      )
-    case "unlocked":
-      return (
-        <div className="shrink-0 rounded-full bg-primary/10 p-1.5">
-          <Unlock className="h-3.5 w-3.5 text-primary-ink" />
-        </div>
-      )
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 break-words text-base font-bold leading-tight text-foreground">
+            {challenge.title}
+          </span>
+          <span className="mt-1 block text-sm text-muted-foreground">{meta}</span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-foreground" aria-hidden="true" />
+      </button>
+    )
   }
+
+  const solved = status === "solved"
+  return (
+    <div
+      className={`flex min-h-[72px] items-center gap-3 rounded-2xl border-2 p-4 ${
+        solved ? "border-primary bg-primary/10" : "border-dashed border-foreground/20 bg-transparent"
+      }`}
+    >
+      <span className="min-w-0 flex-1">
+        <span
+          className={`line-clamp-2 break-words text-base font-bold leading-tight ${
+            solved ? "text-foreground" : "text-muted-foreground"
+          }`}
+        >
+          {challenge.title}
+        </span>
+        <span className="mt-1 block text-sm text-muted-foreground">
+          {solved ? `Išspręsta · ${challenge.points} tšk.` : "Pirmiausia išspręskite reikalingas užduotis"}
+        </span>
+      </span>
+      {solved ? (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary" aria-hidden="true">
+          <Check className="h-4 w-4 text-primary-foreground" strokeWidth={3} />
+        </span>
+      ) : (
+        <Lock className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      )}
+    </div>
+  )
 }

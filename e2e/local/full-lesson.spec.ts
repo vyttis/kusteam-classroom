@@ -438,6 +438,16 @@ test("an opened hint is shown and the task then scores less", async () => {
   const hintButton = page.getByRole("button", { name: /Reikia užuominos\?/ })
   await expect(hintButton).toContainText(`(-${TASKS.capital.hintPenalty} tšk.)`)
   await hintButton.click()
+  // The price is said first and nothing is spent yet: the hint needs a
+  // second, explicit step.
+  await expect(page.getByText(`Užuomina kainuos ${TASKS.capital.hintPenalty} tšk.`)).toBeVisible()
+  await expect(
+    page.getByText(
+      `Už teisingą atsakymą tada gausite ${TASKS.capital.points - TASKS.capital.hintPenalty} tšk. vietoj ${TASKS.capital.points}.`,
+    ),
+  ).toBeVisible()
+  await expect(page.getByText(TASKS.capital.hint)).toHaveCount(0)
+  await page.getByRole("button", { name: `Atverti už ${TASKS.capital.hintPenalty} tšk.` }).click()
   await expect(page.getByText(TASKS.capital.hint)).toBeVisible()
   // The only hint is open: no further one is offered.
   await expect(page.getByRole("button", { name: /užuomin/i })).toHaveCount(0)
