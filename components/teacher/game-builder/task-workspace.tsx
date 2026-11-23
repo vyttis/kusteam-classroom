@@ -7,7 +7,8 @@ import { ManualTaskEditor } from "./manual-task-editor"
 import { DiWorkspace } from "./di-workspace"
 import { LibraryWorkspace } from "./library-workspace"
 import { TaskPreview } from "./task-preview"
-import { Edit3, Sparkles, BookOpen } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { BookOpen, Pencil, Plus, Sparkles } from "lucide-react"
 
 interface TaskWorkspaceProps {
   gameId: string
@@ -48,6 +49,8 @@ interface TaskWorkspaceProps {
   onImportedSuggestions?: (suggestions: AiSuggestion[]) => void
   // Library
   onTaskAdded: () => void
+  /** Starts a new task in the editor (the manual mode's next step). */
+  onAddNew: () => void
   // Active tab
   activeTab: string
   onTabChange: (tab: string) => void
@@ -87,6 +90,7 @@ export function TaskWorkspace({
   generationSuccess,
   onImportedSuggestions,
   onTaskAdded,
+  onAddNew,
   activeTab,
   onTabChange,
 }: TaskWorkspaceProps) {
@@ -98,13 +102,10 @@ export function TaskWorkspace({
   // If editing or creating, show the editor
   if (editingChallenge || isCreatingNew) {
     return (
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Edit3 className="h-4 w-4 text-primary-ink" />
-          <h3 className="font-semibold text-sm text-steam-dark">
-            {editingChallenge ? "Redaguoti užduotį" : "Nauja užduotis"}
-          </h3>
-        </div>
+      <div className="motion-fade-in">
+        <h2 className="mb-5 text-xl font-bold leading-tight text-steam-dark">
+          {editingChallenge ? "Redaguoti užduotį" : "Nauja užduotis"}
+        </h2>
         <ManualTaskEditor
           gameId={gameId}
           challenge={editingChallenge}
@@ -120,32 +121,42 @@ export function TaskWorkspace({
 
   return (
     <Tabs value={activeTab} onValueChange={onTabChange}>
-      <TabsList className="w-full grid grid-cols-3 mb-4">
-        <TabsTrigger value="manual" className="gap-1.5 text-xs">
-          <Edit3 className="h-3.5 w-3.5" />
+      {/* Three ways to get a task, as one segmented control. */}
+      <TabsList className="mb-5 grid w-full grid-cols-3" aria-label="Kaip kurti užduotį">
+        <TabsTrigger value="manual" className="gap-1.5 px-2">
+          <Pencil className="h-4 w-4 shrink-0" aria-hidden="true" />
           Rankinis
         </TabsTrigger>
-        <TabsTrigger value="di" className="gap-1.5 text-xs">
-          <Sparkles className="h-3.5 w-3.5" />
+        <TabsTrigger value="di" className="gap-1.5 px-2">
+          <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
           DI
         </TabsTrigger>
-        <TabsTrigger value="library" className="gap-1.5 text-xs">
-          <BookOpen className="h-3.5 w-3.5" />
+        <TabsTrigger value="library" className="gap-1.5 px-2">
+          <BookOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
           Biblioteka
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="manual">
-        <div className="text-center py-8">
-          <Edit3 className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">
-            Pasirinkite užduotį kairėje pusėje, kad ją redaguotumėte, arba
-            sukurkite naują.
+      <TabsContent value="manual" className="mt-0">
+        <div className="mx-auto max-w-md py-8 text-center">
+          <h2 className="text-xl font-bold leading-tight text-steam-dark">Rašykite užduotį patys</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Užduočiai reikia klausimo, teisingo atsakymo ir taškų. Jei norite pakeisti jau esamą užduotį,
+            pasirinkite ją užduočių sąraše.
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onAddNew}
+            className="mt-5 gap-1.5 border-2 border-primary bg-white font-bold text-foreground hover:bg-primary/10"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Nauja užduotis
+          </Button>
         </div>
       </TabsContent>
 
-      <TabsContent value="di">
+      <TabsContent value="di" className="mt-0">
         <DiWorkspace
           gameId={gameId}
           gameTitle={gameTitle}
@@ -174,7 +185,7 @@ export function TaskWorkspace({
         />
       </TabsContent>
 
-      <TabsContent value="library">
+      <TabsContent value="library" className="mt-0">
         <LibraryWorkspace gameId={gameId} onTaskAdded={onTaskAdded} />
       </TabsContent>
     </Tabs>

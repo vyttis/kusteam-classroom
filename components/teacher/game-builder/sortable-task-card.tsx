@@ -1,12 +1,26 @@
 "use client"
 
-import { useSortable } from "@dnd-kit/sortable"
+import { useState } from "react"
+import { useSortable, defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Challenge } from "@/types/game"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { isUnreviewedAiTask } from "@/lib/game/ai-review"
+import { cn } from "@/lib/utils"
+import { useReducedMotion } from "@/hooks/use-reduced-motion"
 import { Button } from "@/components/ui/button"
-import { GripVertical, Edit3, Trash2, Copy, Sparkles, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
+  Copy,
+  Eye,
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react"
 
 interface SortableTaskCardProps {
   challenge: Challenge
@@ -21,7 +35,75 @@ interface SortableTaskCardProps {
   isLast?: boolean
   /** The activity is running or paused: no dragging, removing or copying. */
   locked?: boolean
+  /** A short confirmation on the row: the task was just added or saved. */
+  flash?: "added" | "saved" | null
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  text: "Tekstas",
+  number: "Skaičius",
+  multiple_choice: "Pasirinkimas",
+}
+
+const DIFFICULTY_LABELS: Record<string, string> = {
+  easy: "Lengva",
+  medium: "Vidutinė",
+  hard: "Sunki",
+}
+
+/** Points, type and difficulty as one quiet line of text. */
+export function taskMeta(challenge: Pick<Challenge, "points" | "type" | "difficulty" | "generated_by_di">): string {
+  return [
+    `${challenge.points} tšk.`,
+    TYPE_LABELS[challenge.type] ?? challenge.type,
+    challenge.difficulty ? DIFFICULTY_LABELS[challenge.difficulty] : null,
+    challenge.generated_by_di ? "DI" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+}
+
+type Attention = { label: string; hint: string; blocking: boolean }
+
+/**
+ * What the facilitator still has to do with a task before the lesson, most
+ * pressing first. Said in words: the colour of the mark only supports it.
+ */
+function taskAttention(challenge: Challenge): Attention | null {
+  if (challenge.needs_answer) {
+    return {
+      label: "Trūksta atsakymo",
+      hint: "Be teisingo atsakymo veiklos pradėti negalima. Atidarykite užduotį ir jį įrašykite.",
+      blocking: true,
+    }
+  }
+  if (
+    challenge.generated_by_di &&
+    (challenge.verification_verdict === "uncertain" || challenge.verification_verdict === "fail")
+  ) {
+    return {
+      label: "Reikia peržiūros",
+      hint: "DI patikra abejoja šia užduotimi. Atidarykite, peržiūrėkite ir išsaugokite.",
+      blocking: false,
+    }
+  }
+  if (isUnreviewedAiTask(challenge)) {
+    return {
+      label: "Patvirtinkite atsakymą",
+      hint: "DI sukurta užduotis. Atidarykite, patikrinkite atsakymą ir išsaugokite.",
+      blocking: false,
+    }
+  }
+  return null
+}
+
+const menuItem =
+  "flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-steam-dark hover:bg-muted focus-visible:bg-muted focus-visible:outline-none aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent"
+
+// Rows also glide to their new place after a move made from the menu, not
+// only while one is dragged.
+const animateLayoutChanges: AnimateLayoutChanges = (args) =>
+  args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true
 
 export function SortableTaskCard({
   challenge,
@@ -34,7 +116,10 @@ export function SortableTaskCard({
   isFirst = false,
   isLast = false,
   locked = false,
+  flash = null,
 }: SortableTaskCardProps) {
+  // "Reduce motion": rows change place at once.
+  const reducedMotion = useReducedMotion()
   const {
     attributes,
     listeners,
@@ -42,196 +127,179 @@ export function SortableTaskCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: `challenge-${challenge.id}`, disabled: locked })
+  } = useSortable({
+    id: `challenge-${challenge.id}`,
+    disabled: locked,
+    transition: reducedMotion ? null : undefined,
+    animateLayoutChanges: reducedMotion ? () => false : animateLayoutChanges,
+  })
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   }
 
-  const difficultyLabel =
-    challenge.difficulty === "easy"
-      ? "Lengva"
-      : challenge.difficulty === "medium"
-      ? "Vidutinė"
-      : challenge.difficulty === "hard"
-      ? "Sunki"
-      : null
+  const attention = taskAttention(challenge)
 
   return (
-    <div
+    <li
       ref={setNodeRef}
       style={style}
-      className={isDragging ? "opacity-40 z-50" : ""}
+      id={`task-row-${challenge.id}`}
+      className={cn("list-none", isDragging && "relative z-10 opacity-40")}
     >
-      <Card
-        className={`border-border/50 bg-white hover:border-primary/30 transition-colors cursor-pointer ${
-          isSelected ? "ring-2 ring-primary/40 border-primary/30" : ""
-        }`}
-        onClick={() => onSelect(challenge)}
+      {/* The entrance animation sits on the inner box: on the sortable node
+          its transform would fight the one dragging sets. */}
+      <div
+        className={cn(
+          "flex items-stretch rounded-xl border bg-white transition-colors motion-reduce:transition-none",
+          isSelected
+            ? "border-l-[6px] border-primary bg-primary/5"
+            : "border-border hover:border-foreground/30",
+          flash === "added" && "motion-rise-in"
+        )}
       >
-        <CardContent className="p-3">
-          <div className="flex items-start gap-2">
-            {locked ? (
-              <span className="flex flex-col items-center gap-0.5 pt-0.5 shrink-0">
-                <span className="h-4 w-4" aria-hidden="true" />
-                <span className="text-xs font-bold text-primary-ink w-5 text-center">
-                  {index + 1}
-                </span>
-              </span>
-            ) : (
-              <button
-                type="button"
-                aria-label={`Vilkti užduotį ${index + 1} „${challenge.title}“ į kitą vietą`}
-                className="flex flex-col items-center gap-0.5 pt-0.5 cursor-grab active:cursor-grabbing touch-none shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                {...attributes}
-                {...listeners}
-                onClick={(e) => e.stopPropagation()}
+        {locked ? (
+          <span className="flex w-11 shrink-0 items-center justify-center text-sm font-bold tabular-nums text-steam-dark">
+            {index + 1}
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-label={`Vilkti užduotį ${index + 1} „${challenge.title}“ į kitą vietą`}
+            className="flex w-11 shrink-0 cursor-grab touch-none flex-col items-center justify-center gap-0.5 rounded-l-xl text-muted-foreground hover:bg-muted active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" aria-hidden="true" />
+            <span className="text-sm font-bold leading-none tabular-nums text-steam-dark">{index + 1}</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          aria-current={isSelected ? "true" : undefined}
+          title={attention?.hint}
+          className="min-h-14 min-w-0 flex-1 rounded-md py-2 pl-1 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          onClick={() => onSelect(challenge)}
+        >
+          <span className="sr-only">Redaguoti: </span>
+          <span className="line-clamp-2 break-words text-sm font-bold leading-snug text-steam-dark">
+            {challenge.title}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{taskMeta(challenge)}</span>
+          {flash ? (
+            <span className="motion-pop-in mt-1 inline-flex items-center gap-1 text-xs font-semibold text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary-ink" aria-hidden="true" />
+              {flash === "added" ? "Pridėta" : "Išsaugota"}
+            </span>
+          ) : (
+            attention && (
+              <span
+                className={cn(
+                  "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-foreground",
+                  attention.blocking ? "bg-accent/15" : "bg-highlight/30"
+                )}
               >
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-bold text-primary-ink w-5 text-center">
-                  {index + 1}
-                </span>
-              </button>
-            )}
+                {attention.blocking ? (
+                  <AlertTriangle className="h-3 w-3 shrink-0 text-accent-ink" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-3 w-3 shrink-0" aria-hidden="true" />
+                )}
+                {attention.label}
+              </span>
+            )
+          )}
+          {isSelected && <span className="sr-only"> (dabar redaguojama)</span>}
+        </button>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-medium text-sm text-steam-dark truncate">
-                  {challenge.title}
-                </h3>
-                {challenge.generated_by_di && (
-                  <Sparkles className="h-3 w-3 text-highlight-ink shrink-0" />
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                {challenge.needs_answer && (
-                  <Badge
-                    className="text-xs px-1.5 py-0 bg-accent/10 text-accent-ink border-accent/40 hover:bg-accent/15 gap-0.5"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSelect(challenge)
-                    }}
-                  >
-                    <AlertTriangle className="h-2.5 w-2.5" />
-                    Trūksta atsakymo
-                  </Badge>
-                )}
-                {!challenge.needs_answer &&
-                  challenge.generated_by_di &&
-                  (challenge.verification_verdict === "uncertain" ||
-                    challenge.verification_verdict === "fail") && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs px-1.5 py-0 border-highlight/50 bg-highlight/10 text-steam-dark"
-                      title="DI patikra abejoja šia užduotimi. Atidarykite, peržiūrėkite ir išsaugokite."
-                    >
-                      Reikia peržiūros
-                    </Badge>
-                  )}
-                <Badge variant="outline" className="text-xs px-1.5 py-0">
-                  {challenge.points} tšk.
-                </Badge>
-                <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                  {challenge.type === "text"
-                    ? "Tekstas"
-                    : challenge.type === "number"
-                    ? "Skaičius"
-                    : "Pasirinkimas"}
-                </Badge>
-                {difficultyLabel && (
-                  <Badge
-                    variant="outline"
-                    className={`text-xs px-1.5 py-0 ${
-                      challenge.difficulty === "easy"
-                        ? "text-primary-ink border-primary/30"
-                        : challenge.difficulty === "hard"
-                        ? "text-accent-ink border-accent/30"
-                        : "text-highlight-ink border-highlight/30"
-                    }`}
-                  >
-                    {difficultyLabel}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex max-w-[5.5rem] flex-wrap justify-end gap-0.5 shrink-0">
-              {!locked && onMove && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Perkelti „${challenge.title}“ aukštyn`}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-secondary-ink"
-                    disabled={isFirst}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onMove(challenge, -1)
-                    }}
-                  >
-                    <ArrowUp className="h-3 w-3" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Perkelti „${challenge.title}“ žemyn`}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-secondary-ink"
-                    disabled={isLast}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onMove(challenge, 1)
-                    }}
-                  >
-                    <ArrowDown className="h-3 w-3" aria-hidden="true" />
-                  </Button>
-                </>
-              )}
+        {locked ? (
+          <span className="flex w-11 shrink-0 items-center justify-center text-muted-foreground" aria-hidden="true">
+            <Pencil className="h-4 w-4" />
+          </span>
+        ) : (
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
               <Button
                 variant="ghost"
-                size="sm"
-                aria-label={`Redaguoti „${challenge.title}“`}
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-secondary-ink"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSelect(challenge)
-                }}
+                size="icon"
+                className="h-11 w-11 shrink-0 self-center text-muted-foreground"
+                aria-label={`Daugiau veiksmų: „${challenge.title}“`}
               >
-                <Edit3 className="h-3 w-3" />
+                <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
               </Button>
-              {!locked && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1">
+              <ul>
+                {onMove && (
+                  <>
+                    {/* The menu stays open after a move, so a task can go
+                        several steps without reopening it. */}
+                    <li>
+                      <button
+                        type="button"
+                        className={menuItem}
+                        aria-label={`Perkelti „${challenge.title}“ aukštyn`}
+                        aria-disabled={isFirst}
+                        onClick={() => {
+                          if (!isFirst) onMove(challenge, -1)
+                        }}
+                      >
+                        <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                        Perkelti aukštyn
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        className={menuItem}
+                        aria-label={`Perkelti „${challenge.title}“ žemyn`}
+                        aria-disabled={isLast}
+                        onClick={() => {
+                          if (!isLast) onMove(challenge, 1)
+                        }}
+                      >
+                        <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                        Perkelti žemyn
+                      </button>
+                    </li>
+                  </>
+                )}
+                <li>
+                  <button
+                    type="button"
+                    className={menuItem}
                     aria-label={`Kopijuoti „${challenge.title}“`}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-secondary-ink"
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onClick={() => {
+                      setMenuOpen(false)
                       onDuplicate(challenge)
                     }}
                   >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    Kopijuoti
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className={menuItem}
                     aria-label={`Ištrinti „${challenge.title}“`}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-accent-ink"
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onClick={() => {
+                      setMenuOpen(false)
                       onDelete(challenge)
                     }}
                   >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                    <Trash2 className="h-4 w-4 text-accent-ink" aria-hidden="true" />
+                    Ištrinti
+                  </button>
+                </li>
+              </ul>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+    </li>
   )
 }
 
@@ -243,19 +311,13 @@ export function TaskCardOverlay({
   index: number
 }) {
   return (
-    <Card className="border-primary/30 bg-white shadow-lg shadow-primary/10 w-full max-w-md">
-      <CardContent className="p-3">
-        <div className="flex items-center gap-2">
-          <GripVertical className="h-4 w-4 text-primary-ink" />
-          <span className="text-xs font-bold text-primary-ink">{index + 1}</span>
-          <h3 className="font-medium text-sm text-steam-dark truncate flex-1">
-            {challenge.title}
-          </h3>
-          <Badge variant="outline" className="text-xs">
-            {challenge.points} tšk.
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-primary bg-white py-2 pl-3 pr-4 shadow-lg">
+      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="text-sm font-bold tabular-nums text-steam-dark">{index + 1}</span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-steam-dark">{challenge.title}</p>
+        <p className="text-xs text-muted-foreground">{taskMeta(challenge)}</p>
+      </div>
+    </div>
   )
 }

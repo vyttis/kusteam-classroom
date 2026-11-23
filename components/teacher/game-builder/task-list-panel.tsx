@@ -1,13 +1,16 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useDroppable } from "@dnd-kit/core"
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { Challenge } from "@/types/game"
+import { cn } from "@/lib/utils"
 import { SortableTaskCard } from "./sortable-task-card"
-import { Plus, Puzzle, ArrowRight } from "lucide-react"
+import { ArrowRight, BookOpen, Pencil, Plus, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface TaskListPanelProps {
@@ -19,9 +22,19 @@ interface TaskListPanelProps {
   /** Moves a task one step: the alternative to dragging. */
   onMove?: (challenge: Challenge, direction: -1 | 1) => void
   onAddNew: () => void
+  /** Opens the DI or the library mode of the workspace. */
+  onOpenMode?: (mode: "di" | "library") => void
+  /** The task saved in the editor a moment ago: its row confirms it. */
+  savedId?: string | null
   isOverPanel: boolean
   locked?: boolean
 }
+
+/** How long a new row keeps its "Pridėta" confirmation. */
+const FRESH_MS = 2500
+
+const startOption =
+  "flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-white p-3 text-left transition-colors hover:border-foreground/30 hover:bg-muted/40 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 
 export function TaskListPanel({
   challenges,
@@ -31,6 +44,8 @@ export function TaskListPanel({
   onDuplicate,
   onMove,
   onAddNew,
+  onOpenMode,
+  savedId = null,
   isOverPanel,
   locked = false,
 }: TaskListPanelProps) {
@@ -41,42 +56,74 @@ export function TaskListPanel({
   const sortableIds = challenges.map((c) => `challenge-${c.id}`)
   const totalPoints = challenges.reduce((sum, c) => sum + (c.points || 0), 0)
 
+  // Tasks that were not in the list a moment ago rise in and say "Pridėta".
+  // Worked out while rendering, so the row never shows before its entrance.
+  const [seenIds, setSeenIds] = useState(() => new Set(challenges.map((c) => c.id)))
+  const freshKey = challenges
+    .filter((c) => !seenIds.has(c.id))
+    .map((c) => c.id)
+    .join(",")
+  useEffect(() => {
+    if (!freshKey) return
+    const fresh = freshKey.split(",")
+    // A task added below the fold is brought into view.
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    document
+      .getElementById(`task-row-${fresh[fresh.length - 1]}`)
+      ?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" })
+    const timer = setTimeout(() => {
+      setSeenIds((prev) => new Set([...prev, ...fresh]))
+    }, FRESH_MS)
+    return () => clearTimeout(timer)
+  }, [freshKey])
+  const freshIds = new Set(freshKey ? freshKey.split(",") : [])
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-base font-semibold text-steam-dark flex items-center gap-2">
-            <Puzzle className="h-4 w-4 text-primary-ink" />
-            Užduotys
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold leading-tight text-steam-dark">Užduotys</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground tabular-nums">
             {challenges.length} užd. &middot; {totalPoints} tšk.
           </p>
         </div>
         <Button
           onClick={onAddNew}
-          size="sm"
-          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 h-8"
+          variant="outline"
+          className="shrink-0 gap-1.5 border-2 border-primary bg-white font-bold text-foreground hover:bg-primary/10"
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
           Nauja
         </Button>
       </div>
 
+      {/* Below lg the workspace is a sheet: these two open its other modes. */}
+      {onOpenMode && (
+        <div className="mb-3 grid grid-cols-2 gap-2 lg:hidden">
+          <Button type="button" variant="outline" className="gap-1.5 px-3" onClick={() => onOpenMode("di")}>
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            Kurti su DI
+          </Button>
+          <Button type="button" variant="outline" className="gap-1.5 px-3" onClick={() => onOpenMode("library")}>
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
+            Biblioteka
+          </Button>
+        </div>
+      )}
+
       <div
         ref={setNodeRef}
-        className={`flex-1 min-h-[200px] rounded-lg transition-colors ${
-          isOverPanel
-            ? "bg-primary/5 border-2 border-dashed border-primary/30"
-            : ""
-        }`}
+        className={cn(
+          "-m-1 min-h-0 flex-1 rounded-xl p-1 transition-colors motion-reduce:transition-none lg:overflow-y-auto",
+          isOverPanel && "bg-primary/5 outline-dashed outline-2 -outline-offset-2 outline-primary"
+        )}
       >
         <SortableContext
           items={sortableIds}
           strategy={verticalListSortingStrategy}
         >
           {challenges.length > 0 ? (
-            <div className="space-y-2">
+            <ol className="space-y-2">
               {challenges.map((challenge, index) => (
                 <SortableTaskCard
                   key={challenge.id}
@@ -90,53 +137,86 @@ export function TaskListPanel({
                   isFirst={index === 0}
                   isLast={index === challenges.length - 1}
                   locked={locked}
+                  flash={freshIds.has(challenge.id) ? "added" : savedId === challenge.id ? "saved" : null}
                 />
               ))}
+            </ol>
+          ) : isOverPanel ? (
+            <div className="px-4 py-12 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
+                <Plus className="h-7 w-7 text-primary-ink" aria-hidden="true" />
+              </div>
+              <h3 className="text-base font-bold text-steam-dark">Paleiskite užduotį čia</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Atleiskite, kad pridėtumėte</p>
             </div>
           ) : (
-            <div className="text-center py-12">
-              {isOverPanel ? (
-                <>
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Plus className="h-8 w-8 text-primary-ink animate-pulse" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-primary-ink mb-1">
-                    Paleiskite užduotį čia
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Atleiskite, kad pridėtumėte
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-highlight/10 flex items-center justify-center">
-                    <ArrowRight className="h-7 w-7 text-highlight-ink animate-[nudge_1.5s_ease-in-out_infinite]" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-steam-dark mb-1">
-                    Nutempkite DI užduotis čia
-                  </h3>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    arba sukurkite rankiniu būdu
-                  </p>
-                  <Button
-                    onClick={onAddNew}
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Pridėti rankiniu būdu
-                  </Button>
-                </>
-              )}
+            <div className="motion-fade-in">
+              <h3 className="text-base font-bold text-steam-dark">Užduočių dar nėra</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pasirinkite, nuo ko pradėti. Vėliau užduotis galėsite keisti ir rikiuoti.
+              </p>
+              <ul className="mt-4 space-y-2">
+                {onOpenMode && (
+                  <li>
+                    <button type="button" className={startOption} onClick={() => onOpenMode("di")}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-highlight text-highlight-foreground">
+                        <Sparkles className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-steam-dark">Gauti pasiūlymų iš DI</span>
+                        <span className="block text-sm text-muted-foreground">
+                          Aprašote temą, DI pasiūlo užduotis su atsakymais. Atsakymus patvirtinate jūs.
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                )}
+                {onOpenMode && (
+                  <li>
+                    <button type="button" className={startOption} onClick={() => onOpenMode("library")}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+                        <BookOpen className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-steam-dark">Paimti iš bibliotekos</span>
+                        <span className="block text-sm text-muted-foreground">
+                          Užduotys iš patvirtintų kitų vedėjų veiklų.
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                )}
+                <li>
+                  <button type="button" className={startOption} onClick={onAddNew}>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <Pencil className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-steam-dark">Rašyti savo užduotį</span>
+                      <span className="block text-sm text-muted-foreground">
+                        Klausimas, teisingas atsakymas ir taškai.
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              </ul>
+              <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
+                Reikia visos pamokos iš karto? Paruoštose veiklose užduotys ir atsakymai jau sudėti.{" "}
+                <Link
+                  href="/paruostos-veiklos"
+                  className="inline-flex min-h-11 items-center gap-1 font-semibold text-foreground underline underline-offset-4 hover:decoration-2"
+                >
+                  Paruoštos veiklos
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </p>
             </div>
           )}
         </SortableContext>
 
         {isOverPanel && challenges.length > 0 && (
-          <div className="mt-2 h-10 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center">
-            <p className="text-xs text-primary-ink font-medium">
-              Paleiskite čia
-            </p>
+          <div className="mt-2 flex h-11 items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/5">
+            <p className="text-sm font-semibold text-foreground">Paleiskite čia</p>
           </div>
         )}
       </div>

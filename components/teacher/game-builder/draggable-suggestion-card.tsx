@@ -47,7 +47,7 @@ export function DraggableSuggestionCard({
         <button
           type="button"
           aria-label={`Vilkti pasiūlymą „${suggestion.title}“ į užduočių sąrašą`}
-          className="absolute left-1 top-4 z-10 p-1 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-muted/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-opacity"
+          className="absolute right-1.5 top-1.5 z-10 hidden h-9 w-9 cursor-grab touch-none items-center justify-center rounded-full bg-white opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing group-hover:opacity-100 motion-reduce:transition-none lg:flex"
           {...attributes}
           {...listeners}
         >

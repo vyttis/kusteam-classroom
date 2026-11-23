@@ -8,31 +8,24 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useLeaveWarning } from "@/hooks/use-leave-warning"
 import { useSessionExpired } from "@/hooks/use-session-expired"
 import { SessionExpiredNotice } from "@/components/teacher/session-expired-notice"
 import {
-  Loader2,
-  Plus,
-  Trash2,
-  Lightbulb,
-  Save,
-  MapPin,
-  Sparkles,
+  AlertCircle,
+  AlertTriangle,
+  Check,
   ChevronDown,
   ChevronUp,
-  BookOpen,
-  AlertTriangle,
+  Loader2,
+  Plus,
+  Save,
+  Sparkles,
+  Trash2,
 } from "lucide-react"
+import { calculatePoints } from "@/lib/game/scoring"
+import { cn } from "@/lib/utils"
 import { ImageUpload } from "../image-upload"
 import { MapsEmbed } from "@/components/shared/maps-embed"
 import { ChallengePrerequisites } from "../challenge-prerequisites"
@@ -117,6 +110,41 @@ function initialForm(challenge: Challenge | null, prefill: AiSuggestion | null):
   }
 }
 
+type ErrorField = "title" | "answer" | "points" | "options"
+
+const TASK_TYPES: { value: ChallengeType; label: string; note: string }[] = [
+  { value: "text", label: "Tekstas", note: "Dalyviai įrašo žodį ar trumpą frazę." },
+  { value: "number", label: "Skaičius", note: "Dalyviai įrašo skaičių." },
+  { value: "multiple_choice", label: "Pasirinkimas", note: "Dalyviai renkasi vieną iš jūsų surašytų variantų." },
+]
+
+const DIFFICULTIES = [
+  { value: "easy", label: "Lengva" },
+  { value: "medium", label: "Vidutinė" },
+  { value: "hard", label: "Sunki" },
+] as const
+
+const labelClass = "block text-sm font-semibold leading-snug text-foreground"
+const noteClass = "text-xs text-muted-foreground"
+const sectionTitle = "text-base font-bold text-steam-dark"
+const removeButton = "h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground"
+
+/** A refused save, said at the field. */
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p
+      id={id}
+      role="alert"
+      className="motion-shake flex items-start gap-1.5 text-sm font-semibold text-destructive"
+      style={{ "--motion-shake-distance": "4px" } as React.CSSProperties}
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      {message}
+    </p>
+  )
+}
+
 const formKey = (f: TaskForm) =>
   JSON.stringify([
     f.title, f.description, f.type, f.pointsText, f.correctAnswer, f.acceptedAnswers, f.removeAccepted,
@@ -164,6 +192,10 @@ export function ManualTaskEditor({
   // its hash, so changed options force the teacher to re-mark the answer).
   const [initialOptions, setInitialOptions] = useState<string[] | null>(null)
 
+  // A refused save is explained at the field it is about, and the cursor
+  // goes there (the field may be far above the save bar).
+  const [errors, setErrors] = useState<Partial<Record<ErrorField, string>>>({})
+
   const showPrerequisites = pathMode === "free" && !!challenge
 
   // The form as last loaded: an edit compared against it is unsaved work.
@@ -197,9 +229,8 @@ export function ManualTaskEditor({
     setDifficulty(f.difficulty)
     setHintPenalty(f.hintPenalty)
     setPrerequisites(f.prerequisites)
-    setShowExtras(
-      !!(f.explanation || f.difficulty || f.imageUrl || f.mapsUrl || f.prerequisites.length > 0)
-    )
+    setShowExtras(!!(f.imageUrl || f.mapsUrl))
+    setErrors({})
     setBaseline(formKey(f))
   }, [challenge, prefillData])
 
@@ -211,51 +242,45 @@ export function ManualTaskEditor({
     (challenge.verification_verdict === "uncertain" || challenge.verification_verdict === "fail")
   const diIssues = flaggedByDi && Array.isArray(challenge.verification_issues) ? challenge.verification_issues : []
 
+  function fail(field: ErrorField, message: string) {
+    setErrors({ [field]: message })
+    document.getElementById(`${fieldId}-${field}`)?.focus()
+  }
+  function clearError(field: ErrorField) {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
+  }
+
   async function handleSave() {
+    setErrors({})
     if (!title.trim()) {
-      toast({
-        title: "Pavadinimas privalomas",
-        variant: "destructive",
-      })
+      fail("title", "Pavadinimas privalomas")
       return
     }
     // New tasks and duplicated/cloned tasks without a confirmed answer
     // (needs_answer) must get one; ordinary edits may leave it blank to keep
     // the existing answer.
     if ((!challenge || challenge.needs_answer) && !correctAnswer.trim()) {
-      toast({
-        title: "Atsakymas privalomas",
-        variant: "destructive",
-      })
+      if (type === "multiple_choice") fail("options", "Atsakymas privalomas. Pažymėkite teisingą variantą.")
+      else fail("answer", "Atsakymas privalomas")
       return
     }
 
     const points = Number(pointsText)
     if (!Number.isInteger(points) || points < 1 || points > 1000) {
-      toast({
-        title: "Taškai turi būti sveikasis skaičius nuo 1 iki 1000",
-        variant: "destructive",
-      })
+      fail("points", "Taškai turi būti sveikasis skaičius nuo 1 iki 1000")
       return
     }
 
     if (type === "multiple_choice") {
       const cleanOptions = options.map((o) => o.trim()).filter(Boolean)
       if (cleanOptions.length < 2) {
-        toast({
-          title: "Reikia bent dviejų atsakymo variantų",
-          variant: "destructive",
-        })
+        fail("options", "Reikia bent dviejų atsakymo variantų")
         return
       }
       // A marked answer must still exist among the options (it may have been
       // deleted or renamed after being marked).
       if (correctAnswer.trim() && !cleanOptions.includes(correctAnswer.trim())) {
-        toast({
-          title: "Pažymėkite teisingą atsakymą",
-          description: "Pažymėtas atsakymas nebesutampa su nė vienu variantu.",
-          variant: "destructive",
-        })
+        fail("options", "Pažymėkite teisingą atsakymą. Pažymėtas atsakymas nebesutampa su nė vienu variantu.")
         return
       }
       // Editing options without re-marking the answer would leave the stored
@@ -267,12 +292,7 @@ export function ManualTaskEditor({
         JSON.stringify(cleanOptions) !==
           JSON.stringify(initialOptions.map((o) => o.trim()).filter(Boolean))
       if (optionsChanged && !correctAnswer.trim()) {
-        toast({
-          title: "Pažymėkite teisingą atsakymą",
-          description:
-            "Pakeitus atsakymų variantus būtina iš naujo pažymėti teisingą.",
-          variant: "destructive",
-        })
+        fail("options", "Pažymėkite teisingą atsakymą. Pakeitus atsakymų variantus būtina iš naujo pažymėti teisingą.")
         return
       }
     }
@@ -377,20 +397,24 @@ export function ManualTaskEditor({
     }
   }
 
+  const pointsNumber = Number(pointsText)
+  const pointsValid = Number.isInteger(pointsNumber) && pointsNumber >= 1 && pointsNumber <= 1000
+  const typeNote = TASK_TYPES.find((t) => t.value === type)?.note
+
   return (
-    <div className="space-y-4" data-unsaved-task={dirty ? "true" : undefined}>
+    <div className="space-y-6" data-unsaved-task={dirty ? "true" : undefined}>
       {/* AI prefill badge */}
       {prefillData && !challenge && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-highlight/10 border border-highlight/20 text-sm text-steam-dark">
-          <Sparkles className="h-4 w-4 text-highlight-ink shrink-0" />
+        <div className="flex items-start gap-2.5 rounded-xl border border-border border-l-[6px] border-l-highlight bg-white px-4 py-3 text-sm text-foreground">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>Užpildyta pagal DI pasiūlymą. Peržiūrėkite ir patvirtinkite.</span>
         </div>
       )}
 
       {/* Needs-answer notice for duplicated/cloned tasks */}
       {challenge?.needs_answer && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20 text-sm text-steam-dark">
-          <AlertTriangle className="h-4 w-4 text-accent-ink shrink-0" />
+        <div className="flex items-start gap-2.5 rounded-xl border border-border border-l-[6px] border-l-accent bg-white px-4 py-3 text-sm text-foreground">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent-ink" aria-hidden="true" />
           <span>
             Ši užduotis dar neturi teisingo atsakymo. Įveskite jį žemiau, kad
             galėtumėte pradėti veiklą.
@@ -400,12 +424,12 @@ export function ManualTaskEditor({
 
       {/* DI check notes on a saved DI task */}
       {flaggedByDi && (
-        <div className="rounded-lg border border-highlight/40 bg-highlight/10 p-3 text-sm text-steam-dark">
-          <p className="flex items-center gap-2 font-medium">
-            <Sparkles className="h-4 w-4 shrink-0 text-highlight-ink" aria-hidden="true" />
+        <div className="rounded-xl border border-border border-l-[6px] border-l-highlight bg-white px-4 py-3 text-sm text-foreground">
+          <p className="flex items-center gap-2 font-bold">
+            <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
             Reikia peržiūros
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1">
             {challenge?.needs_answer
               ? "DI patikra rado klaidą, todėl atsakymas neišsaugotas."
               : challenge?.verification_verdict === "fail"
@@ -414,7 +438,7 @@ export function ManualTaskEditor({
             Peržiūrėkite ją ir išsaugokite: tada žyma dings.
           </p>
           {diIssues.length > 0 && (
-            <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs">
+            <ul className="mt-2 list-disc space-y-0.5 pl-5">
               {diIssues.map((issue, i) => (
                 <li key={i}>{issue}</li>
               ))}
@@ -423,107 +447,315 @@ export function ManualTaskEditor({
         </div>
       )}
 
-      {/* Title */}
-      <div className="space-y-1.5">
-        <Label htmlFor={`${fieldId}-title`} className="text-xs font-medium">
-          Pavadinimas *
-        </Label>
-        <Input
-          id={`${fieldId}-title`}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="pvz., Demografinis detektyvas"
-          className="bg-white"
-        />
-      </div>
-
-      {/* Description */}
-      <div className="space-y-1.5">
-        <Label htmlFor={`${fieldId}-description`} className="text-xs font-medium">
-          Aprašymas / klausimas
-        </Label>
-        <Textarea
-          id={`${fieldId}-description`}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Detalus užduoties aprašymas dalyviams..."
-          className="bg-white resize-none"
-          rows={3}
-        />
-      </div>
-
-      {/* Type + Points */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* ===== Question ===== */}
+      <section className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor={`${fieldId}-type`} className="text-xs font-medium">Tipas</Label>
-          <Select value={type} onValueChange={(v) => setType(v as ChallengeType)}>
-            <SelectTrigger id={`${fieldId}-type`} className="bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="text">Tekstas</SelectItem>
-              <SelectItem value="number">Skaičius</SelectItem>
-              <SelectItem value="multiple_choice">Pasirinkimas</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`${fieldId}-points`} className="text-xs font-medium">
-            Taškai
+          <Label htmlFor={`${fieldId}-title`} className={labelClass}>
+            Pavadinimas *
           </Label>
           <Input
-            id={`${fieldId}-points`}
-            type="number"
-            min={1}
-            max={1000}
-            inputMode="numeric"
-            value={pointsText}
-            onChange={(e) => setPointsText(e.target.value)}
+            id={`${fieldId}-title`}
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value)
+              clearError("title")
+            }}
+            placeholder="pvz., Demografinis detektyvas"
             className="bg-white"
+            aria-invalid={errors.title ? true : undefined}
+            aria-describedby={errors.title ? `${fieldId}-title-error` : undefined}
           />
+          <FieldError id={`${fieldId}-title-error`} message={errors.title} />
         </div>
-      </div>
 
-      {/* Multiple choice options */}
-      {type === "multiple_choice" && (
-        <div className="space-y-2">
-          <Label className="text-xs font-medium">
-            Atsakymų variantai (pažymėkite teisingą)
+        <div className="space-y-1.5">
+          <Label htmlFor={`${fieldId}-description`} className={labelClass}>
+            Aprašymas / klausimas
           </Label>
-          {options.map((option, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name={`${fieldId}-correct-option`}
-                aria-label={`Teisingas atsakymas: variantas ${i + 1}`}
-                checked={correctAnswer === option && option.trim() !== ""}
-                onChange={() => setCorrectAnswer(option)}
-                disabled={!option.trim()}
-                className="h-4 w-4 accent-primary shrink-0"
-              />
+          <Textarea
+            id={`${fieldId}-description`}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Detalus užduoties aprašymas dalyviams..."
+            className="resize-y bg-white"
+            rows={3}
+            aria-describedby={`${fieldId}-description-note`}
+          />
+          <p id={`${fieldId}-description-note`} className={noteClass}>
+            Tai, ką dalyviai skaito ekrane. Be klausimo jie matytų tik pavadinimą.
+          </p>
+        </div>
+      </section>
+
+      {/* ===== Answer ===== */}
+      <section className="space-y-4 border-t border-border pt-5">
+        <h3 className={sectionTitle}>Atsakymas</h3>
+        {challenge && !challenge.needs_answer && (
+          <p className="text-sm text-muted-foreground">
+            Teisingas atsakymas išsaugotas ir čia nerodomas. Jei jo nekeisite, jis liks toks pat.
+          </p>
+        )}
+
+        {/* Type */}
+        <fieldset className="space-y-1.5">
+          <legend className={labelClass}>Tipas</legend>
+          <div className="grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
+            {TASK_TYPES.map((t) => (
+              <label key={t.value} className="relative min-w-0">
+                <input
+                  type="radio"
+                  name={`${fieldId}-type`}
+                  value={t.value}
+                  checked={type === t.value}
+                  onChange={() => {
+                    setType(t.value)
+                    setErrors({})
+                  }}
+                  className="peer sr-only"
+                />
+                <span className="flex min-h-11 cursor-pointer items-center justify-center rounded-full px-2 text-center text-sm font-semibold text-muted-foreground transition-colors motion-reduce:transition-none peer-checked:bg-white peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
+                  {t.label}
+                </span>
+              </label>
+            ))}
+          </div>
+          {typeNote && <p className={noteClass}>{typeNote}</p>}
+        </fieldset>
+
+        {/* Multiple choice options */}
+        {type === "multiple_choice" && (
+          <fieldset
+            className="space-y-2"
+            aria-describedby={errors.options ? `${fieldId}-options-error` : undefined}
+          >
+            <legend className={labelClass}>
+              Atsakymų variantai (pažymėkite teisingą)
+            </legend>
+            {options.map((option, i) => {
+              const marked = correctAnswer === option && option.trim() !== ""
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex items-center gap-1 rounded-lg",
+                    marked && "bg-primary/10"
+                  )}
+                >
+                  <label
+                    className={cn(
+                      "flex h-11 w-11 shrink-0 items-center justify-center",
+                      option.trim() ? "cursor-pointer" : "cursor-not-allowed"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={`${fieldId}-correct-option`}
+                      aria-label={`Teisingas atsakymas: variantas ${i + 1}`}
+                      checked={marked}
+                      onChange={() => {
+                        setCorrectAnswer(option)
+                        clearError("options")
+                      }}
+                      disabled={!option.trim()}
+                      className="h-5 w-5 shrink-0 accent-primary"
+                    />
+                  </label>
+                  <Input
+                    value={option}
+                    onChange={(e) => {
+                      const old = option
+                      const newOpts = [...options]
+                      newOpts[i] = e.target.value
+                      setOptions(newOpts)
+                      if (correctAnswer === old) {
+                        setCorrectAnswer(e.target.value)
+                      }
+                      clearError("options")
+                    }}
+                    placeholder={`Variantas ${i + 1}`}
+                    aria-label={`Variantas ${i + 1}`}
+                    className="flex-1 bg-white"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={removeButton}
+                    aria-label={`Pašalinti ${i + 1} variantą`}
+                    onClick={() => setOptions(options.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              )
+            })}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              id={`${fieldId}-options`}
+              onClick={() => {
+                setOptions([...options, ""])
+                clearError("options")
+              }}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Pridėti variantą
+            </Button>
+            <FieldError id={`${fieldId}-options-error`} message={errors.options} />
+            <p className={noteClass}>
+              Kiekviena komanda variantus mato kita tvarka. Jei kuris nors variantas remiasi kitais (pvz. „Visi
+              išvardyti“), tvarka nekeičiama.
+            </p>
+          </fieldset>
+        )}
+
+        {/* Correct answer (non-multiple-choice or editing) */}
+        {type !== "multiple_choice" && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`${fieldId}-answer`} className={labelClass}>
+              Teisingas atsakymas{" "}
+              {challenge && !challenge.needs_answer
+                ? "(palikite tuščią, jei nekeičiate)"
+                : "*"}
+            </Label>
+            <Input
+              id={`${fieldId}-answer`}
+              type={type === "number" ? "number" : "text"}
+              value={correctAnswer}
+              onChange={(e) => {
+                setCorrectAnswer(e.target.value)
+                clearError("answer")
+              }}
+              placeholder="Tikslus teisingas atsakymas"
+              autoFocus={challenge?.needs_answer === true}
+              className="bg-white"
+              aria-invalid={errors.answer ? true : undefined}
+              aria-describedby={`${errors.answer ? `${fieldId}-answer-error ` : ""}${fieldId}-answer-note`}
+            />
+            <FieldError id={`${fieldId}-answer-error`} message={errors.answer} />
+            <p id={`${fieldId}-answer-note`} className={noteClass}>
+              {challenge && !challenge.needs_answer && (
+                <>Išsaugoto atsakymo parodyti negalima. Rašykite čia tik tada, kai norite jį pakeisti. </>
+              )}
+              {type === "number"
+                ? "Dalyvis turi įvesti tą patį skaičių."
+                : "Tikrinant nesvarbu didžiosios raidės, lietuviškos raidės (š = s) ir nereikalingi tarpai. Žodžio forma ir tarpai tarp žodžių turi sutapti."}
+            </p>
+          </div>
+        )}
+
+        {/* More accepted answers (text and number tasks) */}
+        {type !== "multiple_choice" && (
+          <AcceptedAnswersField
+            fieldId={fieldId}
+            type={type}
+            values={acceptedAnswers}
+            onChange={setAcceptedAnswers}
+            savedCount={challenge?.accepted_answer_count ?? 0}
+            savedForType={challenge ? challenge.type === type : true}
+            remove={removeAccepted}
+            onRemoveChange={setRemoveAccepted}
+          />
+        )}
+      </section>
+
+      {/* ===== Points and help ===== */}
+      <section className="space-y-4 border-t border-border pt-5">
+        <h3 className={sectionTitle}>Taškai ir pagalba</h3>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[9rem_minmax(0,1fr)]">
+          <div className="space-y-1.5">
+            <Label htmlFor={`${fieldId}-points`} className={labelClass}>
+              Taškai
+            </Label>
+            <Input
+              id={`${fieldId}-points`}
+              type="number"
+              min={1}
+              max={1000}
+              inputMode="numeric"
+              value={pointsText}
+              onChange={(e) => {
+                setPointsText(e.target.value)
+                clearError("points")
+              }}
+              className="bg-white"
+              aria-invalid={errors.points ? true : undefined}
+              aria-describedby={errors.points ? `${fieldId}-points-error` : `${fieldId}-points-note`}
+            />
+            {!errors.points && (
+              <p id={`${fieldId}-points-note`} className={noteClass}>
+                Nuo 1 iki 1000.
+              </p>
+            )}
+          </div>
+
+          {/* Difficulty: optional, pressing the chosen one again clears it */}
+          <div className="space-y-1.5" role="group" aria-labelledby={`${fieldId}-difficulty-label`}>
+            <p id={`${fieldId}-difficulty-label`} className={labelClass}>
+              Sunkumas <span className="font-normal text-muted-foreground">(neprivaloma)</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {DIFFICULTIES.map((d) => {
+                const chosen = difficulty === d.value
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    aria-pressed={chosen}
+                    onClick={() => setDifficulty(chosen ? null : d.value)}
+                    className={cn(
+                      "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      chosen
+                        ? "border-steam-dark bg-steam-dark text-white"
+                        : "border-input bg-white text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {chosen && <Check className="h-4 w-4" aria-hidden="true" />}
+                    {d.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div className="sm:col-span-2 empty:hidden">
+            <FieldError id={`${fieldId}-points-error`} message={errors.points} />
+          </div>
+        </div>
+
+        {/* Hints */}
+        <fieldset className="space-y-2">
+          <legend className={labelClass}>
+            Užuominos <span className="font-normal text-muted-foreground">(neprivaloma)</span>
+          </legend>
+          <p className={noteClass}>
+            Įstrigusi komanda užuominas atveria po vieną, iš eilės. Pirmoji turėtų tik pakreipti, paskutinė
+            beveik atsakyti.
+          </p>
+          {hints.map((hint, i) => (
+            <div key={i} className="flex items-center gap-1">
               <Input
-                value={option}
+                value={hint}
                 onChange={(e) => {
-                  const old = option
-                  const newOpts = [...options]
-                  newOpts[i] = e.target.value
-                  setOptions(newOpts)
-                  if (correctAnswer === old) {
-                    setCorrectAnswer(e.target.value)
-                  }
+                  const newH = [...hints]
+                  newH[i] = e.target.value
+                  setHints(newH)
                 }}
-                placeholder={`Variantas ${i + 1}`}
-                className="bg-white flex-1"
+                placeholder={`Užuomina ${i + 1}`}
+                aria-label={`Užuomina ${i + 1}`}
+                className="flex-1 bg-white"
               />
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-accent-ink"
-                aria-label={`Pašalinti ${i + 1} variantą`}
-                onClick={() => setOptions(options.filter((_, j) => j !== i))}
+                size="icon"
+                className={removeButton}
+                aria-label={`Pašalinti ${i + 1} užuominą`}
+                onClick={() => setHints(hints.filter((_, j) => j !== i))}
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           ))}
@@ -531,179 +763,18 @@ export function ManualTaskEditor({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setOptions([...options, ""])}
-            className="gap-1 text-xs"
+            onClick={() => setHints([...hints, ""])}
+            className="gap-1.5"
           >
-            <Plus className="h-3 w-3" />
-            Pridėti variantą
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Pridėti užuominą
           </Button>
-          <p className="text-xs text-muted-foreground">
-            Kiekviena komanda variantus mato kita tvarka. Jei kuris nors variantas remiasi kitais (pvz. „Visi
-            išvardyti“), tvarka nekeičiama.
-          </p>
-        </div>
-      )}
+        </fieldset>
 
-      {/* Correct answer (non-multiple-choice or editing) */}
-      {type !== "multiple_choice" && (
-        <div className="space-y-1.5">
-          <Label htmlFor={`${fieldId}-answer`} className="text-xs font-medium">
-            Teisingas atsakymas{" "}
-            {challenge && !challenge.needs_answer
-              ? "(palikite tuščią, jei nekeičiate)"
-              : "*"}
-          </Label>
-          <Input
-            id={`${fieldId}-answer`}
-            type={type === "number" ? "number" : "text"}
-            value={correctAnswer}
-            onChange={(e) => setCorrectAnswer(e.target.value)}
-            placeholder="Tikslus teisingas atsakymas"
-            autoFocus={challenge?.needs_answer === true}
-            className={`bg-white ${
-              challenge?.needs_answer
-                ? "border-accent/50 focus:border-accent"
-                : "border-primary/30 focus:border-primary"
-            }`}
-          />
-          <p className="text-xs text-muted-foreground">
-            {type === "number"
-              ? "Dalyvis turi įvesti tą patį skaičių."
-              : "Tikrinant nesvarbu didžiosios raidės, lietuviškos raidės (š = s) ir nereikalingi tarpai. Žodžio forma ir tarpai tarp žodžių turi sutapti."}
-          </p>
-        </div>
-      )}
-
-      {/* More accepted answers (text and number tasks) */}
-      {type !== "multiple_choice" && (
-        <AcceptedAnswersField
-          fieldId={fieldId}
-          type={type}
-          values={acceptedAnswers}
-          onChange={setAcceptedAnswers}
-          savedCount={challenge?.accepted_answer_count ?? 0}
-          savedForType={challenge ? challenge.type === type : true}
-          remove={removeAccepted}
-          onRemoveChange={setRemoveAccepted}
-        />
-      )}
-
-      {/* Hints */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium flex items-center gap-1.5">
-          <Lightbulb className="h-3 w-3 text-highlight-ink" />
-          Užuominos
-        </Label>
-        {hints.map((hint, i) => (
-          <div key={i} className="flex gap-2">
-            <Input
-              value={hint}
-              onChange={(e) => {
-                const newH = [...hints]
-                newH[i] = e.target.value
-                setHints(newH)
-              }}
-              placeholder={`Užuomina ${i + 1}`}
-              className="bg-white flex-1"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-accent-ink"
-              aria-label={`Pašalinti ${i + 1} užuominą`}
-              onClick={() => setHints(hints.filter((_, j) => j !== i))}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setHints([...hints, ""])}
-          className="gap-1 text-xs"
-        >
-          <Plus className="h-3 w-3" />
-          Pridėti užuominą
-        </Button>
-      </div>
-
-      {/* Free-mode prerequisites (only for saved challenges) */}
-      {showPrerequisites && challenge && (
-        <ChallengePrerequisites
-          challengeId={challenge.id}
-          gameId={gameId}
-          allChallenges={allChallenges}
-          currentPrerequisites={prerequisites}
-          onChange={setPrerequisites}
-        />
-      )}
-
-      {/* Collapsible extras */}
-      <button
-        type="button"
-        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-steam-dark transition-colors w-full py-2"
-        onClick={() => setShowExtras(!showExtras)}
-      >
-        {showExtras ? (
-          <ChevronUp className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5" />
-        )}
-        Papildomi laukai (paaiškinimas, sunkumas, nuotrauka, žemėlapis)
-      </button>
-
-      {showExtras && (
-        <div className="space-y-4 pl-2 border-l-2 border-border/30">
-          {/* Explanation */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium flex items-center gap-1.5">
-              <BookOpen className="h-3 w-3 text-secondary-ink" />
-              Paaiškinimas (rodomas po teisingo atsakymo)
-            </Label>
-            <Textarea
-              value={explanation}
-              onChange={(e) => setExplanation(e.target.value)}
-              placeholder="Trumpas edukacinis paaiškinimas dalyviams..."
-              className="bg-white resize-none"
-              rows={2}
-            />
-          </div>
-
-          {/* Difficulty */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Sunkumas</Label>
-            <div className="flex gap-2">
-              {(
-                [
-                  { value: "easy", label: "Lengva", color: "text-primary-ink border-primary/30 hover:bg-primary/5" },
-                  { value: "medium", label: "Vidutinė", color: "text-highlight-ink border-highlight/30 hover:bg-highlight/5" },
-                  { value: "hard", label: "Sunki", color: "text-accent-ink border-accent/30 hover:bg-accent/5" },
-                ] as const
-              ).map((d) => (
-                <Badge
-                  key={d.value}
-                  variant="outline"
-                  className={`cursor-pointer text-xs px-3 py-1 ${d.color} ${
-                    difficulty === d.value
-                      ? "ring-2 ring-offset-1 ring-current"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    setDifficulty(difficulty === d.value ? null : d.value)
-                  }
-                >
-                  {d.label}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Hint penalty */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${fieldId}-hint-penalty`} className="text-xs font-medium">
+        {/* Hint penalty: only matters once there is a hint */}
+        {hints.length > 0 && (
+          <div className="motion-fade-in space-y-1.5">
+            <Label htmlFor={`${fieldId}-hint-penalty`} className={labelClass}>
               Užuominos kaina (taškų)
             </Label>
             <Input
@@ -713,64 +784,140 @@ export function ManualTaskEditor({
               id={`${fieldId}-hint-penalty`}
               value={hintPenalty}
               onChange={(e) => setHintPenalty(parseInt(e.target.value) || 0)}
-              className="bg-white w-32"
+              className="w-36 bg-white"
               aria-describedby={`${fieldId}-hint-penalty-note`}
             />
-            <p id={`${fieldId}-hint-penalty-note`} className="text-xs text-muted-foreground">
+            <p id={`${fieldId}-hint-penalty-note`} className={noteClass}>
               Už kiekvieną atidarytą užuominą, bet kartu ne daugiau nei pusė užduoties taškų.
+              {pointsValid && (
+                <>
+                  {" "}
+                  Dabar: atvėrusi vieną užuominą, komanda už teisingą atsakymą gaus{" "}
+                  {calculatePoints(pointsNumber, 1, hintPenalty)} tšk. iš {pointsNumber}
+                  {hints.length > 1 && (
+                    <>
+                      , atvėrusi visas ({hints.length}): {calculatePoints(pointsNumber, hints.length, hintPenalty)} tšk
+                    </>
+                  )}
+                  .
+                </>
+              )}
             </p>
           </div>
+        )}
 
-          {/* Image */}
-          <ImageUpload value={imageUrl} onChange={setImageUrl} />
-
-          {/* Maps */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium flex items-center gap-1.5">
-              <MapPin className="h-3 w-3 text-primary-ink" />
-              Google Maps nuoroda
-            </Label>
-            <Input
-              placeholder="https://maps.google.com/..."
-              value={mapsUrl}
-              onChange={(e) => setMapsUrl(e.target.value)}
-              className="bg-white"
-            />
-            {mapsUrl.trim() && (
-              <MapsEmbed
-                url={mapsUrl.trim()}
-                className="rounded-lg overflow-hidden mt-2"
-              />
-            )}
-          </div>
+        {/* Explanation */}
+        <div className="space-y-1.5">
+          <Label htmlFor={`${fieldId}-explanation`} className={labelClass}>
+            Paaiškinimas (rodomas po teisingo atsakymo){" "}
+            <span className="font-normal text-muted-foreground">(neprivaloma)</span>
+          </Label>
+          <Textarea
+            id={`${fieldId}-explanation`}
+            value={explanation}
+            onChange={(e) => setExplanation(e.target.value)}
+            placeholder="Trumpas edukacinis paaiškinimas dalyviams..."
+            className="resize-y bg-white"
+            rows={2}
+          />
         </div>
+      </section>
+
+      {/* Free-mode prerequisites (only for saved challenges) */}
+      {showPrerequisites && challenge && (
+        <section className="border-t border-border pt-5">
+          <ChallengePrerequisites
+            challengeId={challenge.id}
+            gameId={gameId}
+            allChallenges={allChallenges}
+            currentPrerequisites={prerequisites}
+            onChange={setPrerequisites}
+          />
+        </section>
       )}
 
-      {session.expired && <SessionExpiredNotice onRetry={() => void handleSave()} retrying={loading} />}
-
-      {/* Actions */}
-      <div className="flex gap-3 pt-2">
-        <Button
-          onClick={handleSave}
-          disabled={loading || !title.trim()}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {challenge ? "Atnaujinti" : "Pridėti užduotį"}
-        </Button>
-        <Button
+      {/* ===== Optional picture and map ===== */}
+      <section className="border-t border-border pt-3">
+        <button
           type="button"
-          variant="outline"
-          onClick={() => {
-            if (!dirty || window.confirm("Užduoties pakeitimai neišsaugoti. Atmesti juos?")) onCancel()
-          }}
+          aria-expanded={showExtras}
+          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-left text-base font-bold text-steam-dark"
+          onClick={() => setShowExtras(!showExtras)}
         >
-          Atšaukti
-        </Button>
+          <span>
+            Nuotrauka ir žemėlapis <span className="text-sm font-normal text-muted-foreground">(neprivaloma)</span>
+          </span>
+          {showExtras ? (
+            <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
+        </button>
+
+        {showExtras && (
+          <div className="motion-fade-in space-y-4 pb-1 pt-2">
+            {/* Image */}
+            <ImageUpload value={imageUrl} onChange={setImageUrl} />
+
+            {/* Maps */}
+            <div className="space-y-1.5">
+              <Label htmlFor={`${fieldId}-maps`} className={labelClass}>
+                Google Maps nuoroda
+              </Label>
+              <Input
+                id={`${fieldId}-maps`}
+                placeholder="https://maps.google.com/..."
+                value={mapsUrl}
+                onChange={(e) => setMapsUrl(e.target.value)}
+                className="bg-white"
+              />
+              {mapsUrl.trim() && (
+                <MapsEmbed
+                  url={mapsUrl.trim()}
+                  className="rounded-lg overflow-hidden mt-2"
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Save bar: stays at the bottom of the view, so saving never needs a
+          scroll to the end of the form. */}
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 space-y-3 rounded-b-2xl border-t border-border bg-white px-5 py-3 shadow-[0_-6px_12px_-8px_hsl(var(--foreground)/0.18)]">
+        {session.expired && <SessionExpiredNotice onRetry={() => void handleSave()} retrying={loading} />}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="min-w-0 flex-1 basis-full text-sm text-muted-foreground empty:hidden sm:basis-40 sm:empty:block" aria-live="polite">
+            {!title.trim()
+              ? "Įrašykite pavadinimą, tada galėsite išsaugoti."
+              : dirty
+                ? "Yra neišsaugotų pakeitimų."
+                : ""}
+          </p>
+          <div className="flex items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (!dirty || window.confirm("Užduoties pakeitimai neišsaugoti. Atmesti juos?")) onCancel()
+              }}
+            >
+              Atšaukti
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={loading || !title.trim()}
+              className="gap-2 font-bold"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              ) : (
+                <Save className="h-4 w-4" aria-hidden="true" />
+              )}
+              {challenge ? "Atnaujinti" : "Pridėti užduotį"}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )
