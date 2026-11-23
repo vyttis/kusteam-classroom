@@ -26,7 +26,7 @@ interface GameDetailClientProps {
 }
 
 const menuItem =
-  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-steam-dark hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+  "flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-steam-dark hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
 
 /**
  * The activity page's secondary actions (FAC-13). Only what the current
@@ -61,8 +61,7 @@ export function GameDetailClient({ game, canPublish = false }: GameDetailClientP
           <Button
             asChild
             variant="outline"
-            size="sm"
-            className="gap-2 border-highlight/40 text-highlight-ink hover:bg-highlight/10"
+            className="h-11 gap-2 rounded-full px-5"
           >
             <Link href={`/games/${game.id}/builder`}>
               <Sparkles className="h-4 w-4" aria-hidden="true" />
@@ -73,8 +72,7 @@ export function GameDetailClient({ game, canPublish = false }: GameDetailClientP
         {publishOnHeader && (
           <Button
             variant="outline"
-            size="sm"
-            className="gap-2 border-secondary/30 text-secondary-ink hover:bg-secondary/5"
+            className="h-11 gap-2 rounded-full px-5"
             onClick={() => setPublishDialogOpen(true)}
           >
             <Share2 className="h-4 w-4" aria-hidden="true" />
@@ -84,7 +82,7 @@ export function GameDetailClient({ game, canPublish = false }: GameDetailClientP
 
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2" aria-label="Daugiau veiksmų">
+            <Button variant="outline" className="h-11 gap-2 rounded-full px-5" aria-label="Daugiau veiksmų">
               <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
               Daugiau
             </Button>

@@ -2,20 +2,11 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { ArrowRight, Clock, Puzzle, SearchX } from "lucide-react"
-import { pluralizeLt } from "@/lib/utils"
+import { cn, pluralizeLt } from "@/lib/utils"
 import { relevance, sortByRelevance, type CatalogueEntry } from "@/lib/starter-catalogue/types"
+import { RAY_FILL_CLASS, subjectRay } from "@/lib/starter-catalogue/subject-ray"
 
 const ALL = "all"
 
@@ -64,44 +55,10 @@ export function StarterCatalogue({
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-3">
-        <div className="space-y-1.5 sm:w-64">
-          <Label htmlFor="starter-subject">Dalykas</Label>
-          <Select value={subject} onValueChange={setSubject}>
-            <SelectTrigger id="starter-subject">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Visi dalykai</SelectItem>
-              {subjects.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-48">
-          <Label htmlFor="starter-grade">Klasė</Label>
-          <Select value={gradeBand} onValueChange={setGradeBand}>
-            <SelectTrigger id="starter-grade">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Visos klasės</SelectItem>
-              {gradeBands.map((g) => (
-                <SelectItem key={g} value={g}>
-                  {g}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {filtering && (
-          <Button type="button" variant="ghost" onClick={clearFilters} className="sm:mb-0 self-start sm:self-auto">
-            Rodyti visas
-          </Button>
-        )}
+      {/* One press filters: every choice is on the page, nothing to open. */}
+      <div className="mb-4 space-y-3">
+        <FilterRow label="Dalykas" value={subject} onChange={setSubject} allLabel="Visi dalykai" options={subjects} marked />
+        <FilterRow label="Klasė" value={gradeBand} onChange={setGradeBand} allLabel="Visos klasės" options={gradeBands} />
       </div>
 
       <p className="text-sm text-muted-foreground mb-6" role="status" aria-live="polite">
@@ -113,11 +70,11 @@ export function StarterCatalogue({
       {visible.length === 0 ? (
         <div className="text-center py-16">
           <SearchX className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" aria-hidden="true" />
-          <h2 className="text-base font-semibold text-steam-dark">Šiam dalykui ir klasei paruoštos veiklos dar nėra</h2>
+          <h2 className="text-base font-bold text-steam-dark">Šiam dalykui ir klasei paruoštos veiklos dar nėra</h2>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
             Pasirinkite kitą dalyką ar klasę arba peržiūrėkite visas veiklas.
           </p>
-          <Button type="button" variant="outline" onClick={clearFilters}>
+          <Button type="button" variant="outline" onClick={clearFilters} className="h-11 rounded-full px-5">
             Rodyti visas veiklas
           </Button>
         </div>
@@ -148,7 +105,7 @@ function CatalogueGroup({
 }) {
   return (
     <section aria-labelledby={id} className={className}>
-      <h2 id={id} className={titleHidden ? "sr-only" : "text-lg font-semibold text-steam-dark mb-4"}>
+      <h2 id={id} className={titleHidden ? "sr-only" : "text-lg font-bold text-steam-dark mb-4"}>
         {title}
       </h2>
       <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -162,41 +119,101 @@ function CatalogueGroup({
   )
 }
 
+/**
+ * The subject area's ray: a short slanted stroke in the area's brand colour.
+ * A shape only; the subject name beside it carries the meaning.
+ */
+function RayMark({ subject, className }: { subject: string; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("inline-block h-1.5 w-5 shrink-0 -rotate-[32deg] rounded-full", RAY_FILL_CLASS[subjectRay(subject)], className)}
+    />
+  )
+}
+
+function FilterRow({
+  label,
+  value,
+  onChange,
+  allLabel,
+  options,
+  marked = false,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  allLabel: string
+  options: string[]
+  /** Show each option's ray colour (subjects). */
+  marked?: boolean
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+      <span className="shrink-0 pt-2.5 text-sm font-bold text-steam-dark sm:w-16">{label}</span>
+      <div className="flex flex-wrap gap-2">
+        {[ALL, ...options].map((option) => {
+          const selected = value === option
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(selected && option !== ALL ? ALL : option)}
+              className={cn(
+                "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                selected
+                  ? "border-foreground bg-foreground font-bold text-background"
+                  : "border-foreground/25 bg-white text-foreground hover:bg-muted",
+              )}
+            >
+              {marked && option !== ALL && (
+                <RayMark subject={option} className={selected ? "ring-1 ring-background/70" : undefined} />
+              )}
+              {option === ALL ? allLabel : option}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function CatalogueCard({ entry }: { entry: CatalogueEntry }) {
   return (
-    // The whole card is one link target (the title link stretches over it).
-    <Card className="relative flex w-full flex-col transition-shadow hover:shadow-md focus-within:ring-2 focus-within:ring-ring">
-      <CardContent className="flex flex-1 flex-col p-5">
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          <Badge variant="secondary">{entry.subject}</Badge>
-          <Badge variant="outline">{entry.grade_band}</Badge>
-        </div>
-        <h3 className="font-semibold text-steam-dark leading-snug">
-          <Link
-            href={`/paruostos-veiklos/${entry.slug}`}
-            className="focus:outline-none after:absolute after:inset-0 after:rounded-xl"
-          >
-            {entry.title}
-          </Link>
-        </h3>
-        <p className="text-sm text-muted-foreground mt-2 flex-1">{entry.description}</p>
-        <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t text-sm text-muted-foreground">
-          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-4 w-4" aria-hidden="true" />
-              {entry.duration_minutes} min.
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Puzzle className="h-4 w-4" aria-hidden="true" />
-              {entry.task_count} {pluralizeLt(entry.task_count, "užduotis", "užduotys", "užduočių")}
-            </span>
+    // The whole card is one link target (the title link stretches over it);
+    // keyboard focus on the link rings the whole card.
+    <article className="relative flex w-full flex-col rounded-xl border border-border bg-white p-5 shadow-sm transition-shadow hover:shadow-md motion-reduce:transition-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
+      <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-steam-dark">
+        <RayMark subject={entry.subject} />
+        <span className="font-bold">{entry.subject}</span>
+        <span className="text-muted-foreground">{entry.grade_band}</span>
+      </p>
+      <h3 className="text-lg font-bold leading-snug text-steam-dark">
+        <Link
+          href={`/paruostos-veiklos/${entry.slug}`}
+          className="focus:outline-none after:absolute after:inset-0 after:rounded-xl"
+        >
+          {entry.title}
+        </Link>
+      </h3>
+      <p className="mt-2 flex-1 text-sm text-muted-foreground">{entry.description}</p>
+      <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <Clock className="h-4 w-4" aria-hidden="true" />
+            {entry.duration_minutes} min.
           </span>
-          <span className="inline-flex items-center gap-1 font-medium text-primary-ink" aria-hidden="true">
-            Peržiūrėti
-            <ArrowRight className="h-4 w-4" />
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <Puzzle className="h-4 w-4" aria-hidden="true" />
+            {entry.task_count} {pluralizeLt(entry.task_count, "užduotis", "užduotys", "užduočių")}
           </span>
-        </div>
-      </CardContent>
-    </Card>
+        </span>
+        <span className="inline-flex items-center gap-1 font-bold text-steam-dark" aria-hidden="true">
+          Peržiūrėti
+          <ArrowRight className="h-4 w-4" />
+        </span>
+      </div>
+    </article>
   )
 }

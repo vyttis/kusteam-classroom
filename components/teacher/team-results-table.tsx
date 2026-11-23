@@ -66,11 +66,10 @@ export function TeamResultsTable({
         </CardTitle>
         <Button
           variant="outline"
-          size="sm"
           onClick={handleExport}
-          className="gap-2 text-xs"
+          className="h-11 gap-2 rounded-full px-5"
         >
-          <Download className="h-3.5 w-3.5" />
+          <Download className="h-4 w-4" aria-hidden="true" />
           Eksportuoti CSV
         </Button>
       </CardHeader>
@@ -111,10 +110,10 @@ export function TeamResultsTable({
                     )}
                   </td>
                   <td className="py-2.5 px-3 font-medium text-steam-dark">{team.name}</td>
-                  <td className="py-2.5 px-3 text-right font-bold text-primary-ink tabular-nums">
+                  <td className="py-2.5 px-3 text-right text-base font-bold text-steam-dark tabular-nums">
                     {team.total_points}
                   </td>
-                  <td className="py-2.5 px-3 text-right tabular-nums">
+                  <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap">
                     {team.solved} / {totalChallenges}
                   </td>
                   <td className="py-2.5 px-3 text-right text-muted-foreground tabular-nums">
@@ -123,7 +122,7 @@ export function TeamResultsTable({
                   <td className="py-2.5 px-3 text-right text-muted-foreground tabular-nums">
                     {team.hints_used}
                   </td>
-                  <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">
+                  <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap tabular-nums">
                     {team.last_activity
                       ? new Date(team.last_activity).toLocaleString("lt-LT", {
                           month: "2-digit",

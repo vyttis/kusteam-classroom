@@ -22,6 +22,7 @@ import { TeamRejoinDialog } from "./team-rejoin-dialog"
 import { useTeamClocks } from "@/hooks/use-team-clocks"
 import { joiningTimeOver } from "@/lib/game/clock"
 import { teamTime, teamTimeLabel } from "@/lib/game/team-time"
+import { sharedRanks } from "@/lib/game/live-board"
 
 interface LiveTeamProgressProps {
   gameId: string
@@ -164,6 +165,9 @@ export function LiveTeamProgress({
     )
   }
 
+  // The leader's mark appears only once a team has points; level teams share it.
+  const ranks = sharedRanks(teams)
+
   return (
     <div className="space-y-3">
       {connectionState === "degraded" && (
@@ -206,8 +210,11 @@ export function LiveTeamProgress({
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-sm text-steam-dark leading-snug line-clamp-2 break-words" title={team.name}>
-                      {index === 0 && teams.length > 1 && (
-                        <Trophy className="inline h-3.5 w-3.5 text-highlight-ink mr-1 -mt-0.5" />
+                      {ranks[index] === 1 && teams.length > 1 && (
+                        <>
+                          <Trophy className="inline h-3.5 w-3.5 text-highlight-ink mr-1 -mt-0.5" aria-hidden="true" />
+                          <span className="sr-only">Pirmauja: </span>
+                        </>
                       )}
                       {team.name}
                     </p>
@@ -221,14 +228,14 @@ export function LiveTeamProgress({
                     )}
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Tvarkyti komandą: ${team.name}`}>
+                        <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-11 w-11" aria-label={`Tvarkyti komandą: ${team.name}`}>
                           <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent align="end" className="w-52 p-1">
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted"
+                          className="flex min-h-11 w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                           onClick={() => {
                             setNameDraft(team.name)
                             setEditing({ id: team.id, name: team.name, mode: "rename" })
@@ -239,7 +246,7 @@ export function LiveTeamProgress({
                         </button>
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted"
+                          className="flex min-h-11 w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                           onClick={() => setRejoinTeam({ id: team.id, name: team.name })}
                         >
                           <Smartphone className="h-4 w-4" aria-hidden="true" />
@@ -247,7 +254,7 @@ export function LiveTeamProgress({
                         </button>
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm text-accent-ink hover:bg-accent/5"
+                          className="flex min-h-11 w-full items-center gap-2 rounded px-2 py-2 text-left text-sm text-accent-ink hover:bg-accent/5 focus-visible:bg-accent/5 focus-visible:outline-none"
                           onClick={() => setEditing({ id: team.id, name: team.name, mode: "remove" })}
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -261,7 +268,7 @@ export function LiveTeamProgress({
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-muted-foreground mb-0.5">Taškai</p>
-                    <p className="font-bold text-lg text-primary-ink leading-none">
+                    <p className="font-bold text-lg text-steam-dark leading-none tabular-nums">
                       {team.total_points}
                     </p>
                   </div>
@@ -269,7 +276,7 @@ export function LiveTeamProgress({
                     <p className="text-muted-foreground mb-0.5">
                       Užduočių išspręsta
                     </p>
-                    <p className="font-bold text-lg text-steam-dark leading-none">
+                    <p className="font-bold text-lg text-steam-dark leading-none tabular-nums">
                       {solvedCounts.get(team.id) ?? 0}
                     </p>
                   </div>

@@ -158,6 +158,8 @@ export default async function DashboardPage() {
   }
 
   // ============ Facilitator with activities: their activities lead ============
+  const groups = groupGames(dashboardGames)
+  const lessonRunning = groups.running.length > 0
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -166,13 +168,23 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground mt-1">Komandinės veiklos jūsų klasei ar grupei</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" className="gap-2">
+          <Button asChild variant="outline" className="h-11 gap-2 rounded-full px-5">
             <Link href={CATALOGUE_PATH}>
               <LayoutGrid className="h-4 w-4" aria-hidden="true" />
               Paruoštos veiklos
             </Link>
           </Button>
-          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20 gap-2">
+          {/* While a lesson runs, going back to it is the main action of the
+              page; creating a new activity steps back to an outlined button. */}
+          <Button
+            asChild
+            variant={lessonRunning ? "outline" : "default"}
+            className={
+              lessonRunning
+                ? "h-11 gap-2 rounded-full px-5"
+                : "h-12 gap-2 rounded-full bg-primary px-6 font-bold text-primary-foreground hover:bg-primary/90"
+            }
+          >
             <Link href="/games/new">
               <Plus className="h-4 w-4" aria-hidden="true" />
               Nauja veikla
@@ -181,7 +193,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <GamesGrid groups={groupGames(dashboardGames)} />
+      <GamesGrid groups={groups} />
 
       {/* First-success checklist: until done, then until the teacher hides it */}
       {checklist("")}

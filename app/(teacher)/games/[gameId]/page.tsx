@@ -20,9 +20,6 @@ import {
   ArrowLeft,
   Puzzle,
   Pencil,
-  Users,
-  Clock,
-  Trophy,
   BarChart3,
   Sparkles,
   Printer,
@@ -121,48 +118,38 @@ export default async function GameDetailPage(
   // The team count is read once on the server. During a live session the
   // control centre shows the live count, so a tile here would stay at the
   // number from page load: show it only for a finished session.
+  const totalPoints = challenges.reduce((sum: number, c: Challenge) => sum + (c.points || 0), 0)
+  const facts: { label: string; value: string | number }[] = [
+    { label: "Užduotys", value: challenges.length },
+    ...(isFinished ? [{ label: "Komandos", value: teamCount }] : []),
+    { label: "Iš viso taškų", value: totalPoints },
+    { label: "Trukmė", value: settings?.time_limit_minutes ? `${settings.time_limit_minutes} min.` : "Be limito" },
+  ]
+  // Facts, not a dashboard: one compact row of numbers on a shared baseline.
+  const factsRow = (
+    <dl className="flex flex-wrap gap-x-8 gap-y-3">
+      {facts.map((fact) => (
+        <div key={fact.label} className="flex flex-col-reverse">
+          <dt className="text-xs text-muted-foreground">{fact.label}</dt>
+          <dd className="text-xl font-bold leading-tight text-steam-dark tabular-nums">{fact.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
   const statsCards = (
-    <div className={isFinished ? "grid grid-cols-2 sm:grid-cols-4 gap-3" : "grid grid-cols-3 gap-3"}>
-      <Card className="border-border/50 bg-white">
-        <CardContent className="p-4 text-center">
-          <Puzzle className="h-5 w-5 mx-auto mb-1 text-primary-ink" />
-          <p className="text-2xl font-bold text-steam-dark">
-            {challenges.length}
-          </p>
-          <p className="text-xs text-muted-foreground">Užduotys</p>
-        </CardContent>
-      </Card>
-      {isFinished && (
-        <Card className="border-border/50 bg-white">
-          <CardContent className="p-4 text-center">
-            <Users className="h-5 w-5 mx-auto mb-1 text-secondary-ink" />
-            <p className="text-2xl font-bold text-steam-dark">{teamCount}</p>
-            <p className="text-xs text-muted-foreground">Komandos</p>
-          </CardContent>
-        </Card>
-      )}
-      <Card className="border-border/50 bg-white">
-        <CardContent className="p-4 text-center">
-          <Trophy className="h-5 w-5 mx-auto mb-1 text-highlight-ink" />
-          <p className="text-2xl font-bold text-steam-dark">
-            {challenges.reduce(
-              (sum: number, c: Challenge) => sum + (c.points || 0),
-              0
-            )}
-          </p>
-          <p className="text-xs text-muted-foreground">Iš viso taškų</p>
-        </CardContent>
-      </Card>
-      <Card className="border-border/50 bg-white">
-        <CardContent className="p-4 text-center">
-          <Clock className="h-5 w-5 mx-auto mb-1 text-accent-ink" />
-          <p className="text-2xl font-bold text-steam-dark">
-            {settings?.time_limit_minutes || "∞"}
-          </p>
-          <p className="text-xs text-muted-foreground">Minutės</p>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="border-border/50 bg-white">
+      <CardContent className="p-4">{factsRow}</CardContent>
+    </Card>
+  )
+
+  const statusActions = (
+    <GameStatusActions
+      gameId={game.id}
+      status={status}
+      challengeCount={challenges.length}
+      tasksNeedingAnswer={tasksNeedingAnswer}
+      aiTasksToReview={isDraft ? aiTasksToReview(challenges) : []}
+    />
   )
 
   const challengeList = (
@@ -173,11 +160,8 @@ export default async function GameDetailPage(
           Užduotys
         </CardTitle>
         <Link href={`/games/${game.id}/builder`}>
-          <Button
-            size="sm"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1"
-          >
-            <Pencil className="h-3.5 w-3.5" />
+          <Button variant="outline" className="h-11 gap-2 rounded-full px-5">
+            <Pencil className="h-4 w-4" aria-hidden="true" />
             Redaguoti užduotis
           </Button>
         </Link>
@@ -192,7 +176,7 @@ export default async function GameDetailPage(
                   key={challenge.id}
                   href={`/games/${game.id}/builder?task=${challenge.id}`}
                   aria-label={`Redaguoti „${challenge.title}“`}
-                  className="group flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30 transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="group flex min-h-11 items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30 transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary-ink shrink-0">
                     {index + 1}
@@ -233,11 +217,8 @@ export default async function GameDetailPage(
               Dar nėra užduočių
             </p>
             <Link href={`/games/${game.id}/builder`}>
-              <Button
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
+              <Button className="h-12 gap-2 rounded-full bg-primary px-6 font-bold text-primary-foreground hover:bg-primary/90">
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
                 Kurti užduotis
               </Button>
             </Link>
@@ -278,10 +259,9 @@ export default async function GameDetailPage(
       <Link href="/dashboard" className="inline-block mb-6">
         <Button
           variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground"
+          className="-ml-3 h-11 gap-2 text-muted-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Visos veiklos
         </Button>
       </Link>
@@ -309,19 +289,18 @@ export default async function GameDetailPage(
             timeLimit={settings?.time_limit_minutes ?? null}
             resumedAt={(game as { resumed_at?: string | null }).resumed_at ?? null}
           />
-          <GameStatusActions
-            gameId={game.id}
-            status={status}
-            challengeCount={challenges.length}
-            tasksNeedingAnswer={tasksNeedingAnswer}
-            aiTasksToReview={isDraft ? aiTasksToReview(challenges) : []}
-          />
+          {/* A draft's start button is the page's main action and sits in
+              the readiness panel below, next to what it depends on. */}
+          {!isDraft && statusActions}
           {isLive && (
             <Button
               asChild
-              variant="outline"
-              size="sm"
-              className="gap-2 border-accent/30 text-accent-ink hover:bg-accent/5"
+              variant={status === "active" ? "default" : "outline"}
+              className={
+                status === "active"
+                  ? "h-11 gap-2 rounded-full bg-primary px-5 font-bold text-primary-foreground hover:bg-primary/90"
+                  : "h-11 gap-2 rounded-full px-5"
+              }
             >
               <Link href={`/games/${game.id}/live`} target="_blank">
                 <MonitorPlay className="h-4 w-4" aria-hidden="true" />
@@ -332,9 +311,12 @@ export default async function GameDetailPage(
           {!isDraft && (
             <Button
               asChild
-              variant="outline"
-              size="sm"
-              className="gap-2 border-primary/30 text-primary-ink hover:bg-primary/5"
+              variant={isFinished ? "default" : "outline"}
+              className={
+                isFinished
+                  ? "h-11 gap-2 rounded-full bg-primary px-5 font-bold text-primary-foreground hover:bg-primary/90"
+                  : "h-11 gap-2 rounded-full px-5"
+              }
             >
               <Link href={`/games/${game.id}/analytics`}>
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -343,12 +325,7 @@ export default async function GameDetailPage(
             </Button>
           )}
           {isFinished && (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="gap-2 border-secondary/30 text-secondary-ink hover:bg-secondary/5"
-            >
+            <Button asChild variant="outline" className="h-11 gap-2 rounded-full px-5">
               <Link href={`/games/${game.id}/report`}>
                 <Printer className="h-4 w-4" aria-hidden="true" />
                 Spausdinti ataskaitą
@@ -441,12 +418,13 @@ export default async function GameDetailPage(
               }
               hasDescription={!!game.description}
               hasTimeLimit={!!settings?.time_limit_minutes}
+              action={statusActions}
+              facts={factsRow}
             />
-            {statsCards}
             {challengeList}
           </div>
           <div className="space-y-6">
-            <QRDisplay gameCode={game.game_code} />
+            <QRDisplay gameCode={game.game_code} compact />
             {gameInfoCard}
           </div>
         </div>
