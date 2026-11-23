@@ -2,14 +2,14 @@
   <!-- STEAM X symbol - colorful asterisk/star -->
   <g transform="translate(32, 32)">
     <!-- Blue line (top-left to center) -->
-    <line x1="-20" y1="-16" x2="-2" y2="2" stroke="#008CB4" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-20" y1="-16" x2="-2" y2="2" stroke="#008CB5" stroke-width="7" stroke-linecap="round"/>
     <!-- Pink/Red line (top-right to center) -->
-    <line x1="20" y1="-16" x2="2" y2="2" stroke="#FA2864" stroke-width="7" stroke-linecap="round"/>
+    <line x1="20" y1="-16" x2="2" y2="2" stroke="#FF306D" stroke-width="7" stroke-linecap="round"/>
     <!-- Green line (horizontal through center) -->
-    <line x1="-24" y1="4" x2="24" y2="4" stroke="#00D296" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-24" y1="4" x2="24" y2="4" stroke="#00D99B" stroke-width="7" stroke-linecap="round"/>
     <!-- Yellow line (bottom-left from center) -->
-    <line x1="-16" y1="22" x2="-2" y2="4" stroke="#FAC846" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-16" y1="22" x2="-2" y2="4" stroke="#FFCE4E" stroke-width="7" stroke-linecap="round"/>
     <!-- Dark teal line (bottom-right from center) -->
-    <line x1="16" y1="22" x2="2" y2="4" stroke="#00323C" stroke-width="7" stroke-linecap="round"/>
+    <line x1="16" y1="22" x2="2" y2="4" stroke="#003B4E" stroke-width="7" stroke-linecap="round"/>
   </g>
 </svg>
