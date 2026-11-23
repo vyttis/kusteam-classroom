@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, Target, CheckCircle, Clock } from "lucide-react"
 import { GameStats } from "@/types/game"
+import { formatAverageTime } from "@/lib/game/formative-insights"
 
 interface AnalyticsCardsProps {
   stats: GameStats
@@ -12,11 +13,7 @@ export function AnalyticsCards({ stats }: AnalyticsCardsProps) {
       ? Math.round((stats.correct_submissions / stats.total_submissions) * 100)
       : 0
 
-  const avgTime = stats.avg_completion_time_seconds
-    ? stats.avg_completion_time_seconds < 60
-      ? `${Math.round(stats.avg_completion_time_seconds)}s`
-      : `${Math.round(stats.avg_completion_time_seconds / 60)}min`
-    : "-"
+  const avgTime = formatAverageTime(stats.avg_completion_time_seconds)
 
   const cards = [
     {
@@ -35,13 +32,13 @@ export function AnalyticsCards({ stats }: AnalyticsCardsProps) {
     },
     {
       label: "Teisingi atsakymai",
-      value: `${stats.correct_submissions} (${successRate}%)`,
+      value: `${stats.correct_submissions} (${successRate} %)`,
       icon: CheckCircle,
       color: "text-primary-ink",
       bg: "bg-primary/10",
     },
     {
-      label: "Vid. laikas",
+      label: "Vid. laikas iki teisingo atsakymo",
       value: avgTime,
       icon: Clock,
       color: "text-highlight-ink",

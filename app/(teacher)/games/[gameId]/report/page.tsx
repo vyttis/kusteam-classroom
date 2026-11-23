@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { PrintReportButton } from "@/components/teacher/print-report-button"
 import { computeDetailedStats } from "@/lib/game/detailed-stats"
-import { GameStats } from "@/types/game"
+import { buildDigest, summarizeClass } from "@/lib/game/formative-insights"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata: Metadata = { title: "Veiklos ataskaita" }
@@ -43,27 +44,32 @@ export default async function GameReportPage(
     notFound()
   }
 
-  const [{ data: profile }, { data: statsData }, detailed, { data: reflectionsData }] =
+  // The query above returned the activity only to its owner (teacher_id and
+  // the user's own RLS), so the answer texts may be read for the digest line
+  // about the most common wrong answer. submissions.answer is not granted to
+  // browser roles: it is read with the service role, for this activity's
+  // tasks only. Without the service key the report prints without that line.
+  let answerReader: ReturnType<typeof createAdminClient> | undefined
+  try {
+    answerReader = createAdminClient()
+  } catch {
+    answerReader = undefined
+  }
+
+  const [{ data: profile }, detailed, { data: reflectionsData }] =
     await Promise.all([
       supabase.from("profiles").select("full_name, school").eq("id", user!.id).single(),
-      supabase.rpc("get_game_stats", { game_uuid: params.gameId }),
-      computeDetailedStats(supabase, params.gameId),
+      computeDetailedStats(supabase, params.gameId, { answerReader }),
       supabase.rpc("get_game_reflections", { game_uuid: params.gameId }),
     ])
 
-  const stats = statsData as GameStats | null
+  const digest = buildDigest(detailed.challenge_stats, detailed.answers_included)
   const reflections = ((reflectionsData as ReflectionRow[]) || []).slice(0, 5)
   const totalChallenges = detailed.challenge_stats.length
 
-  const totalSolves = detailed.challenge_stats.reduce((s, c) => s + c.solves, 0)
-  const completionPct =
-    detailed.total_teams > 0 && totalChallenges > 0
-      ? Math.round((totalSolves / (totalChallenges * detailed.total_teams)) * 100)
-      : 0
-  const accuracyPct =
-    stats && stats.total_submissions > 0
-      ? Math.round((stats.correct_submissions / stats.total_submissions) * 100)
-      : 0
+  const totals = summarizeClass(detailed.challenge_stats, detailed.total_teams)
+  const completionPct = totals.completion_pct
+  const accuracyPct = totals.accuracy_pct
 
   // The day the activity ran (its start), not the day it was created, and
   // how long it ran when it has finished.
@@ -87,8 +93,8 @@ export default async function GameReportPage(
   const kpis = [
     { label: "Komandos", value: String(detailed.total_teams) },
     { label: "Užduotys", value: String(totalChallenges) },
-    { label: "Užbaigimas", value: `${completionPct}%` },
-    { label: "Bandymų tikslumas", value: `${accuracyPct}%` },
+    { label: "Užbaigimas", value: `${completionPct} %` },
+    { label: "Bandymų tikslumas", value: `${accuracyPct} %` },
   ]
 
   return (
@@ -155,6 +161,27 @@ export default async function GameReportPage(
           ))}
         </div>
 
+        {/* What to discuss with the class */}
+        <section style={{ breakInside: "avoid" }}>
+          <h2 className="text-base font-semibold text-steam-dark mb-2">Ką aptarti su klase</h2>
+          {digest ? (
+            <dl className="border border-border/50 rounded-lg p-3 space-y-1.5 text-sm">
+              {digest.map((line) => (
+                <div key={line.key} className="sm:flex sm:gap-3 print:flex print:gap-3">
+                  <dt className="font-semibold text-steam-dark sm:w-40 sm:shrink-0 print:w-40 print:shrink-0">
+                    {line.label}
+                  </dt>
+                  <dd className="min-w-0 break-words">{line.text}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Komandos nepateikė atsakymų, todėl aptarti nėra ko.
+            </p>
+          )}
+        </section>
+
         {/* Team results */}
         <section style={{ breakInside: "avoid" }}>
           <h2 className="text-base font-semibold text-steam-dark mb-2">
@@ -163,14 +190,15 @@ export default async function GameReportPage(
           {detailed.team_stats.length > 0 ? (
             <div className="overflow-x-auto print:overflow-visible focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} role="region" aria-label="Komandų rezultatai">
               <table className="w-full min-w-[28rem] text-sm border-collapse print:min-w-0">
+                <caption className="sr-only">Komandų rezultatai pagal taškus</caption>
                 <thead>
                   <tr className="border-b-2 border-border text-left">
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground">#</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground">Komanda</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Taškai</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Išspręsta</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Bandymai</th>
-                    <th className="py-1.5 font-medium text-muted-foreground text-right">Užuominos</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground">#</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground">Komanda</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Taškai</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Išspręsta</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Bandymai</th>
+                    <th scope="col" className="py-1.5 font-medium text-muted-foreground text-right">Užuominos</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,15 +232,17 @@ export default async function GameReportPage(
           {detailed.challenge_stats.length > 0 ? (
             <div className="overflow-x-auto print:overflow-visible focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} role="region" aria-label="Užduočių statistika">
               <table className="w-full min-w-[28rem] text-sm border-collapse print:min-w-0">
+                <caption className="sr-only">Užduočių statistika</caption>
                 <thead>
                   <tr className="border-b-2 border-border text-left">
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground">#</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground">Užduotis</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Taškai</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Bandymai</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Išsprendė</th>
-                    <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Tikslumas</th>
-                    <th className="py-1.5 font-medium text-muted-foreground text-right">Užbaigimas</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground">#</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground">Užduotis</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Taškai</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Bandymai</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Išsprendė</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Tikslumas</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Užbaigimas</th>
+                    <th scope="col" className="py-1.5 font-medium text-muted-foreground text-right whitespace-nowrap">Iš pirmo karto</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,8 +253,9 @@ export default async function GameReportPage(
                       <td className="py-1.5 pr-2 text-right">{c.points}</td>
                       <td className="py-1.5 pr-2 text-right">{c.total_attempts}</td>
                       <td className="py-1.5 pr-2 text-right">{c.solves}</td>
-                      <td className="py-1.5 pr-2 text-right">{c.accuracy}%</td>
-                      <td className="py-1.5 text-right">{c.completion_rate}%</td>
+                      <td className="py-1.5 pr-2 text-right">{c.accuracy} %</td>
+                      <td className="py-1.5 pr-2 text-right">{c.completion_rate} %</td>
+                      <td className="py-1.5 text-right">{c.first_try_rate === null ? "-" : `${c.first_try_rate} %`}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -234,6 +265,31 @@ export default async function GameReportPage(
             <p className="text-sm text-muted-foreground">Užduočių nėra.</p>
           )}
         </section>
+
+        {/* Per-task interpretation. Not one unbreakable block: a long list may run onto the next page. */}
+        {detailed.challenge_stats.length > 0 && (
+          <div>
+            <h2 className="text-base font-semibold text-steam-dark mb-2">
+              Užduočių įžvalgos
+            </h2>
+            <ol className="space-y-1.5 text-sm">
+              {detailed.challenge_stats.map((c, i) => (
+                <li
+                  key={c.challenge_id}
+                  className="border-b border-border/40 pb-1.5"
+                  style={{ breakInside: "avoid" }}
+                >
+                  <span className="font-medium">
+                    {i + 1}. {c.title}
+                  </span>{" "}
+                  <span className="font-semibold text-steam-dark">({c.insight.label})</span>
+                  <br />
+                  <span>{c.insight.text}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         {/* Reflections excerpt */}
         {reflections.length > 0 && (
@@ -275,7 +331,8 @@ export default async function GameReportPage(
           style={{ breakInside: "avoid" }}
         >
           <strong className="text-steam-dark">Metodinė pastaba.</strong>{" "}
-          Ataskaita pateikia kiekybinius rodiklius. Pedagoginis vertinimas
+          Ataskaita pateikia kiekybinius rodiklius, o įžvalgos sudarytos iš jų
+          pagal taisykles, be dirbtinio intelekto. Pedagoginis vertinimas
           reikalauja kokybinės refleksijos su klase: kas pavyko, kodėl, ką
           darysite kitą pamoką.
         </section>
