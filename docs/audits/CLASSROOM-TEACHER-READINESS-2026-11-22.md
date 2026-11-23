@@ -600,24 +600,24 @@ Po piloto: Vercel runtime klaidos, Supabase žurnalai, radinių lentelė, sprend
 
 | Radinys | Būsena | Įrodymas ar kas liko |
 | --- | --- | --- |
-| R-01 | Ištaisyta kode | #133: šaltinio atsakymai skaitomi tik iš publikavusio vedėjo veiklos. DB taisyklė `library_items_source_rules` yra #144 (nepritaikyta). Produkcijos užklausa 6 (16.1) nevykdyta |
+| R-01 | Ištaisyta kode | #133: šaltinio atsakymai skaitomi tik iš publikavusio vedėjo veiklos. DB taisyklė `library_items_source_rules` pritaikyta produkcijoje 2026-11-23 (#144). Produkcijos užklausa 6 (16.1) nevykdyta |
 | R-02 | Neatlikta | Atkūrimo bandymas, Vyčio veiksmas (16.3) |
 | R-03 | Iš dalies | #134: žemėlapis įkeliamas tik paspaudus. Užduočių paveikslėliai iš bet kurio `https` serverio lieka |
 | R-04 | Neatlikta | Antras asmuo su prieiga ir pranešimų gavėjas, Vyčio sprendimas |
-| R-05 | Parengta, nepritaikyta | #144: RESTRICTIVE skaitymo politika tik aktyvioms paskyroms |
+| R-05 | Ištaisyta | #144, migracija `20261123120000` pritaikyta produkcijoje 2026-11-23: užblokuota ir laukianti paskyra per RLS mato 0 veiklų |
 | R-06 | Ištaisyta | #149: atsakymas ir administratoriaus ekranas rodo, ar laišką priėmė siuntimo paslauga; „Siųsti dar kartą“. Gyvai produkcijoje nebandyta (reikėtų siųsti tikrą laišką) |
 | R-07 | Ištaisyta | #139: veiklos pradėti negalima, kol vedėjas nepatvirtina peržiūrėjęs DI užduotis (`ai_review_required`). #138, #148: užuominų ir atsakymų patikros, „DI klaidų nerado“ |
-| R-08 | Parengta, nepritaikyta | #144: pašalinamos `admins_update_all_games` ir administratorių planų keitimo bei trynimo politikos |
+| R-08 | Ištaisyta | #144, pritaikyta produkcijoje 2026-11-23: trijų administratorių rašymo politikų nebėra |
 | R-09 | Neatlikta | CLS-011, CLS-005, TEAM-006 perkėlimas į migracijas: Vyčio sprendimai |
 | R-10 | Iš dalies | #137: klaidos ekranas nebetrina žetono, bandoma iš naujo. #147: DB trikdis nebelaikomas „komanda nerasta“. Komandos kūrimo idempotentiškumas nekeistas |
 | R-11 | Ištaisyta | #137: ryšio juosta ir neišnykstantys skelbimai. #139, #145: vedėjo ekranas perskaito duomenis po kiekvieno kanalo prisijungimo |
-| R-12 | Vykdoma | CLS-022, reikia migracijos |
-| R-13 | Vykdoma | CLS-022, reikia migracijos |
+| R-12 | Ištaisyta | #153: komandos laikas vedėjo ekrane, naujos komandos nepriimamos pasibaigus veiklos laikui. Automatinio užbaigimo nėra, lieka naktinis darbas |
+| R-13 | Ištaisyta | #153 ir migracija `20261123130000`, pritaikyta 2026-11-23: atsakymas ir taškai viena operacija; grįžimo nuoroda vienkartinė ir perkelia sesiją (patikrinta produkcijoje); keičiant vykstančios veiklos atsakymą rodomas įspėjimas, perskaičiavimo nėra |
 | R-14 | Neperžiūrėta po audito | |
 | R-15 | Neatlikta | |
 | R-16 | Iš dalies | #136: kodo pakartotinis siuntimas. #139: pasibaigusios sesijos pranešimas, veiklos trynimo ir kopijavimo dialogai. Atsijungimas visuose įrenginiuose nekeistas |
 | R-17 | Ištaisyta | #143: visos pamokos E2E su vietiniu Supabase kiekvienam PR. #147: maršrutų testai |
-| R-18 | Parengta, laukia patvirtinimo | #150 (juodraštis): pranešimo papildymas ir 11 klausimų Vyčiui |
+| R-18 | Iš dalies | #150 paskelbtas 2026-11-23. 11 klausimų iš PR aprašymo lieka atviri |
 | R-19 | Iš dalies | #137: skelbimo kontrastas, formų etiketės. #139: užduočių rikiavimas klaviatūra. 11 skyriaus sąrašas iš naujo netikrintas |
 | R-20 | Neatlikta | Greičio ribos lieka atmintyje |
 | R-21 | Iš dalies | #137: saugus `localStorage` skaitymas. Kiti punktai neperžiūrėti. Gyvo bandymo radiniai N-1 (#136), N-2 ir N-5 (#147) ištaisyti |
@@ -635,7 +635,7 @@ Po piloto: Vercel runtime klaidos, Supabase žurnalai, radinių lentelė, sprend
 | A6 | Neįvykdyta |
 | A7 | Neįvykdyta |
 | B1 | Neįvykdyta |
-| B2 | R-06, R-07, R-11 ištaisyti; R-10 iš dalies; R-05 ir R-08 laukia #144 pritaikymo |
+| B2 | R-05, R-06, R-07, R-08, R-11 ištaisyti (R-05 ir R-08 pritaikius migraciją 2026-11-23); R-10 iš dalies |
 | B3 | Neįvykdyta |
 | B4 | Neįvykdyta |
 | B5 | Įvykdyta (#143) |
