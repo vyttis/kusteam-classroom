@@ -8,6 +8,9 @@ import {
   FALLBACK_POLL_MS,
   SAFETY_REFETCH_MS,
   channelStatusAction,
+  isDatabaseStreamReady,
+  mergeRowsAfterRead,
+  type RecentRow,
   type LiveConnectionState,
 } from "@/hooks/live-channel"
 
@@ -56,8 +59,13 @@ export function useLiveGame(gameId: string, running = true): UseLiveGameResult {
 
   const retry = useCallback(() => setRetryNonce((n) => n + 1), [])
 
+  // Teams that came over realtime lately: a full read that was already on
+  // its way when they arrived must not drop them (mergeRowsAfterRead).
+  const recentTeamsRef = useRef<Map<string, RecentRow<LiveTeam>>>(new Map())
+
   const fetchInitialData = useCallback(async () => {
     const supabase = createClient()
+    const readStartedAt = Date.now()
 
     const { data: teamsData, error } = await supabase
       .from("teams")
@@ -68,7 +76,12 @@ export function useLiveGame(gameId: string, running = true): UseLiveGameResult {
     if (error) throw error
     if (!teamsData) return
 
-    setTeams(teamsData)
+    const recent = recentTeamsRef.current
+    for (const [id, r] of recent) {
+      if (r.at < readStartedAt - 120_000) recent.delete(id)
+    }
+    const merged = mergeRowsAfterRead<LiveTeam>(teamsData, recent.values(), readStartedAt)
+    setTeams(merged === teamsData ? teamsData : [...merged].sort((a, b) => b.total_points - a.total_points))
 
     const teamIds = teamsData.map((t) => t.id)
     if (teamIds.length === 0) {
@@ -215,6 +228,7 @@ export function useLiveGame(gameId: string, running = true): UseLiveGameResult {
         (payload) => {
           if (payload.eventType === "INSERT") {
             const newTeam = payload.new as LiveTeam
+            recentTeamsRef.current.set(newTeam.id, { row: newTeam, at: Date.now() })
             setTeams((prev) =>
               [...prev.filter((t) => t.id !== newTeam.id), newTeam].sort(
                 (a, b) => b.total_points - a.total_points
@@ -238,6 +252,7 @@ export function useLiveGame(gameId: string, running = true): UseLiveGameResult {
         { event: "DELETE", schema: "public", table: "teams" },
         (payload) => {
           const removedId = (payload.old as { id?: string }).id
+          if (removedId) recentTeamsRef.current.delete(removedId)
           if (removedId) setTeams((prev) => prev.filter((t) => t.id !== removedId))
         }
       )
@@ -287,6 +302,12 @@ export function useLiveGame(gameId: string, running = true): UseLiveGameResult {
           }
         }
       )
+      // SUBSCRIBED comes when the channel is joined; the database stream is
+      // ready a moment later. Read again then: a team that joined in between
+      // is in neither the earlier read nor the stream.
+      .on("system", {}, (payload) => {
+        if (!cancelled && isDatabaseStreamReady(payload)) refetchOrDegrade()
+      })
       .subscribe(handleStatus)
 
     // After the laptop sleeps or the network drops, realtime events from that

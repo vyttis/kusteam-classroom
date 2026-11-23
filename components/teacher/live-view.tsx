@@ -8,6 +8,7 @@ import { useLiveGame } from "@/hooks/use-live-game"
 import { LiveLeaderboardBoard } from "./live-leaderboard-board"
 import { LiveActivityFeed } from "./live-activity-feed"
 import { AnnouncementBanner } from "@/components/player/announcement-banner"
+import { realtimeSignedIn } from "@/lib/supabase/realtime-auth"
 import { LiveConnectionBanner } from "./live-connection-banner"
 import { GameStatusActions } from "./game-status-actions"
 import { TimeControls } from "./time-controls"
@@ -94,7 +95,12 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
   // Live status/settings updates (teacher-owned row — RLS delivers these)
   useEffect(() => {
     const supabase = createClient()
-    const channel = supabase
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    // Join only once realtime has the facilitator's token (realtimeSignedIn).
+    realtimeSignedIn(supabase).then(() => {
+      if (cancelled) return
+      channel = supabase
       .channel(`live_view_game_${game.id}`)
       .on(
         "postgres_changes",
@@ -117,9 +123,11 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
         }
       )
       .subscribe()
+    })
 
     return () => {
-      supabase.removeChannel(channel)
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
     }
   }, [game.id])
 
