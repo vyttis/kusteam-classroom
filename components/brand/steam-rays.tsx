@@ -39,6 +39,7 @@ export function SteamRays({
   draw = false,
   on,
   onDark = false,
+  weight = 8,
 }: {
   className?: string
   /** Draw the rays once when the element appears. */
@@ -47,6 +48,12 @@ export function SteamRays({
   on?: RayColour
   /** Shorthand for `on="dark"`. */
   onDark?: boolean
+  /**
+   * Line weight in the 320 x 420 drawing. The default suits the element at
+   * interface sizes (up to about 200 px); use 5, the style sheet's weight,
+   * when it is shown large (the class screen).
+   */
+  weight?: number
 }) {
   const surface = on ?? (onDark ? "dark" : undefined)
   return (
@@ -65,7 +72,7 @@ export function SteamRays({
           y2={ray.y2}
           pathLength={1}
           stroke={ray.colour === surface ? "#FFFFFF" : COLOURS[ray.colour]}
-          strokeWidth={5}
+          strokeWidth={weight}
           strokeLinecap="butt"
           style={{ animationDelay: `${i * 70}ms` }}
         />

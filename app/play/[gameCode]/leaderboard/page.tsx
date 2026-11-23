@@ -189,7 +189,7 @@ export default function LeaderboardPage() {
         </div>
 
         <div className="mb-5 flex items-center gap-3">
-          <SteamRays className="h-12 w-auto shrink-0" />
+          <SteamRays weight={12} className="h-12 w-auto shrink-0" />
           <div className="min-w-0">
             <h1 className="text-2xl font-bold leading-tight text-foreground">Rezultatų lentelė</h1>
             <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">

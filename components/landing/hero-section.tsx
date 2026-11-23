@@ -59,7 +59,7 @@ export function HeroSection() {
             href="/"
             className="flex items-center hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
           >
-            <SteamLogo className="[&_text]:fill-white [&_line]:opacity-90" />
+            <SteamLogo tone="white" />
           </Link>
 
           <div className="flex flex-wrap items-center gap-3 sm:gap-5">
