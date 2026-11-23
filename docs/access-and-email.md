@@ -60,6 +60,19 @@ siunčiami po atsakymo (`after()`), todėl niekada nestabdo veiksmo; be
 `RESEND_API_KEY` jie praleidžiami ir užrašomi į žurnalą (tik tema, be
 adreso).
 
+Išimtis (nuo 2026-11-23, audito radinys R-06): paskyros laiškas po
+patvirtinimo ar „Sukurti paskyrą“ siunčiamas prieš atsakymą, kad
+administratorius matytų tiesą. `POST /api/admin/invite` ir
+`POST /api/admin/access-requests/[id]` (patvirtinimas) grąžina
+`email: { sent: true }` arba `email: { sent: false, reason }`, kur `reason`
+yra `not_configured` (nėra `RESEND_API_KEY`) arba `provider_error` (Resend
+laiško nepriėmė ar nepasiekiamas). Paskyra abiem atvejais sukurta ar
+aktyvuota. `sent: true` reiškia, kad Resend laišką priėmė siųsti, ne kad jis
+pasiekė pašto dėžutę. Kai laiškas neišsiųstas, administratorius mato
+priežastį ir mygtuką „Siųsti dar kartą“: jis dar kartą kviečia
+`/api/admin/invite`, o kadangi paskyra jau yra, išsiunčiamas laiškas su
+prisijungimo adresu (`accountActivatedEmail`), rolė nekeičiama.
+
 ### Sąranka (vieną kartą)
 
 1. Resend: paskyra, domenas `kusteam.app`, regionas EU (Ireland).
