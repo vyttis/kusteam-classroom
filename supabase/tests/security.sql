@@ -828,3 +828,287 @@ UPDATE public.profiles SET status = 'active' WHERE id = '00000000-0000-0000-0000
 SET ROLE authenticated;
 SELECT public.t_cls015('00000000-0000-0000-0000-0000000001a1', 3);
 RESET ROLE;
+
+-- 20261123120000: blocked and pending accounts read nothing but their own
+-- profile; admins cannot take over activities or lesson plans; a library
+-- item points only at its publisher's own activity; games.starter_slug.
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-0000-0000-0000000002a1', 'sh-teacher@example.lt'),
+  ('00000000-0000-0000-0000-0000000002a2', 'sh-pending@example.lt'),
+  ('00000000-0000-0000-0000-0000000002a3', 'sh-other@example.lt'),
+  ('00000000-0000-0000-0000-0000000002a4', 'sh-admin@example.lt'),
+  ('00000000-0000-0000-0000-0000000002a5', 'sh-super@example.lt');
+UPDATE public.profiles SET status = 'active', role = 'teacher'
+  WHERE id IN ('00000000-0000-0000-0000-0000000002a1', '00000000-0000-0000-0000-0000000002a3');
+UPDATE public.profiles SET status = 'pending', role = 'teacher' WHERE id = '00000000-0000-0000-0000-0000000002a2';
+UPDATE public.profiles SET status = 'active', role = 'admin' WHERE id = '00000000-0000-0000-0000-0000000002a4';
+UPDATE public.profiles SET status = 'active', role = 'super_admin' WHERE id = '00000000-0000-0000-0000-0000000002a5';
+INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', false)
+  ON CONFLICT DO NOTHING;
+
+-- One activity with a row in every facilitator table and two files, for
+-- the teacher (...2a1), the pending account (...2a2, as if written before
+-- it lost access) and the other teacher (...2a3).
+DO $$
+DECLARE
+  n text;
+  u uuid;
+  g uuid;
+  c uuid;
+  t uuid;
+BEGIN
+  FOREACH n IN ARRAY ARRAY['1', '2', '3'] LOOP
+    u := ('00000000-0000-0000-0000-0000000002a' || n)::uuid;
+    g := ('10000000-0000-0000-0000-0000000002a' || n)::uuid;
+    c := ('20000000-0000-0000-0000-0000000002a' || n)::uuid;
+    t := ('30000000-0000-0000-0000-0000000002a' || n)::uuid;
+    INSERT INTO public.games (id, teacher_id, title, game_code, status) VALUES (g, u, 'SH veikla ' || n, 'SHARD' || n, 'active');
+    INSERT INTO public.challenges (id, game_id, title, answer_hash) VALUES (c, g, 'SH užduotis', '$2a$10$sh');
+    INSERT INTO public.teams (id, game_id, name, session_token) VALUES (t, g, 'SH komanda', 'sh-token-' || n);
+    INSERT INTO public.submissions (team_id, challenge_id, answer, is_correct, points_awarded) VALUES (t, c, 'atsakymas', true, 100);
+    INSERT INTO public.announcements (game_id, message, created_by) VALUES (g, 'SH skelbimas', u);
+    INSERT INTO public.achievements (game_id, team_id, type, challenge_id) VALUES (g, t, 'first_solver', c);
+    INSERT INTO public.reflections (game_id, team_id, improvement_text) VALUES (g, t, 'SH refleksija');
+    INSERT INTO public.lesson_plans (teacher_id, title, subject, grade, topic, lesson_type, duration)
+      VALUES (u, 'SH planas ' || n, 'Matematika', 6, 'Trupmenos', 'nauja_tema', 45);
+    INSERT INTO storage.objects (bucket_id, name, owner) VALUES
+      ('challenge-images', u || '/sh.png', u),
+      ('documents', 'imports/' || u || '/sh.pdf', u);
+  END LOOP;
+END $$;
+
+-- What the signed-in account sees of the SH rows, one number per table:
+-- activities, tasks, teams, results, announcements, achievements,
+-- reflections, lesson plans, files; then other people's profiles (0 or
+-- "some") and its own profile.
+CREATE FUNCTION public.t_sh(who uuid, expected text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE got text;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', who::text, false);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', false);
+  got := concat_ws(' ',
+    (SELECT count(*) FROM public.games WHERE game_code LIKE 'SHARD_'),
+    (SELECT count(id) FROM public.challenges WHERE title = 'SH užduotis'),
+    (SELECT count(id) FROM public.teams WHERE name = 'SH komanda'),
+    (SELECT count(id) FROM public.submissions WHERE team_id::text LIKE '30000000-0000-0000-0000-0000000002a_'),
+    (SELECT count(*) FROM public.announcements WHERE message = 'SH skelbimas'),
+    (SELECT count(*) FROM public.achievements WHERE game_id::text LIKE '10000000-0000-0000-0000-0000000002a_'),
+    (SELECT count(*) FROM public.reflections WHERE improvement_text = 'SH refleksija'),
+    (SELECT count(*) FROM public.lesson_plans WHERE title LIKE 'SH planas _'),
+    (SELECT count(*) FROM storage.objects WHERE name LIKE '%/sh.p__'),
+    'others', CASE WHEN EXISTS (SELECT 1 FROM public.profiles WHERE id <> auth.uid()) THEN 'some' ELSE '0' END,
+    'own', (SELECT count(*) FROM public.profiles WHERE id = auth.uid()));
+  IF got <> expected THEN
+    RAISE EXCEPTION 'account % must see "%", sees "%"', who, expected, got;
+  END IF;
+END $$;
+-- A write must change exactly this many rows (0: row security hid them).
+CREATE FUNCTION public.t_changes(q text, expected int) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE n int;
+BEGIN
+  EXECUTE q;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> expected THEN
+    RAISE EXCEPTION 'expected % changed rows, got %: %', expected, n, q;
+  END IF;
+END $$;
+CREATE FUNCTION public.t_bad_slug(slug text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  BEGIN
+    INSERT INTO public.games (teacher_id, title, game_code, status, starter_slug)
+      VALUES (auth.uid(), 'SH bloga', 'SHBAD1', 'draft', slug);
+  EXCEPTION WHEN check_violation THEN
+    RETURN;
+  END;
+  RAISE EXCEPTION 'starter_slug "%" must be refused', slug;
+END $$;
+GRANT EXECUTE ON FUNCTION public.t_sh(uuid, text), public.t_changes(text, int), public.t_bad_slug(text)
+  TO authenticated, service_role;
+
+SET ROLE authenticated;
+-- Active teachers: their own rows only, as before.
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a1', '1 1 1 1 1 1 1 1 2 others 0 own 1');
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a3', '1 1 1 1 1 1 1 1 2 others 0 own 1');
+SELECT public.t_ok($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a3')$q$);
+SELECT public.t_ok($q$SELECT public.get_game_reflections('10000000-0000-0000-0000-0000000002a3')$q$);
+SELECT public.t_denied($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a1')$q$);
+-- Admin and super admin: every activity's rows and every profile, as
+-- before (files were and are the owner's only).
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a4', '3 3 3 3 3 3 3 3 0 others some own 1');
+SELECT public.t_ok($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a3')$q$);
+SELECT public.t_ok($q$SELECT public.get_game_reflections('10000000-0000-0000-0000-0000000002a3')$q$);
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a5', '3 3 3 3 3 3 3 3 0 others some own 1');
+-- A pending account: only its own profile, whatever rows carry its id.
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a2', '0 0 0 0 0 0 0 0 0 others 0 own 1');
+SELECT public.t_denied($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a2')$q$);
+SELECT public.t_denied($q$SELECT public.get_game_reflections('10000000-0000-0000-0000-0000000002a2')$q$);
+-- A signed-in session without a profile row sees nothing at all.
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002ff', '0 0 0 0 0 0 0 0 0 others 0 own 0');
+RESET ROLE;
+
+-- Blocking stops the reads at once, for a teacher and for an admin;
+-- unblocking brings them back.
+UPDATE public.profiles SET status = 'blocked'
+  WHERE id IN ('00000000-0000-0000-0000-0000000002a1', '00000000-0000-0000-0000-0000000002a4');
+SET ROLE authenticated;
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a1', '0 0 0 0 0 0 0 0 0 others 0 own 1');
+SELECT public.t_rows($q$SELECT id FROM public.games WHERE id = '10000000-0000-0000-0000-0000000002a1'$q$, 0);
+SELECT public.t_rows($q$SELECT id FROM public.profiles WHERE id = auth.uid() AND status = 'blocked'$q$, 1);
+SELECT public.t_denied($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a1')$q$);
+SELECT public.t_denied($q$SELECT public.get_game_reflections('10000000-0000-0000-0000-0000000002a1')$q$);
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a4', '0 0 0 0 0 0 0 0 0 others 0 own 1');
+RESET ROLE;
+UPDATE public.profiles SET status = 'active'
+  WHERE id IN ('00000000-0000-0000-0000-0000000002a1', '00000000-0000-0000-0000-0000000002a4');
+SET ROLE authenticated;
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a1', '1 1 1 1 1 1 1 1 2 others 0 own 1');
+SELECT public.t_ok($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a1')$q$);
+SELECT public.t_sh('00000000-0000-0000-0000-0000000002a4', '3 3 3 3 3 3 3 3 0 others some own 1');
+RESET ROLE;
+-- The service role is not an account and keeps the statistics functions.
+SET ROLE service_role;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT public.t_ok($q$SELECT public.get_game_stats('10000000-0000-0000-0000-0000000002a2')$q$);
+SELECT public.t_ok($q$SELECT public.get_game_reflections('10000000-0000-0000-0000-0000000002a2')$q$);
+RESET ROLE;
+
+-- An admin, and a super admin, cannot take over, change or delete someone
+-- else's activity or lesson plan through the Data API: no row is touched.
+CREATE FUNCTION public.t_sh_no_takeover(who uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', who::text, false);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', false);
+  PERFORM public.t_changes($q$UPDATE public.games SET teacher_id = auth.uid() WHERE id = '10000000-0000-0000-0000-0000000002a3'$q$, 0);
+  PERFORM public.t_changes($q$UPDATE public.games SET title = 'Perimta' WHERE id = '10000000-0000-0000-0000-0000000002a3'$q$, 0);
+  PERFORM public.t_changes($q$DELETE FROM public.games WHERE id = '10000000-0000-0000-0000-0000000002a3'$q$, 0);
+  PERFORM public.t_changes($q$UPDATE public.lesson_plans SET teacher_id = auth.uid() WHERE title = 'SH planas 3'$q$, 0);
+  PERFORM public.t_changes($q$UPDATE public.lesson_plans SET goal = 'Perimta' WHERE title = 'SH planas 3'$q$, 0);
+  PERFORM public.t_changes($q$DELETE FROM public.lesson_plans WHERE title = 'SH planas 3'$q$, 0);
+END $$;
+GRANT EXECUTE ON FUNCTION public.t_sh_no_takeover(uuid) TO authenticated;
+SET ROLE authenticated;
+SELECT public.t_sh_no_takeover('00000000-0000-0000-0000-0000000002a4');
+SELECT public.t_sh_no_takeover('00000000-0000-0000-0000-0000000002a5');
+RESET ROLE;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.games WHERE id = '10000000-0000-0000-0000-0000000002a3'
+                 AND teacher_id = '00000000-0000-0000-0000-0000000002a3' AND title = 'SH veikla 3') THEN
+    RAISE EXCEPTION 'an admin must not change or take over another facilitator''s activity';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.lesson_plans WHERE title = 'SH planas 3'
+                 AND teacher_id = '00000000-0000-0000-0000-0000000002a3' AND goal IS DISTINCT FROM 'Perimta') THEN
+    RAISE EXCEPTION 'an admin must not change, take over or delete another facilitator''s lesson plan';
+  END IF;
+END $$;
+-- The owner still changes their own activity and plan, an admin their own.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a3', false);
+SELECT public.t_changes($q$UPDATE public.lesson_plans SET goal = 'Mano tikslas' WHERE title = 'SH planas 3'$q$, 1);
+SELECT public.t_changes($q$UPDATE public.games SET description = 'Mano aprašas' WHERE id = '10000000-0000-0000-0000-0000000002a3'$q$, 1);
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a4', false);
+SELECT public.t_changes($q$INSERT INTO public.lesson_plans (teacher_id, title, subject, grade, topic, lesson_type, duration)
+  VALUES (auth.uid(), 'SH admin planas', 'Fizika', 8, 'Jėgos', 'kartojimas', 45)$q$, 1);
+SELECT public.t_changes($q$UPDATE public.lesson_plans SET goal = 'Tikslas' WHERE title = 'SH admin planas'$q$, 1);
+SELECT public.t_changes($q$DELETE FROM public.lesson_plans WHERE title = 'SH admin planas'$q$, 1);
+
+-- Library: a source must be the publisher's own activity, on insert and on
+-- update; no source is fine.
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a3', false);
+SELECT public.t_denied($q$INSERT INTO public.library_items (title, published_by, status, source_game_id)
+  VALUES ('SH svetima', auth.uid(), 'pending_review', '10000000-0000-0000-0000-0000000002a1')$q$);
+SELECT public.t_changes($q$INSERT INTO public.library_items (id, title, published_by, status, source_game_id)
+  VALUES ('40000000-0000-0000-0000-0000000002a1', 'SH sava', auth.uid(), 'pending_review', '10000000-0000-0000-0000-0000000002a3')$q$, 1);
+SELECT public.t_changes($q$INSERT INTO public.library_items (id, title, published_by, status)
+  VALUES ('40000000-0000-0000-0000-0000000002a2', 'SH be šaltinio', auth.uid(), 'pending_review')$q$, 1);
+SELECT public.t_denied($q$UPDATE public.library_items SET source_game_id = '10000000-0000-0000-0000-0000000002a1'
+  WHERE id = '40000000-0000-0000-0000-0000000002a2'$q$);
+SELECT public.t_denied($q$UPDATE public.library_items SET source_game_id = '10000000-0000-0000-0000-0000000002a1'
+  WHERE id = '40000000-0000-0000-0000-0000000002a1'$q$);
+SELECT public.t_changes($q$UPDATE public.library_items SET source_game_id = '10000000-0000-0000-0000-0000000002a3'
+  WHERE id = '40000000-0000-0000-0000-0000000002a2'$q$, 1);
+SELECT public.t_changes($q$UPDATE public.library_items SET source_game_id = NULL, title = 'SH be šaltinio 2'
+  WHERE id = '40000000-0000-0000-0000-0000000002a2'$q$, 1);
+RESET ROLE;
+-- An older row whose source belongs to someone else (written before the
+-- rule existed; here by the server).
+INSERT INTO public.library_items (id, title, published_by, status, source_game_id) VALUES
+  ('40000000-0000-0000-0000-0000000002a3', 'SH senas', '00000000-0000-0000-0000-0000000002a3', 'pending_review', '10000000-0000-0000-0000-0000000002a1');
+-- Admin moderation of someone else's item works with an own, a missing and
+-- an older foreign source; the admin cannot change the publisher or the
+-- source, not even to an activity of the publisher.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a4', false);
+SELECT public.t_changes($q$UPDATE public.library_items SET status = 'approved', review_notes = NULL, reviewed_by = auth.uid(), reviewed_at = now()
+  WHERE id IN ('40000000-0000-0000-0000-0000000002a1', '40000000-0000-0000-0000-0000000002a2', '40000000-0000-0000-0000-0000000002a3')$q$, 3);
+SELECT public.t_changes($q$UPDATE public.library_items SET status = 'rejected', review_notes = 'Pataisykite užduotis'
+  WHERE id = '40000000-0000-0000-0000-0000000002a3'$q$, 1);
+SELECT public.t_denied($q$UPDATE public.library_items SET published_by = auth.uid() WHERE id = '40000000-0000-0000-0000-0000000002a1'$q$);
+SELECT public.t_denied($q$UPDATE public.library_items SET published_by = NULL WHERE id = '40000000-0000-0000-0000-0000000002a1'$q$);
+SELECT public.t_denied($q$UPDATE public.library_items SET source_game_id = '10000000-0000-0000-0000-0000000002a1' WHERE id = '40000000-0000-0000-0000-0000000002a1'$q$);
+SELECT public.t_denied($q$UPDATE public.library_items SET source_game_id = '10000000-0000-0000-0000-0000000002a3' WHERE id = '40000000-0000-0000-0000-0000000002a2'$q$);
+-- The publisher still edits a rejected item whose older source is foreign,
+-- as long as the source is left alone.
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a3', false);
+SELECT public.t_changes($q$UPDATE public.library_items SET title = 'SH senas 2', status = 'pending_review'
+  WHERE id = '40000000-0000-0000-0000-0000000002a3'$q$, 1);
+-- Deleting the source activity (by its owner, who may not update the
+-- approved item any more) empties the source instead of failing.
+SELECT public.t_changes($q$DELETE FROM public.games WHERE id = '10000000-0000-0000-0000-0000000002a3'$q$, 1);
+RESET ROLE;
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.library_items
+      WHERE id IN ('40000000-0000-0000-0000-0000000002a1', '40000000-0000-0000-0000-0000000002a2')
+        AND status = 'approved' AND published_by = '00000000-0000-0000-0000-0000000002a3'
+        AND source_game_id IS NULL) <> 2 THEN
+    RAISE EXCEPTION 'moderation must keep the publisher, and deleting the source activity must empty source_game_id';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.library_items WHERE id = '40000000-0000-0000-0000-0000000002a3'
+                 AND source_game_id = '10000000-0000-0000-0000-0000000002a1' AND title = 'SH senas 2') THEN
+    RAISE EXCEPTION 'an update that leaves an older source alone must pass';
+  END IF;
+END $$;
+-- The server (clone counter, service role) is not limited by the rule.
+SET ROLE service_role;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT public.t_changes($q$UPDATE public.library_items SET clone_count = clone_count + 1, source_game_id = '10000000-0000-0000-0000-0000000002a2'
+  WHERE id = '40000000-0000-0000-0000-0000000002a1'$q$, 1);
+RESET ROLE;
+
+-- games.starter_slug: the owner sets it when the draft is created and reads
+-- it back; the format holds for every writer.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a1', false);
+SELECT public.t_changes($q$INSERT INTO public.games (teacher_id, title, game_code, status, starter_slug)
+  VALUES (auth.uid(), 'SH paruošta', 'SHSLUG', 'draft', 'vandens-ciklas-5')$q$, 1);
+SELECT public.t_rows($q$SELECT id FROM public.games WHERE starter_slug = 'vandens-ciklas-5'$q$, 1);
+SELECT public.t_rows($q$SELECT id FROM public.games WHERE game_code = 'SHARD1' AND starter_slug IS NULL$q$, 1);
+SELECT public.t_bad_slug(s) FROM unnest(ARRAY[
+  '', 'Vandens-ciklas', 'vandens_ciklas', 'vandens--ciklas', '-vandens', 'vandens-', 'vandens ciklas',
+  E'vandens\nciklas', E'vandens\n', 'ąžuolas', repeat('a', 61)
+]) s;
+SELECT public.t_changes($q$UPDATE public.games SET starter_slug = repeat('a', 60) WHERE game_code = 'SHSLUG'$q$, 1);
+-- Another facilitator does not see it, an admin does, anon reads nothing.
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a3', false);
+SELECT public.t_rows($q$SELECT id FROM public.games WHERE starter_slug IS NOT NULL$q$, 0);
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000002a4', false);
+SELECT public.t_rows($q$SELECT id FROM public.games WHERE starter_slug IS NOT NULL$q$, 1);
+RESET ROLE;
+SET ROLE anon;
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', 'anon', false);
+SELECT public.t_denied('SELECT starter_slug FROM public.games');
+RESET ROLE;
+DO $$
+BEGIN
+  BEGIN
+    UPDATE public.games SET starter_slug = 'Bloga' WHERE game_code = 'SHSLUG';
+    RAISE EXCEPTION 'the starter_slug format must hold for the server too';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END $$;
