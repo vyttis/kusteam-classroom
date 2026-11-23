@@ -955,8 +955,9 @@ Pagrindas: 2026-11-22 auditas (`docs/audits/CLASSROOM-TEACHER-READINESS-2026-11-
 įrodymai `docs/audits/evidence/blocked-read-probe.sql` ir
 `library-and-admin-probe.sql`).
 
-**Produkcijoje NETAIKYTA.** Taikoma tik su Vyčio leidimu, pagal eigą žemiau.
-Programa veikia ir be šios migracijos, ir su ja: kodas `starter_slug` dar
+**Taikyta produkcijoje 2026-11-23** (Vytis, SQL Editor, projektas
+`menmndjyfeuwfweubwnl`), žr. „Taikyta produkcijoje 2026-11-23“ šio skyriaus
+gale. Programa veikia ir be šios migracijos, ir su ja: kodas `starter_slug` dar
 nerašo ir neskaito, o pašalinamų politikų nenaudoja. Kodas, kuris rašys
 `starter_slug`, diegiamas tik po migracijos (kitaip Data API atmes įrašą su
 nežinomu stulpeliu). Duomenys nekeičiami. `types/database.ts` šiame PR
@@ -1326,6 +1327,33 @@ Grįžti į pilną migraciją: vėl pritaikyti migracijos failą po viso grąži
 failo (po dalinio grąžinimo migracijos failas pakartotinai netaikomas, nes
 stulpelis jau yra; tada atkurti tik pašalintą dalį iš migracijos failo).
 
+### Taikyta produkcijoje 2026-11-23
+
+Vykdė Vytis per SQL Editor, tikrino Claude Code. Failai iš `main` (`db1cee6`),
+SHA-256 sutapo su nurodytais viršuje.
+
+- **Sąlygos:** paskutinė kasdienė kopija 2026-11-22 23:46 UTC (apie 9 val.
+  iki taikymo); vykstančių veiklų 0.
+- **Patikros prieš taikymą:** 2 užklausa: 5 paskyros, visos aktyvios (1 staff,
+  1 super_admin, 3 teacher); 3: neaktyvių paskyrų nėra; 4: `3, 3, 0`; 5: 3
+  eilutės; 6: super_admin vardu 34 veiklos, teacher vardu 3; 7: `1, 0, false,
+  true`.
+- **Taikymas:** „Success. No rows returned“. SQL Editor prieš tai parodė
+  įspėjimą dėl destruktyvių veiksmų (`DROP POLICY`), jis laukiamas.
+- **Patikra po taikymo:** `10, 0, 1, false, 2, true`, CHECK su
+  `^[a-z0-9]+(-[a-z0-9]+)*$` ir 60, `true, false`. Blokas grąžino `CLS read
+  check OK`: aktyvi paskyra mato 34/34 veiklas, užblokuota ir laukianti 0,
+  užblokuota skaito 1 profilį. Po bloko visos 5 paskyros tebėra aktyvios.
+- **Programos patikra (Claude Code, mokytojo testinė paskyra, sintetinė
+  veikla „TEST po migracijų 2026-11-23“, kodas DU9JWU):** vedėjas mato savo
+  veiklas ir gyvą ekraną; visi keturi Realtime kanalai patvirtino duomenų
+  srautą (`Subscribed to PostgreSQL`, `ok`); komanda ir jos 100 taškų matomi
+  gyvame ekrane; analitika atsidaro. `E2E smoke (production)` paleistas
+  rankiniu būdu.
+- **Neatlikta:** schemos atspaudo palyginimas (8 punktas ir atspaudas po
+  taikymo) bei trijų funkcijų tekstų md5. Administratoriaus bibliotekos
+  moderavimas ir „Pateikti į biblioteką“ gyvai netikrinti.
+
 ## 2026-11-23: atsakymas ir taškai viena transakcija (`record_submission`, auditas R-13)
 
 Failas `supabase/migrations/20261123130000_record_submission.sql`
@@ -1335,8 +1363,9 @@ grąžinimas `supabase/rollback/20261123130000_record_submission.sql`
 Pagrindas: 2026-11-22 audito radinys R-13
 (`docs/audits/CLASSROOM-TEACHER-READINESS-2026-11-22.md`).
 
-**Produkcijoje NETAIKYTA.** Taikoma tik su Vyčio leidimu, pagal eigą žemiau,
-ir tik **po** `20261123120000` (tokia tvarka išbandyta ir tokiai tvarkai
+**Taikyta produkcijoje 2026-11-23** (Vytis, SQL Editor), iškart po
+`20261123120000`; žr. „Taikyta produkcijoje 2026-11-23“ šio skyriaus gale.
+Taikoma tik **po** `20261123120000` (tokia tvarka išbandyta ir tokiai tvarkai
 skaičiuoti atspaudai). Programa veikia ir be šios migracijos, ir su ja:
 `/api/submissions` kviečia `record_submission()`, o jei funkcijos nėra
 (PostgREST `PGRST202` arba Postgres `42883`), atsakymą ir taškus įrašo dviem
@@ -1504,6 +1533,24 @@ dviem kvietimais, todėl atsakymai toliau priimami ir kodo grąžinti nereikia.
 kvietimų palieka užduotį be taškų). Po grąžinimo atspaudas kaip stulpeliuose
 „buvo“ (patikrinta lokaliai). Pakartotinai taikyti: migracijos failas dar
 kartą (`CREATE OR REPLACE`).
+
+### Taikyta produkcijoje 2026-11-23
+
+Vykdė Vytis per SQL Editor iškart po `20261123120000`, tikrino Claude Code.
+
+- **Patikros prieš taikymą:** 1: `true`; 2: `0`; 3: `true, true`; 4: vykstančių
+  veiklų 0; 5: `teams_with_gap` 0.
+- **Taikymas:** „Success. No rows returned“.
+- **Patikra po taikymo:** `1, false, {"search_path=\"\""}, jsonb, false, false,
+  true`; PUBLIC teisės neturi (0 eilučių).
+- **Programos patikra (Claude Code):** Data API funkciją mato: anoniminis
+  kvietimas į `/rest/v1/rpc/record_submission` atmetamas `42501 permission
+  denied for function record_submission` (nesama funkcija duotų `PGRST202`),
+  todėl `/api/submissions` nuo šiol rašo per ją. Sintetinėje veikloje DU9JWU:
+  neteisingas atsakymas 0 taškų, teisingas 100, pakartotas „Ši užduotis jau
+  išspręsta!“, komandos suma 100.
+- **Neatlikta:** schemos atspaudo palyginimas; `teams_with_gap` po taikymo
+  dar kartą neskaičiuotas (prieš taikymą 0).
 
 ## Konvencija toliau
 
