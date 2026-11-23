@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button"
 import { STORAGE_BLOCKED_MESSAGE, canStorePlayerSession, clearPlayerSession, savePlayerSession } from "@/lib/game/session"
 
 type State = { kind: "working" } | { kind: "error"; message: string }
+type RejoinAnswer = { error?: string; team_id?: string; team_name?: string; session_token?: string }
 
 /**
  * Opened from the facilitator's "Grąžinti į komandą" QR or link. The token
  * after "#" never reaches the server logs; this page sends it once, stores
- * the team's session on this device and opens the activity.
+ * the team's new session on this device and opens the activity. The link
+ * works once, and the device that had the team before is signed out.
  */
 export default function RejoinPage() {
   const params = useParams()
@@ -21,6 +23,7 @@ export default function RejoinPage() {
   const [state, setState] = useState<State>({ kind: "working" })
   // Read once: the hash is cleared right after, and an effect can run twice.
   const tokenRef = useRef<string | null>(null)
+  const exchangeRef = useRef<Promise<{ ok: boolean; data: RejoinAnswer }> | null>(null)
 
   useEffect(() => {
     if (tokenRef.current === null) {
@@ -40,21 +43,19 @@ export default function RejoinPage() {
       return
     }
     let cancelled = false
+    // The link works once: an effect that runs twice must not send it twice
+    // (the second request would be told it was already used).
+    exchangeRef.current ??= fetch("/api/play/rejoin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_code: gameCode, token }),
+    }).then(async (res) => ({ ok: res.ok, data: (await res.json().catch(() => ({}))) as RejoinAnswer }))
+    const exchange = exchangeRef.current
     ;(async () => {
       try {
-        const res = await fetch("/api/play/rejoin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ game_code: gameCode, token }),
-        })
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string
-          team_id?: string
-          team_name?: string
-          session_token?: string
-        }
+        const { ok, data } = await exchange
         if (cancelled) return
-        if (!res.ok || !data.team_id || !data.session_token) {
+        if (!ok || !data.team_id || !data.session_token) {
           setState({ kind: "error", message: data.error || "Nepavyko grįžti į komandą. Bandykite dar kartą." })
           return
         }

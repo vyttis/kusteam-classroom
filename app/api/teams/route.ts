@@ -5,6 +5,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { clientKey } from "@/lib/client-address"
 import { retryLater } from "@/lib/api/retry-later"
+import { clockFromRow, joiningTimeOver } from "@/lib/game/clock"
 
 const createTeamSchema = z.object({
   game_code: z.string().length(6),
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
     // Find the active game
     const { data: game, error: gameError } = await supabase
       .from("games")
-      .select("id, settings")
+      .select("id, settings, starts_at, paused_ms, paused_at")
       .eq("game_code", parsed.data.game_code)
       .eq("status", "active")
       .maybeSingle()
@@ -93,6 +94,22 @@ export async function POST(request: Request) {
         {
           error: "Vedėjas uždarė prisijungimą prie šios veiklos. Jei jūsų komanda dar neprisijungė, kreipkitės į vedėją.",
           code: "joining_closed",
+        },
+        { status: 403 }
+      )
+    }
+    // A timed activity whose limit, counted from its own start (pauses
+    // added back), has passed takes no new teams: without this a forgotten
+    // activity kept accepting them until the nightly clean-up, each with a
+    // fresh full limit (audit R-12). It is the moment the class screen's
+    // countdown reaches zero. Teams already in keep their own time from
+    // their "Pradėti", and the facilitator's "Pratęsti" opens joining again.
+    if (joiningTimeOver(clockFromRow(game as Parameters<typeof clockFromRow>[0]), game.starts_at as string | null, Date.now())) {
+      return NextResponse.json(
+        {
+          error:
+            "Šios veiklos laikas baigėsi, todėl naujos komandos nebepriimamos. Jei veikla dar vyksta, kreipkitės į vedėją.",
+          code: "time_over",
         },
         { status: 403 }
       )

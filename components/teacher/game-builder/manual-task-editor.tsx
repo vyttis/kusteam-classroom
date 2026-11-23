@@ -354,8 +354,13 @@ export function ManualTaskEditor({
         )
       }
 
+      // Saved while the activity runs, with answers already given: they are
+      // not checked again (the server says so, lib/game/live-edit.ts).
+      const saved = await readJson<{ live_scoring_notice?: unknown }>(res)
+      const notice = typeof saved.live_scoring_notice === "string" ? saved.live_scoring_notice : null
       toast({
         title: isEditing ? "Užduotis atnaujinta" : "Užduotis sukurta!",
+        ...(notice ? { description: notice, duration: 15000 } : {}),
       })
       onSuccess()
     } catch (error: unknown) {

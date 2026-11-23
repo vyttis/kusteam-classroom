@@ -32,10 +32,11 @@ interface TeamRejoinDialogProps {
 }
 
 /**
- * "Grąžinti į komandą": a QR and a link, valid for ten minutes, that let a
- * team continue on another device after its phone died, the browser changed
- * or someone pressed "Išeiti". The participant scans it and is back in the
- * same team with its points and solved tasks.
+ * "Grąžinti į komandą": a QR and a link, valid for ten minutes and for one
+ * use, that move a team to another device after its phone died, the browser
+ * changed or someone pressed "Išeiti". The participant scans it and is back
+ * in the same team with its points and solved tasks; the device that had
+ * the team before is signed out.
  */
 export function TeamRejoinDialog({ gameId, team, onClose }: TeamRejoinDialogProps) {
   const [link, setLink] = useState<LinkState>({ kind: "loading" })
@@ -87,7 +88,7 @@ export function TeamRejoinDialog({ gameId, team, onClose }: TeamRejoinDialogProp
           <DialogTitle>Grąžinti į komandą „{team?.name}“</DialogTitle>
           <DialogDescription>
             Dalyvis nuskaito kodą kitu įrenginiu ir tęsia toje pačioje komandoje su jos taškais ir išspręstomis užduotimis.
-            Rodykite kodą tik tai komandai.
+            Komanda toliau dirba tik tame įrenginyje. Rodykite kodą tik tai komandai.
           </DialogDescription>
         </DialogHeader>
 
@@ -113,7 +114,10 @@ export function TeamRejoinDialog({ gameId, team, onClose }: TeamRejoinDialogProp
                 {copied ? "Nukopijuota" : "Kopijuoti"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">Kodas galioja iki {until}. Prireikus sukurkite naują.</p>
+            <p className="text-xs text-muted-foreground">
+              Kodas galioja iki {until} ir tinka vieną kartą. Jį panaudojus ankstesnis komandos įrenginys
+              atjungiamas. Prireikus sukurkite naują.
+            </p>
           </div>
         )}
 

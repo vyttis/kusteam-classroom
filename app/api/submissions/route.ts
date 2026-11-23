@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { calculatePoints } from "@/lib/game/scoring"
+import { recordSubmission } from "@/lib/game/record-submission"
 import { startTeamClock } from "@/lib/game/team-start"
 import { MAX_ANSWER_LENGTH, verifyAcceptedAnswers, verifyAnswer } from "@/lib/game/answer-hasher"
 import { evaluateAchievements, saveAchievements } from "@/lib/game/achievements"
@@ -270,56 +271,40 @@ export async function POST(request: Request) {
     // At most half of the task's points go for hints (lib/game/scoring.ts).
     const pointsAwarded = isCorrect ? calculatePoints(challenge.points, hintsUsed, challenge.hint_penalty || 0) : 0
 
-    // Record submission with hints_used. The insert result MUST be checked:
-    // two concurrent submits can both pass the existingSolve guard above, and
-    // the loser hits idx_submissions_unique_solve (23505). Skipping the check
-    // would double-award points via increment_team_score below.
-    const { error: insertError } = await supabase.from("submissions").insert({
-      team_id: team.id,
-      challenge_id: parsed.data.challenge_id,
+    // Store the answer and, when it is correct, the team's points: one
+    // transaction where migration 20261123130000 is applied, the two calls
+    // of before where it is not (lib/game/record-submission.ts).
+    const recorded = await recordSubmission(supabase, {
+      teamId: team.id,
+      challengeId: parsed.data.challenge_id,
       answer: parsed.data.answer,
-      is_correct: isCorrect,
-      points_awarded: pointsAwarded,
-      hints_used: hintsUsed,
+      isCorrect,
+      pointsAwarded,
+      hintsUsed,
     })
 
-    if (insertError) {
-      if (insertError.code === "23505") {
-        return NextResponse.json({
-          is_correct: true,
-          points_awarded: 0,
-          message: "Ši užduotis jau išspręsta!",
-          already_solved: true,
-        })
-      }
-      console.error("Submission insert failed:", insertError.message)
+    if (!recorded.ok) {
+      console.error("Submission insert failed:", recorded.message)
       return NextResponse.json(
         { error: "Nepavyko išsaugoti atsakymo. Bandykite dar kartą." },
         { status: 500 }
       )
     }
+    // Two concurrent submits can both pass the existingSolve guard above;
+    // the later one finds the task solved (idx_submissions_unique_solve)
+    // and gets no points a second time.
+    if (recorded.alreadySolved) {
+      return NextResponse.json({
+        is_correct: true,
+        points_awarded: 0,
+        message: "Ši užduotis jau išspręsta!",
+        already_solved: true,
+      })
+    }
 
-    // If correct, update team score atomically via RPC
     let earnedAchievements: { type: string; challengeId: string | null; metadata: Record<string, unknown> }[] = []
 
     if (isCorrect) {
-      const { error: scoreError } = await supabase.rpc("increment_team_score", {
-        p_team_id: team.id,
-        p_points: pointsAwarded,
-      })
-      if (scoreError) {
-        // The submission is already stored; without this log a failed score
-        // update stays invisible (as it did for two teams in March 2026).
-        console.error(
-          JSON.stringify({
-            event: "team_score_update_failed",
-            team_id: team.id,
-            code: scoreError.code,
-            message: scoreError.message,
-          })
-        )
-      }
-
       // Evaluate and save achievements
       try {
         const { count: totalChallenges } = await supabase
@@ -345,10 +330,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fetch updated team score for accurate response
-    const newTotalPoints = isCorrect
-      ? team.total_points + pointsAwarded
-      : team.total_points
+    // The total the database returned with the write; without it (the
+    // two-step path) what the team had plus this answer.
+    const newTotalPoints =
+      recorded.totalPoints ?? (isCorrect ? team.total_points + pointsAwarded : team.total_points)
 
     return NextResponse.json({
       is_correct: isCorrect,

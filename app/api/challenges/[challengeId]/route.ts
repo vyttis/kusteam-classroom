@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { hashAnswer, MAX_ANSWER_LENGTH } from "@/lib/game/answer-hasher"
-import { isLiveStatus, LIVE_EDIT_BLOCKED, samePrerequisites } from "@/lib/game/live-edit"
+import { changesScoring, isLiveStatus, LIVE_EDIT_BLOCKED, LIVE_SCORING_NOTICE, samePrerequisites } from "@/lib/game/live-edit"
 import { acceptedAnswersSchema, prepareAcceptedAnswers } from "@/lib/game/accepted-answers"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -57,7 +57,7 @@ async function verifyChallengeOwnership(
 ) {
   const { data: challenge } = await supabase
     .from("challenges")
-    .select("id, game_id, type, prerequisites")
+    .select("id, game_id, type, prerequisites, points, hint_penalty")
     .eq("id", challengeId)
     .single()
 
@@ -75,6 +75,8 @@ async function verifyChallengeOwnership(
         type: challenge.type as string | null,
         gameStatus: game.status as string,
         prerequisites: (challenge.prerequisites as string[] | null) ?? [],
+        points: (challenge.points as number | null) ?? null,
+        hintPenalty: (challenge.hint_penalty as number | null) ?? null,
       }
     : null
 }
@@ -206,6 +208,23 @@ export async function PATCH(request: Request, props: { params: Promise<{ challen
   if (error) {
     console.error("Challenge UPDATE error:", error)
     return NextResponse.json({ error: "Nepavyko atnaujinti užduoties." }, { status: 500 })
+  }
+
+  // Answers already given are never checked again and points are not
+  // recalculated (audit R-13): when the activity runs and this save changed
+  // how the task is scored, the facilitator is told so, if the task has
+  // answers. An unreadable count warns too.
+  if (
+    isLiveStatus(owned.gameStatus) &&
+    changesScoring(parsed.data, { type: owned.type, points: owned.points, hint_penalty: owned.hintPenalty })
+  ) {
+    const { count, error: countError } = await supabase
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("challenge_id", params.challengeId)
+    if (countError || (count ?? 0) > 0) {
+      return NextResponse.json({ ...(data as unknown as Record<string, unknown>), live_scoring_notice: LIVE_SCORING_NOTICE })
+    }
   }
 
   return NextResponse.json(data)

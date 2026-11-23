@@ -39,8 +39,9 @@ paskelbtas, registracijos patikra (CLS-004) praėjo.
 - **Ryšio nutrūkimas ir užrakintas ekranas.** Neįrodyta, kad nutrūkus
   ryšiui atsakymas neprarandamas ir kad atrakinus ekraną būsena atsinaujina.
 - **Įrenginio pakeitimas.** Grąžinimo į komandą QR (vedėjo ekrane
-  „Grąžinti į komandą“) tikru antru įrenginiu netikrintas. Kaip jis veikia ir
-  kuo skiriasi nuo perkėlimo, aprašyta skyriuje „Grąžinimas į komandą“.
+  „Grąžinti į komandą“) tikru antru įrenginiu netikrintas. Kaip jis veikia
+  (kodas vienkartinis, senas įrenginys atjungiamas), aprašyta skyriuje
+  „Grąžinimas į komandą“.
 - **Projektorius.** Kodo, QR, laikmačio ir lentelės įskaitomumas iš
   paskutinio suolo neįvertintas.
 - **Žmonės.** Ar dalyviai supranta užduotis, ar vedėjas suspėja per pamoką,
@@ -76,23 +77,27 @@ Vedėjas veda įprastai. Stebėtojas pildo radinių lentelę ir pažymi laiką.
 | Užrakintas ekranas | Vienas telefonas 1–2 min. užrakinamas. Tuo metu vedėjas siunčia skelbimą. Atrakinus: ar skelbimas matomas, būsena ir laikmatis teisingi, darbas neprarastas? |
 | Pauzė ir skelbimas | Vedėjas pristabdo („Pristabdyti“), po minutės tęsia („Tęsti“). Ar visi įrenginiai mato pauzę per kelias sekundes? Ar laikmatis sustoja? Skelbimas pasiekia visus įrenginius (laukta iki 7 s) |
 | Sesijos atkūrimas tame pačiame įrenginyje | Viena komanda perkrauna puslapį. Kita visiškai uždaro naršyklę ir vėl atidaro `pamokos.kusteam.app/play/<kodas>`. Laukiama: ta pati komanda, taškai ir išspręstos užduotys išlieka |
-| Įrenginio pakeitimas | Viena komanda pereina į kitą įrenginį pagal skyriaus „Grąžinimas į komandą“ procedūrą. Naujas įrenginys tęsia toje pačioje komandoje. Kiek laiko tai užtrunka? **Senas įrenginys prieš „Išeiti“:** pateikia atsakymą. Laukiama: priimamas, nes sesija išlikusi. **Senas įrenginys po „Išeiti“:** grąžinamas į komandos pavadinimo įvedimą. Ar dalyviai ir vedėjas supranta skirtumą? Ar QR nebuvo matomas kitoms komandoms? |
-| Pasibaigęs grąžinimo QR | Tą patį grąžinimo QR nuskaityti po 10 min. Laukiama: „Nuoroda nebegalioja. Paprašykite vedėjo naujos.“ |
+| Įrenginio pakeitimas | Viena komanda pereina į kitą įrenginį pagal skyriaus „Grąžinimas į komandą“ procedūrą. Naujas įrenginys tęsia toje pačioje komandoje. Kiek laiko tai užtrunka? **Senas įrenginys:** bando pateikti atsakymą. Laukiama: atsakymas nepriimamas, ekranas rodo „Komanda tęsia kitame įrenginyje“. Ar dalyviai supranta, kas nutiko? Ar QR nebuvo matomas kitoms komandoms? |
+| Panaudotas grąžinimo QR | Tą patį grąžinimo QR nuskaityti antru įrenginiu. Laukiama: „Ši nuoroda jau panaudota. Paprašykite vedėjo naujos.“ |
+| Pasibaigęs grąžinimo QR | Nepanaudotą grąžinimo QR nuskaityti po 10 min. Laukiama: „Nuoroda nebegalioja. Paprašykite vedėjo naujos.“ |
 | Privatus langas (jei yra iPhone) | Komanda prisijungia Safari privačiame lange, uždaro skirtuką. Ar grįžti galima tik per vedėjo „Grąžinti į komandą“? Ar vedėjas tai supranta be pagalbos? |
 | Pabaiga | Vedėjas baigia veiklą („Baigti veiklą“). Visi įrenginiai rodo pabaigos ekraną ir galutinę lentelę. Jei įjungta, dalyviai užpildo refleksiją. **Prašymų durys:** pabaigos ekrane ir gyvame ekrane („Rodyti prašymo QR“) tik patikrinama, ar matoma. Prašymas teikiamas tik tuo atveju, jei mokytojas tikrai nori paskyros |
 | Po pamokos | Vedėjas atidaro „Veiklos ataskaita“. Ar matoma, kurios užduotys buvo sunkiausios, kiek užuominų panaudota? |
 
 ## Grąžinimas į komandą
 
-Vedėjo „Grąžinti į komandą“ **prideda įrenginį** prie komandos, o ne perkelia jos. Kodas:
-`app/api/play/rejoin`, `lib/game/rejoin-token.ts`, `components/player/leave-team-button.tsx`.
+Vedėjo „Grąžinti į komandą“ **perkelia komandą** į kitą įrenginį (nuo audito R-13 pataisos). Kodas:
+`app/api/play/rejoin`, `lib/game/rejoin-token.ts`, `app/api/play/state` (`session_moved`),
+`components/player/play-screens.tsx` (`PlaySessionMoved`).
 
 | Situacija | Kas vyksta |
 | --- | --- |
-| Seno įrenginio sesija išlieka | Naujas įrenginys gauna tą patį komandos žetoną. Senas įrenginys, jei jo naršyklėje sesija dar yra, toliau veikia toje pačioje komandoje: mato užduotis ir gali pateikti atsakymus. Abu įrenginiai yra viena komanda |
-| Tikras perkėlimas | Tik tada, kai sename įrenginyje paspaudžiama „Išeiti“ ir patvirtinama. Tai išvalo sesiją tame įrenginyje. Grįžti juo galima tik su nauju vedėjo grąžinimo kodu |
-| Senas įrenginys prarastas ar nepasiekiamas | Jo atjungti negalima: platformoje nėra būdo pakeisti komandos žetoną, o pašalinus komandą dingsta jos taškai ir atsakymai. Įrenginys veikia, kol vyksta veikla (naršyklė sesiją laiko iki 24 val.) |
-| Grąžinimo kodas | Galioja 10 min. ir per tą laiką tinka **kiekvienam**, kas nuskaito QR ar atidaro nuorodą: serveris nežymi, kad kodas jau panaudotas. Atšaukti jo negalima. Todėl kodas yra privatus |
+| Naujas įrenginys | Gauna naują komandos žetoną ir tęsia su tais pačiais taškais, išspręstomis užduotimis ir tuo pačiu laiku |
+| Senas įrenginys | Jo žetonas nebegalioja. Bandant pateikti atsakymą, atverti užuominą ar perkrovus puslapį rodoma „Komanda tęsia kitame įrenginyje“. Kol dalyvis nieko nespaudžia, senas ekranas dar gali rodyti užduotį, bet atsakymų serveris nepriima |
+| Grįžti į seną įrenginį | Tik su nauju vedėjo grąžinimo kodu; tada atjungiamas tas įrenginys, kuriame komanda buvo |
+| Du įrenginiai vienoje komandoje | Per grąžinimo kodą nebeįmanoma: komanda dirba viename įrenginyje |
+| Grąžinimo kodas | Galioja 10 min. ir **vieną kartą**. Panaudojus nebeveikia nei jis, nei anksčiau tai komandai sukurti kodai. Jei kodą pirmas nuskaito ne tas žmogus, komandą perima jis: vedėjas sukuria naują kodą tikrajai komandai, ir svetimas įrenginys atjungiamas. Todėl kodas vis tiek yra privatus |
+| Atsakymas prarastas tinkle | Jei naujas įrenginys nuskaitė kodą, bet atsakymo negavo (dingo ryšys), kodas jau panaudotas, o senas įrenginys atjungtas: vedėjas sukuria naują kodą |
 
 Procedūra pilote:
 
@@ -100,9 +105,8 @@ Procedūra pilote:
 2. Dalyvis prieina prie vedėjo. Vedėjas pasitikslina komandos pavadinimą.
 3. Prieš spausdamas „Grąžinti į komandą“ vedėjas pažiūri, ar projektorius nerodo šio ekrano.
 4. QR rodomas iš arti tik tos komandos nariui: prieiti prie suolo arba pasukti ekraną. Nuorodos nekopijuoti į klasės pokalbį ar bendrą laišką.
-5. Kai naujas įrenginys rodo komandą, vedėjas uždaro langą („Uždaryti“).
-6. Jei senas įrenginys pasiekiamas, jame paspausti „Išeiti“ ir patvirtinti. Tik tada tai perkėlimas.
-7. Jei senas įrenginys prarastas arba kodą pamatė kitos komandos, tai užrašoma radinių lentelėje. Per likusį kodo galiojimo laiką vedėjas stebi, ar komandoje neatsiranda svetimų atsakymų.
+5. Kai naujas įrenginys rodo komandą, vedėjas uždaro langą („Uždaryti“). Senas įrenginys atjungiamas pats, „Išeiti“ jame spausti nereikia.
+6. Jei kodą pirma nuskaitė kita komanda (tikroji komanda mato „Ši nuoroda jau panaudota“), vedėjas iš karto sukuria naują kodą ir parodo jį tikrajai komandai. Tai užrašoma radinių lentelėje.
 
 Seno įrenginio atjungimas serverio pusėje ir vienkartinis grąžinimo kodas būtų nauja funkcija. Šiame etape jos nekuriamos; jei pilotas parodys poreikį, tai bus radinys backloge.
 

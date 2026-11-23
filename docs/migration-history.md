@@ -352,7 +352,7 @@ Produkcija 2026-11-07:
 | table | 18 | `4456d03e6c5fa3e0ee1b8a1835df268d` |
 | trigger | 11 | `6b0e207b15b5ecf28ecd7e75c9c4dbb6` |
 
-Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Vėliau jį atnaujino CLS-015 (`grant.table`, `policy`), TEAM-001 (9 sritys) ir `20261123120000` (6 sritys; produkcijoje dar netaikyta, todėl produkcija iki taikymo atitinka ankstesnes reikšmes, jos surašytos tos migracijos įraše): dabartinės reikšmės yra pačiame faile, pasikeitimai nurodyti tų migracijų įrašuose. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
+Tuščia Postgres 17.6 po visų migracijų duoda tuos pačius atspaudus, išskyrus `function` (`1951b8acc9fc0ea793fc0f2f4f5235fd`, dėl `handle_new_user`, CLS-011). Šie laukiami atspaudai yra `supabase/tests/schema-fingerprint.expected`, ir `npm run test:db` su Postgres 17 juos tikrina. Migracija, kuri keičia schemą, tame pačiame PR atnaujina ir šį failą. Vėliau jį atnaujino CLS-015 (`grant.table`, `policy`), TEAM-001 (9 sritys), `20261123120000` (6 sritys) ir `20261123130000` (`function`, `grant.function`); dvi paskutinės produkcijoje dar netaikytos, todėl produkcija iki taikymo atitinka ankstesnes reikšmes, jos surašytos tų migracijų įrašuose: dabartinės reikšmės yra pačiame faile, pasikeitimai nurodyti tų migracijų įrašuose. Su Postgres 16 palyginimas praleidžiamas, nes ten nėra teisės `MAINTAIN`.
 
 ## 2026-11-06: atsakymų, rolių ir statistikos spragos
 
@@ -1325,6 +1325,185 @@ DROP TRIGGER IF EXISTS library_items_source_rules ON public.library_items;
 Grįžti į pilną migraciją: vėl pritaikyti migracijos failą po viso grąžinimo
 failo (po dalinio grąžinimo migracijos failas pakartotinai netaikomas, nes
 stulpelis jau yra; tada atkurti tik pašalintą dalį iš migracijos failo).
+
+## 2026-11-23: atsakymas ir taškai viena transakcija (`record_submission`, auditas R-13)
+
+Failas `supabase/migrations/20261123130000_record_submission.sql`
+(SHA-256 `3e4bb76c33782bb7be10f55c0588177e836ee761ce54abfb52b7d8a2970fdbe7`),
+grąžinimas `supabase/rollback/20261123130000_record_submission.sql`
+(SHA-256 `af666d510237a82eab5d3455c04cf4180df661a46fdb405d1e50ef85f686cc8a`).
+Pagrindas: 2026-11-22 audito radinys R-13
+(`docs/audits/CLASSROOM-TEACHER-READINESS-2026-11-22.md`).
+
+**Produkcijoje NETAIKYTA.** Taikoma tik su Vyčio leidimu, pagal eigą žemiau,
+ir tik **po** `20261123120000` (tokia tvarka išbandyta ir tokiai tvarkai
+skaičiuoti atspaudai). Programa veikia ir be šios migracijos, ir su ja:
+`/api/submissions` kviečia `record_submission()`, o jei funkcijos nėra
+(PostgREST `PGRST202` arba Postgres `42883`), atsakymą ir taškus įrašo dviem
+kvietimais kaip iki šiol (`lib/game/record-submission.ts`; abu keliai
+testuojami `tests/record-submission.test.ts`). Duomenys nekeičiami, esami
+objektai nekeičiami. `types/database.ts` repozitorijoje nėra, todėl nekeistas.
+
+### Ką keičia ir kodėl
+
+Iki šiol teisingas atsakymas buvo įrašomas dviem atskirais kvietimais:
+`INSERT INTO submissions`, tada `increment_team_score()`. Jei tarp jų
+nutrūkdavo ryšys ar serverio funkcija, užduotis likdavo išspręsta, o
+`teams.total_points` (rezultatų lentelė, vedėjo ekranai) be jos taškų.
+
+Nauja funkcija `public.record_submission(p_team_id uuid, p_challenge_id
+uuid, p_answer text, p_is_correct boolean, p_points_awarded integer,
+p_hints_used integer) returns jsonb` viską daro vienoje transakcijoje:
+
+- užrakina komandos eilutę (`FOR UPDATE`), todėl vienos komandos atsakymai
+  įrašomi paeiliui;
+- įrašo atsakymą; antras teisingas tos pačios užduoties atsakymas atsitrenkia
+  į `idx_submissions_unique_solve` (00018) kaip ir anksčiau ir grąžinamas
+  kaip `already_solved` be jokio įrašo ir be taškų;
+- teisingam atsakymui prideda taškus prie `teams.total_points` ir linijiniame
+  režime padidina `current_challenge_index`: ta pati taisyklė kaip
+  `increment_team_score()` (00013, 00018);
+- grąžina `{"already_solved": bool, "total_points": int}`;
+- atmeta kitos veiklos užduotį ar nežinomą komandą (`P0002`) ir neįmanomas
+  reikšmes (`22023`: neigiami taškai, taškai už neteisingą atsakymą).
+
+Vertinimo taisyklės lieka programoje (`lib/game/scoring.ts`): taškai ir
+užuominų skaičius yra parametrai. Atsakymai ir jų maišos į SQL nekeliami,
+`check_answer()` ir toliau nenaudojama. `increment_team_score()` paliekama
+(ja naudojasi atsarginis kelias).
+
+Teisės: funkcija veikia kviečiančiojo teisėmis (ne `SECURITY DEFINER`),
+`search_path = ''`. `EXECUTE` turi tik `service_role`; `PUBLIC`, `anon` ir
+`authenticated` atimta. TEAM-006 taisyklė (`team_staff_access_ok()`) netaikoma,
+nes `authenticated` jos kviesti negali.
+
+Užraktai: tik `CREATE FUNCTION`, esamų lentelių neliečia. Galima taikyti ir
+vykstant veikloms, bet pagal bendrą tvarką taikoma, kai jų nėra.
+
+### Kas veikia iki migracijos ir kas tik po jos
+
+| | Iki migracijos | Po migracijos |
+| --- | --- | --- |
+| Atsakymų tikrinimas, taškų taisyklės, „jau išspręsta“ | veikia kaip iki šiol | tas pats |
+| Atsakymas ir taškai | du kvietimai; gedimas tarp jų palieka užduotį be taškų (žurnale `team_score_update_failed`) | viena transakcija: arba abu, arba nė vieno |
+| `total_points` atsakyme dalyviui | komandos taškai prieš atsakymą plius šis atsakymas | tikra DB reikšmė po įrašo |
+
+Kiti to paties PR pakeitimai (vienkartinė grįžimo nuoroda su sesijos
+perkėlimu, įspėjimas keičiant vykstančios veiklos užduotį, komandų laikas
+vedėjo ekranuose, naujų komandų nepriėmimas pasibaigus laikui) migracijos
+nereikalauja ir veikia iš karto po kodo diegimo.
+
+### Patikrinta lokaliai (Postgres 17, `PGBIN=/opt/pg17/bin npm run test:db`)
+
+Visos migracijos tuščioje bazėje, atspaudai, TEAM-006 pasiūlymas ant viršaus,
+`security.sql`, visų migracijų grąžinimas ir pakartotinis taikymas: žalia.
+`security.sql` tikrina: `anon`, `authenticated` ir `PUBLIC` funkcijos kviesti
+negali (teisė ir tikras kvietimas, 42501), `service_role` gali; funkcija nėra
+`SECURITY DEFINER` ir turi tuščią `search_path`; neteisingas atsakymas nieko
+nekeičia; teisingas prideda taškus ir pastumia linijinę komandą; antras
+teisingas atsakymas neįrašomas ir taškų neprideda; laisvame režime indeksas
+nejuda; kai taškų pridėti nepavyksta (komandos taškai ties `integer` riba),
+atsakymas taip pat neįrašomas; kitos veiklos užduotis, nežinoma komanda ir
+neigiami taškai atmetami.
+
+Atspaudų pokytis (kitos sritys nepakito):
+
+| Sritis | be TEAM-006: buvo | be TEAM-006: tapo | su TEAM-006: buvo | su TEAM-006: tapo |
+| --- | --- | --- | --- | --- |
+| `function` | `30\|30d6cc4e0639cdd8f893d8c48570b5cd` | `31\|0ae096d931e8d63f753d922dc4484145` | `41\|29f59cd1be2fabe9f38652c4195df716` | `42\|31c110127efddc4989888c529d9b7943` |
+| `grant.function` | `57\|870fe4886537d8560a5064365befce19` | `58\|b9fe0cc426b28377087a44b131d7f72a` | `69\|4f29cf477f13540a45b635f21975123e` | `70\|cf4206849a25564d1f8365185090fcd1` |
+
+Produkcijoje `function` md5 skiriasi dėl `handle_new_user()` (CLS-011), todėl
+ten lyginamas skaičius (+1) ir pačios funkcijos eilutė detaliame režime:
+`record_submission(uuid,uuid,text,boolean,integer,integer)` =
+`d58e19c9346407db1e5a17f1146821e2`. `grant.function` produkcijoje turi
+sutapti su stulpeliu „su TEAM-006: tapo“.
+
+### Prieš taikymą: patikra produkcijoje (tik skaitymas, SQL Editor)
+
+```sql
+-- 1. 20261123120000 jau pritaikyta: laukiama true. Kitaip pirma ji.
+select exists (select 1 from information_schema.columns
+  where table_schema = 'public' and table_name = 'games' and column_name = 'starter_slug') as previous_applied;
+
+-- 2. Funkcijos dar nėra: laukiama 0. Jei 1, migracija jau taikyta arba
+--    objektas sukurtas kitaip: sustoti ir išsiaiškinti.
+select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'record_submission';
+
+-- 3. Tai, kuo funkcija remiasi, yra vietoje: laukiama true, true.
+select
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'idx_submissions_unique_solve') as unique_solve,
+  to_regprocedure('public.increment_team_score(uuid, integer)') is not null as two_step_kept;
+
+-- 4. Vykstančios veiklos (pagal bendrą tvarką laukiama 0; pati migracija
+--    lentelių neužrakina).
+select count(*) as running from public.games where status in ('active', 'paused');
+
+-- 5. Palyginimui po taikymo: komandos, kurių taškai nesutampa su jų
+--    atsakymų suma (senojo dviejų žingsnių kelio pėdsakas). Migracija jų
+--    netaiso; skaičius po taikymo turi būti toks pat ir toliau neaugti.
+select count(*) as teams_with_gap from public.teams t
+where t.total_points <> coalesce((select sum(s.points_awarded) from public.submissions s
+                                  where s.team_id = t.id and s.is_correct), 0);
+```
+
+### Taikymas (viena transakcija)
+
+1. Sąlygos: Vyčio leidimas šiam žingsniui; `20261123120000` pritaikyta
+   (1 užklausa `true`); Database > Backups paskutinė kasdienė kopija ne
+   senesnė nei 24 h; 2 užklausa grąžina 0, 3 užklausa `true, true`.
+2. SQL Editor: visas migracijos failas, SHA-256 sutampa su nurodytu viršuje.
+   Failas pats turi `BEGIN`, `COMMIT` ir `SET LOCAL lock_timeout = '5s'`. Jei
+   SQL Editor po klaidos rašo „current transaction is aborted“, pirmiausia
+   paleisti `ROLLBACK;`.
+3. Laukiama „Success. No rows returned“.
+4. Patikra po taikymo (žemiau). Jei nepavyksta: grąžinimas.
+5. Jei CLS-005 jau atliktas: `migration repair --status applied --remote 20261123130000`.
+6. Įrašas čia: data, kas vykdė, rezultatai.
+
+Programos diegti iš naujo nereikia: PostgREST schemos podėlis atsinaujina
+pats (Supabase po DDL siunčia `NOTIFY pgrst`), ir nuo tada `/api/submissions`
+naudoja funkciją. Jei po kelių minučių Vercel žurnale dar nėra kvietimų į
+`record_submission`, SQL Editor paleisti `NOTIFY pgrst, 'reload schema';`.
+
+### Patikra po taikymo
+
+```sql
+-- Laukiama: 1, false, {"search_path=\"\""}, jsonb, false, false, true.
+select
+  (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'record_submission') as fn,
+  p.prosecdef as security_definer,
+  p.proconfig as config,
+  p.prorettype::regtype as returns,
+  has_function_privilege('anon', p.oid, 'EXECUTE') as anon_can,
+  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_can,
+  has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_can
+from pg_proc p
+where p.oid = 'public.record_submission(uuid, uuid, text, boolean, integer, integer)'::regprocedure;
+
+-- PUBLIC taip pat neturi teisės: laukiama 0 eilučių.
+select a.grantee from pg_proc p, aclexplode(p.proacl) a
+where p.oid = 'public.record_submission(uuid, uuid, text, boolean, integer, integer)'::regprocedure and a.grantee = 0;
+```
+
+Tada schemos atspaudas (`supabase/tests/schema-fingerprint.sql`): `function`
+skaičius +1, `grant.function` kaip stulpelyje „su TEAM-006: tapo“.
+
+Naršyklėje (sintetine veikla, ne mokinių duomenimis): komanda teisingai
+atsako į užduotį, taškai dalyvio ekrane ir vedėjo komandos kortelėje sutampa;
+tas pats atsakymas dar kartą duoda „Ši užduotis jau išspręsta!“; neteisingas
+atsakymas taškų nekeičia. Vercel runtime žurnale nėra `Submission insert
+failed` ir `team_score_update_failed`. 5 užklausos skaičius nepadidėjo.
+
+### Grąžinimas
+
+Grąžinimo failas SQL Editor (viena transakcija). Jis tik pašalina funkciją;
+duomenys nekeičiami. Programa tada vėl gauna „funkcija nerasta“ ir rašo
+dviem kvietimais, todėl atsakymai toliau priimami ir kodo grąžinti nereikia.
+**Dėmesio:** po grąžinimo R-13 spraga vėl atvira (gedimas tarp dviejų
+kvietimų palieka užduotį be taškų). Po grąžinimo atspaudas kaip stulpeliuose
+„buvo“ (patikrinta lokaliai). Pakartotinai taikyti: migracijos failas dar
+kartą (`CREATE OR REPLACE`).
 
 ## Konvencija toliau
 

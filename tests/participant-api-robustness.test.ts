@@ -45,7 +45,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 }))
 vi.mock("@/lib/ai/rate-limit", () => ({ checkAiRateLimitAsync: async () => true }))
 vi.mock("@/lib/game/rejoin-token", () => ({
-  verifyRejoinToken: () => ({ ok: true, teamId: "00000000-0000-4000-8000-0000000000a1" }),
+  verifyRejoinToken: () => ({ ok: true, teamId: "00000000-0000-4000-8000-0000000000a1", binding: "bound" }),
+  rejoinTokenUnused: () => true,
 }))
 
 const TOKEN = "team-session-token"

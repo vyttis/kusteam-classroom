@@ -14,6 +14,8 @@ import { GameStatusActions } from "./game-status-actions"
 import { TimeControls } from "./time-controls"
 import { getPlayUrl, getPublicUrl } from "@/lib/game/play-url"
 import { secondsLeft, secondsRunning, type GameClock } from "@/lib/game/clock"
+import { formatClock, latestTeamSecondsLeft } from "@/lib/game/team-time"
+import { useTeamClocks } from "@/hooks/use-team-clocks"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
@@ -57,17 +59,6 @@ interface LiveViewProps {
   challengeCount: number
   /** Path of the teacher access request page, when the activity accepts requests. */
   accessRequestPath?: string | null
-}
-
-function formatClock(totalSeconds: number): string {
-  const abs = Math.max(0, totalSeconds)
-  const h = Math.floor(abs / 3600)
-  const m = Math.floor((abs % 3600) / 60)
-  const s = abs % 60
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-  }
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
 }
 
 // Projector "class screen": big leaderboard + QR + activity feed on a dark
@@ -202,18 +193,44 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
         ? { kind: "join" as const, url: playUrl }
         : null
 
-  // Class-wide clock anchored on starts_at, without the pauses (teams that
-  // joined later have their own deadline; this is the shared classroom time)
+  // The time limit runs for each team from its own "Pradėti", so teams end
+  // at different moments (audit R-12). Their starts come from the server.
+  const timed = !!timeLimit && timeLimit > 0
+  const teamClocks = useTeamClocks(
+    game.id,
+    timed && (status === "active" || status === "paused"),
+    `${teams.length}:${status}:${timeLimit}`
+  )
+
+  // Class-wide clock anchored on starts_at, without the pauses. With a limit
+  // it counts from the start of the activity: no team's time ends before it
+  // reaches zero, and from then on no new team is accepted (/api/teams).
+  // The label says so, and the line under it shows the last team's own
+  // deadline, which is when the whole class is done.
   const clock = useMemo(() => {
     if (!startsAt) return null
     const startMs = new Date(startsAt).getTime()
-    const state: GameClock = { limitMinutes: timeLimit && timeLimit > 0 ? timeLimit : null, pausedMs, pausedAt }
+    const state: GameClock = { limitMinutes: timed ? timeLimit : null, pausedMs, pausedAt }
     const left = secondsLeft(state, startMs, 0, nowTick)
     if (left !== null) {
-      return { label: status === "paused" ? "Liko laiko (pauzė)" : "Liko laiko", value: left, countdown: true }
+      const lastTeam = latestTeamSecondsLeft(state, teamClocks.teams.values(), nowTick + teamClocks.skewMs)
+      return {
+        label: status === "paused" ? "Liko nuo veiklos pradžios (pauzė)" : "Liko nuo veiklos pradžios",
+        value: left,
+        countdown: true,
+        // Only when it says more than the class clock already does.
+        lastTeam: lastTeam !== null && lastTeam > left ? lastTeam : null,
+        joiningOver: left === 0 && status === "active",
+      }
     }
-    return { label: "Bendras laikas", value: secondsRunning(state, startMs, nowTick), countdown: false }
-  }, [startsAt, timeLimit, pausedMs, pausedAt, nowTick, status])
+    return {
+      label: "Bendras laikas",
+      value: secondsRunning(state, startMs, nowTick),
+      countdown: false,
+      lastTeam: null,
+      joiningOver: false,
+    }
+  }, [startsAt, timed, timeLimit, pausedMs, pausedAt, nowTick, status, teamClocks])
 
   const handleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
@@ -294,6 +311,19 @@ export function LiveView({ game, challengeCount, accessRequestPath = null }: Liv
                 <Clock className="h-3 w-3" />
                 {clock.label}
               </p>
+              {clock.countdown && (
+                <p className="text-xs text-white/60">
+                  {clock.lastTeam !== null ? (
+                    <>
+                      Vėliausiai pradėjusiai komandai liko{" "}
+                      <span className="font-mono font-semibold tabular-nums text-white">{formatClock(clock.lastTeam)}</span>
+                    </>
+                  ) : (
+                    "Komandos laikas skaičiuojamas nuo jos pradžios"
+                  )}
+                  {clock.joiningOver && ". Naujos komandos nebepriimamos"}
+                </p>
+              )}
             </div>
           )}
           <Button
