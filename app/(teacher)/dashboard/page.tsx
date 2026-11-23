@@ -4,12 +4,12 @@ import { withChallengeCount } from "@/lib/game/challenge-count"
 import { GamesGrid } from "@/components/teacher/games-grid"
 import { OnboardingChecklist } from "@/components/teacher/onboarding-checklist"
 import { CreateSampleGameButton } from "@/components/teacher/create-sample-game-button"
+import { CATALOGUE_PATH, checklistSteps, groupGames } from "@/lib/teacher/dashboard"
 import { GameWithChallengeCount } from "@/types/game"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Gamepad2, GraduationCap, ArrowRight } from "lucide-react"
+import { Plus, Gamepad2, GraduationCap, ArrowRight, LayoutGrid, Compass } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 
 export const metadata: Metadata = { title: "Mano veiklos" }
 
@@ -37,141 +37,155 @@ export default async function DashboardPage() {
     throw new Error("Nepavyko įkelti veiklų")
   }
 
-  // First-success checklist state, derived from the teacher's actual data
   type GameRow = GameWithChallengeCount & { teams?: { id: string }[] }
   const gameRows = (games || []).map(withChallengeCount) as GameRow[]
-  const hasGame = gameRows.length > 0
-  const gameWithTasks = gameRows.find((g) => (g.challenges?.[0]?.count || 0) > 0)
-  const startedGame = gameRows.find((g) => g.status !== "draft")
-  const gameWithResults = gameRows.find(
-    (g) => (g.teams?.length || 0) > 0 || g.status === "finished"
+  const dashboardGames = gameRows.map((g) => ({
+    ...g,
+    taskCount: g.challenges?.[0]?.count || 0,
+    teamCount: g.teams?.length || 0,
+  }))
+
+  // First-success checklist state, derived from the teacher's actual data
+  const steps = checklistSteps(dashboardGames)
+  const checklist = (className: string) => (
+    <OnboardingChecklist
+      steps={steps}
+      showSampleGameButton={gameRows.length > 0 && !dashboardGames.some((g) => g.taskCount > 0)}
+      userId={user!.id}
+      className={className}
+    />
   )
-  const latestGame = gameRows[0]
 
-  const onboardingSteps = [
-    { label: "Sukurkite veiklą", done: hasGame, href: "/games/new" },
-    {
-      label: "Pridėkite užduočių",
-      done: !!gameWithTasks,
-      href: latestGame ? `/games/${latestGame.id}/builder` : "/games/new",
-    },
-    {
-      label: "Pradėkite veiklą su QR kodu",
-      done: !!startedGame,
-      href: gameWithTasks ? `/games/${gameWithTasks.id}` : "/games/new",
-    },
-    {
-      label: "Peržiūrėkite rezultatus",
-      done: !!gameWithResults,
-      href: startedGame ? `/games/${startedGame.id}/analytics` : "/games/new",
-    },
-  ]
-  const showChecklist = onboardingSteps.some((s) => !s.done)
-
-  return (
-    <div>
-      {/* First-success checklist (hides itself when all steps are done) */}
-      {showChecklist && (
-        <OnboardingChecklist
-          steps={onboardingSteps}
-          showSampleGameButton={!gameWithTasks}
-        />
-      )}
-
-      {/* Two clear paths */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        {/* Path 1: Lesson plans */}
-        <Link href="/lesson-plans/new">
-          <Card className="border-secondary/30 bg-gradient-to-br from-secondary/5 to-secondary/10 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-300 group cursor-pointer h-full">
-            <CardContent className="p-6 flex flex-col items-center text-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
-                <GraduationCap className="h-7 w-7 text-secondary-ink" />
+  // Other ways to begin: a lesson plan, or an activity from scratch.
+  const otherPaths = (
+    <section aria-labelledby="kiti-budai">
+      <h2 id="kiti-budai" className="mb-3 text-base font-semibold text-steam-dark">
+        {gameRows.length > 0 ? "Kurti naują" : "Kiti būdai pradėti"}
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link href="/lesson-plans/new" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <Card className="border-secondary/30 bg-gradient-to-br from-secondary/5 to-secondary/10 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-300 group h-full">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 shrink-0 rounded-2xl bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
+                <GraduationCap className="h-6 w-6 text-secondary-ink" aria-hidden="true" />
               </div>
-              <div>
-                <h3 className="font-bold text-steam-dark text-base mb-1">
-                  Kurti pamokos planą
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Struktūruotas pamokos planas pagal ugdymo programą su DI pagalba
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-steam-dark text-base mb-1">Kurti pamokos planą</h3>
+                <p className="text-sm text-muted-foreground">
+                  Pamokos planas pagal ugdymo programą su DI pagalba
                 </p>
               </div>
-              <ArrowRight className="h-4 w-4 text-secondary-ink group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-secondary-ink group-hover:translate-x-1 transition-transform" aria-hidden="true" />
             </CardContent>
           </Card>
         </Link>
 
-        {/* Path 2: Student activity */}
-        <Link href="/games/new">
-          <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 group cursor-pointer h-full">
-            <CardContent className="p-6 flex flex-col items-center text-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <Gamepad2 className="h-7 w-7 text-primary-ink" />
+        <Link href="/games/new" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 group h-full">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <Gamepad2 className="h-6 w-6 text-primary-ink" aria-hidden="true" />
               </div>
-              <div>
-                <h3 className="font-bold text-steam-dark text-base mb-1">
-                  Kurti veiklą dalyviams
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Interaktyvi veikla su užduotimis, kurią dalyviai atlieka klasėje
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-steam-dark text-base mb-1">Kurti veiklą dalyviams</h3>
+                <p className="text-sm text-muted-foreground">
+                  Veikla su užduotimis, kurias komandos sprendžia klasėje
                 </p>
               </div>
-              <ArrowRight className="h-4 w-4 text-primary-ink group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-primary-ink group-hover:translate-x-1 transition-transform" aria-hidden="true" />
             </CardContent>
           </Card>
         </Link>
       </div>
+    </section>
+  )
 
-      {/* Activities header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-steam-dark">
-            Mano veiklos
+  // ============ Brand-new facilitator: what this is and what to do first ============
+  if (gameRows.length === 0) {
+    return (
+      <div className="space-y-8">
+        <section
+          aria-labelledby="pradzia"
+          className="rounded-2xl border border-primary/30 bg-white p-6 shadow-sm sm:p-8"
+        >
+          <h1 id="pradzia" className="text-2xl font-bold text-steam-dark sm:text-3xl">
+            Pradėkite nuo paruoštos veiklos
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Interaktyvios komandinės veiklos jūsų grupei
+          <p className="mt-3 max-w-2xl text-base text-foreground">
+            Čia vedate komandines veiklas: dalyviai prisijungia telefonu su QR kodu ir komandomis sprendžia
+            užduotis, o jūs ekrane matote, kaip joms sekasi. Pirmai pamokai pasirinkite paruoštą veiklą pagal
+            dalyką ir klasę.
           </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button
+              asChild
+              size="lg"
+              className="h-12 gap-2 bg-primary px-6 text-base font-semibold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90"
+            >
+              <Link href={CATALOGUE_PATH}>
+                <LayoutGrid className="h-5 w-5" aria-hidden="true" />
+                Pasirinkti paruoštą veiklą
+              </Link>
+            </Button>
+          </div>
+          <div className="mt-5 border-t border-border/50 pt-4">
+            <p className="mb-3 text-sm text-muted-foreground">
+              Arba išbandykite pavyzdinę veiklą su 3 užduotimis, arba kurkite savo nuo nulio.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <CreateSampleGameButton />
+              <Button asChild variant="outline" className="gap-2">
+                <Link href="/games/new">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Kurti nuo nulio
+                </Link>
+              </Button>
+              <Link
+                href="/gidas"
+                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-steam-dark underline underline-offset-4 sm:ml-auto"
+              >
+                <Compass className="h-4 w-4" aria-hidden="true" />
+                Gidas: kaip vesti veiklą
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {checklist("")}
+        {otherPaths}
+      </div>
+    )
+  }
+
+  // ============ Facilitator with activities: their activities lead ============
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-steam-dark">Mano veiklos</h1>
+          <p className="text-muted-foreground mt-1">Komandinės veiklos jūsų klasei ar grupei</p>
         </div>
-        <Link href="/games/new">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20 gap-2">
-            <Plus className="h-4 w-4" />
-            Nauja veikla
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="gap-2">
+            <Link href={CATALOGUE_PATH}>
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+              Paruoštos veiklos
+            </Link>
           </Button>
-        </Link>
+          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20 gap-2">
+            <Link href="/games/new">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Nauja veikla
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Games grid */}
-      {gameRows.length > 0 ? (
-        <GamesGrid games={gameRows} />
-      ) : (
-        /* Empty state */
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-48 h-48 mb-6">
-            <Image src="/illustrations/empty-state.svg" alt="Nėra veiklų" width={192} height={192} className="w-full h-full" />
-          </div>
-          <Gamepad2 className="h-10 w-10 text-muted-foreground/30 mb-4" />
-          <h2 className="text-xl font-semibold text-steam-dark mb-2">
-            Dar nėra veiklų
-          </h2>
-          <p className="text-muted-foreground mb-6 max-w-sm">
-            Sukurkite interaktyvią veiklą savo klasei arba pradėkite nuo pamokos plano
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Link href="/lesson-plans/new">
-              <Button variant="outline" className="gap-2 border-secondary/30 text-secondary-ink hover:bg-secondary/5">
-                <GraduationCap className="h-4 w-4" />
-                Kurti pamokos planą
-              </Button>
-            </Link>
-            <Link href="/games/new">
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2">
-                <Plus className="h-4 w-4" />
-                Kurti veiklą
-              </Button>
-            </Link>
-            <CreateSampleGameButton />
-          </div>
-        </div>
-      )}
+      <GamesGrid groups={groupGames(dashboardGames)} />
+
+      {/* First-success checklist: until done, then until the teacher hides it */}
+      {checklist("")}
+      {otherPaths}
     </div>
   )
 }
