@@ -463,7 +463,7 @@ export function LessonPlanDetail({ plan: initialPlan, openConvert = false }: Les
                           <div className="flex flex-wrap gap-1 mt-2">
                             {stage.bloom_level && BLOOM_LABELS[stage.bloom_level as BloomLevel] && (
                               <span className="text-xs px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary-ink border border-secondary/20">
-                                Bloom: {BLOOM_LABELS[stage.bloom_level as BloomLevel]}
+                                Mąstymo lygis: {BLOOM_LABELS[stage.bloom_level as BloomLevel]}
                               </span>
                             )}
                             {(stage.competencies ?? []).map((c) =>

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { AiSuggestion, VerificationVerdict } from "@/lib/ai/types"
+import { proposedAcceptedAnswers } from "@/components/teacher/game-builder/suggestion-payload"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -29,24 +30,28 @@ function VerdictBadge({ verdict }: { verdict?: VerificationVerdict }) {
   if (!verdict) return null
   const config = {
     pass: {
-      label: "DI patikrino",
+      label: "DI klaidų nerado",
+      // Not a guarantee: the facilitator confirms the answer.
+      title: "Tai ne garantija. Atsakymą patvirtinate jūs.",
       className: "bg-primary/10 text-primary-ink border-primary/20",
       Icon: ShieldCheck,
     },
     uncertain: {
       label: "Reikia peržiūros",
+      title: undefined,
       className: "bg-highlight/10 text-highlight-ink border-highlight/20",
       Icon: AlertTriangle,
     },
     fail: {
       label: "Klaida",
+      title: undefined,
       className: "bg-accent/10 text-accent-ink border-accent/20",
       Icon: XCircle,
     },
   }
   const c = config[verdict]
   return (
-    <Badge variant="outline" className={`text-xs gap-1 ${c.className}`}>
+    <Badge variant="outline" title={c.title} className={`text-xs gap-1 ${c.className}`}>
       <c.Icon className="h-3 w-3" />
       {c.label}
     </Badge>
@@ -81,6 +86,7 @@ export function AiSuggestionCard({
   const isFailed = suggestion.verification?.verdict === "fail"
   const isUncertain = suggestion.verification?.verdict === "uncertain"
   const isDisabled = added || isFailed
+  const alsoAccepted = proposedAcceptedAnswers(suggestion)
 
   return (
     <motion.div
@@ -160,6 +166,13 @@ export function AiSuggestionCard({
               Atsakymas: {suggestion.correct_answer}
             </span>
           </div>
+
+          {/* Other spellings the DI proposes; added with the task */}
+          {alsoAccepted.length > 0 && (
+            <p className="text-xs text-muted-foreground pl-7">
+              Taip pat tinka: {alsoAccepted.join(", ")}
+            </p>
+          )}
 
           {/* Options (for multiple choice) */}
           {suggestion.type === "multiple_choice" && suggestion.options && (
