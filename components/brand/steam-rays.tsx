@@ -1,60 +1,75 @@
 import { cn } from "@/lib/utils"
 
 /**
- * The STEAM LT Klaipėda graphic element: five rays from one point
- * (DESIGN-SYSTEM.md, "Prekės ženklas"). Decorative only, so it is hidden
- * from assistive technology.
+ * The STEAM LT Klaipėda graphic element: five rays, one per field (S, T, E,
+ * A, M), after the pulsar map of the Voyager record. Geometry and colours
+ * follow the brand style sheet ("Grafinis elementas"): the rays leave a
+ * small hub rather than one point, have square ends and run to the edge of
+ * an imagined rectangle.
  *
- * `draw` plays the one deliberate motion of a page: the rays draw
- * themselves once from the centre. It is pure CSS, runs once, and is
- * switched off by prefers-reduced-motion (the rays are then simply there).
- * Use it large on a first screen and small or not at all elsewhere.
+ * Brand rules kept here:
+ * - never one colour, never two rays of the same colour;
+ * - the ray whose colour equals the background becomes white (`on`);
+ * - next to this element the logo is used without its symbol.
+ *
+ * Decorative only, so hidden from assistive technology. `draw` plays the
+ * one deliberate motion of a page: the rays draw themselves once from the
+ * hub. Pure CSS, runs once, off under prefers-reduced-motion.
  */
-const RAYS = [
-  { angle: -128, length: 46, color: "#008CB5" },
-  { angle: -48, length: 40, color: "#FF306D" },
-  { angle: 2, length: 50, color: "#00D99B" },
-  { angle: 52, length: 38, color: "#003B4E" },
-  { angle: 118, length: 34, color: "#FFCE4E" },
-] as const
+const COLOURS = {
+  dark: "#003B4E",
+  yellow: "#FFCE4E",
+  green: "#00D99B",
+  red: "#FF306D",
+  blue: "#008CB5",
+} as const
+
+type RayColour = keyof typeof COLOURS
+
+const RAYS: readonly { colour: RayColour; x1: number; y1: number; x2: number; y2: number }[] = [
+  { colour: "dark", x1: 198, y1: 166, x2: 180, y2: 16 },
+  { colour: "yellow", x1: 206, y1: 170, x2: 304, y2: 110 },
+  { colour: "green", x1: 193, y1: 175, x2: 16, y2: 160 },
+  { colour: "red", x1: 197, y1: 182, x2: 110, y2: 404 },
+  { colour: "blue", x1: 205, y1: 179, x2: 304, y2: 270 },
+]
 
 export function SteamRays({
   className,
   draw = false,
+  on,
   onDark = false,
 }: {
   className?: string
   /** Draw the rays once when the element appears. */
   draw?: boolean
-  /** On a dark surface the dark blue ray would vanish: it becomes white. */
+  /** The brand colour of the surface behind: that ray becomes white. */
+  on?: RayColour
+  /** Shorthand for `on="dark"`. */
   onDark?: boolean
 }) {
+  const surface = on ?? (onDark ? "dark" : undefined)
   return (
     <svg
-      viewBox="-60 -60 120 120"
+      viewBox="0 0 320 420"
       aria-hidden="true"
       focusable="false"
       className={cn("steam-rays", draw && "steam-rays-draw", className)}
     >
-      {RAYS.map((ray, i) => {
-        const rad = (ray.angle * Math.PI) / 180
-        const x = Math.round(Math.cos(rad) * ray.length * 100) / 100
-        const y = Math.round(Math.sin(rad) * ray.length * 100) / 100
-        return (
-          <line
-            key={ray.angle}
-            x1={0}
-            y1={0}
-            x2={x}
-            y2={y}
-            pathLength={1}
-            stroke={onDark && ray.color === "#003B4E" ? "#FFFFFF" : ray.color}
-            strokeWidth={7}
-            strokeLinecap="round"
-            style={{ animationDelay: `${i * 70}ms` }}
-          />
-        )
-      })}
+      {RAYS.map((ray, i) => (
+        <line
+          key={ray.colour}
+          x1={ray.x1}
+          y1={ray.y1}
+          x2={ray.x2}
+          y2={ray.y2}
+          pathLength={1}
+          stroke={ray.colour === surface ? "#FFFFFF" : COLOURS[ray.colour]}
+          strokeWidth={5}
+          strokeLinecap="butt"
+          style={{ animationDelay: `${i * 70}ms` }}
+        />
+      ))}
       <style>{`
         @media (prefers-reduced-motion: no-preference) {
           .steam-rays-draw line {
