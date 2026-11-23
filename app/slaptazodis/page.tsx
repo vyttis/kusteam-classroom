@@ -25,11 +25,11 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="space-y-5 rounded-2xl bg-white p-6 shadow-sm sm:p-8">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-steam-dark">{forgot ? "Naujas slaptažodis" : "Slaptažodis"}</h1>
+            <h1 className="text-2xl font-bold text-steam-dark">{forgot ? "Naujas slaptažodis" : "Sukurti arba pakeisti slaptažodį"}</h1>
             <p className="text-sm text-muted-foreground">
               {forgot
                 ? "Prisijungėte su kodu iš laiško. Susikurkite naują slaptažodį: senasis nustos galioti."
-                : "Susikurkite arba pakeiskite slaptažodį, kuriuo jungsitės kartu su savo el. paštu."}
+                : "Jei slaptažodžio dar neturite (jungiatės su kodu iš laiško arba per „Google“), čia jį susikursite. Jei jau turite, čia jį pakeisite: senasis nustos galioti."}
             </p>
           </div>
           <PasswordForm email={user.email ?? ""} />

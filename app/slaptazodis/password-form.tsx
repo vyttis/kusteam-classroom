@@ -45,7 +45,7 @@ export function PasswordForm({ email }: { email: string }) {
     return (
       <div className="space-y-4" role="status">
         <p className="rounded-md bg-primary/10 px-3 py-2 text-sm text-steam-dark">
-          Slaptažodis išsaugotas. Kitą kartą junkitės el. paštu {email} ir šiuo slaptažodžiu.
+          Slaptažodis išsaugotas. Nuo šiol junkitės el. paštu {email} ir šiuo slaptažodžiu. Ankstesnis slaptažodis, jei jį turėjote, nebegalioja.
         </p>
         <Button asChild className="h-12 w-full bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90">
           <Link href="/dashboard">Į mano veiklas</Link>
@@ -81,7 +81,7 @@ export function PasswordForm({ email }: { email: string }) {
       </Button>
       <p className="text-center text-sm">
         <Link href="/dashboard" className="inline-flex min-h-11 items-center font-medium text-steam-dark underline underline-offset-4">
-          Praleisti
+          Grįžti nieko nekeičiant
         </Link>
       </p>
     </form>
