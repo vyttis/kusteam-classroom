@@ -4,6 +4,7 @@ import { checkAiRateLimitAsync } from "@/lib/ai/rate-limit"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { clientKey } from "@/lib/client-address"
+import { retryLater } from "@/lib/api/retry-later"
 
 const createTeamSchema = z.object({
   game_code: z.string().length(6),
@@ -64,10 +65,15 @@ export async function POST(request: Request) {
       .select("id, settings")
       .eq("game_code", parsed.data.game_code)
       .eq("status", "active")
-      .single()
+      .maybeSingle()
 
-    if (gameError || !game) {
-      console.error("Game lookup failed:", gameError?.message)
+    // Only a read that failed is an error (logged, 503, try again).
+    if (gameError) return retryLater("teams game", gameError)
+
+    // A mistyped code, or an activity that has not started, is paused or has
+    // ended: an expected answer for a participant, so nothing is logged (a
+    // class mistyping codes must not look like server errors).
+    if (!game) {
       return NextResponse.json(
         { error: "Veikla nerasta arba dar neprasidėjo. Patikrinkite kodą." },
         { status: 404 }
@@ -105,7 +111,7 @@ export async function POST(request: Request) {
       .select("id")
       .eq("game_id", game.id)
       .eq("name", parsed.data.team_name)
-      .single()
+      .maybeSingle()
 
     if (existingTeam) {
       return NextResponse.json(

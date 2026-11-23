@@ -8,6 +8,7 @@ import { NextResponse } from "next/server"
 import { clockFromRow, deadlineMs } from "@/lib/game/clock"
 import { z } from "zod"
 import { checkAiRateLimitAsync } from "@/lib/ai/rate-limit"
+import { NO_ROW, retryLater } from "@/lib/api/retry-later"
 
 // Answer checks per minute, right or wrong, counted before any bcrypt work:
 // per team, above a fast streak of one-tap choices; per activity, above a
@@ -77,11 +78,12 @@ export async function POST(request: Request) {
     // "*" (server only) so the clock columns are read when they exist:
     // started_at (00023) and pause_offset_ms (20261106150000) drive the
     // deadline check below, which is skipped on a database without them.
-    const { data: team } = (await supabase
+    const { data: team, error: teamError } = (await supabase
       .from("teams")
       .select("*")
       .eq("session_token", parsed.data.session_token)
       .maybeSingle()) as {
+      error: { code?: string; message?: string } | null
       data: {
         id: string
         game_id: string
@@ -91,6 +93,11 @@ export async function POST(request: Request) {
         pause_offset_ms?: number | string | null
       } | null
     }
+
+    // The read failed: that is not "no such team". 401 below makes the page
+    // check its session (and drop it if the team is gone); 503 only asks to
+    // send the answer again.
+    if (teamError) return retryLater("submissions team", teamError)
 
     if (!team) {
       return NextResponse.json(
@@ -133,6 +140,12 @@ export async function POST(request: Request) {
         .eq("team_id", team.id)
         .eq("challenge_id", parsed.data.challenge_id),
     ])
+
+    // Failed reads are not "activity unavailable" or "task not found".
+    if (gameRes.error && gameRes.error.code !== NO_ROW) return retryLater("submissions game", gameRes.error)
+    if (challengeRes.error && challengeRes.error.code !== NO_ROW) {
+      return retryLater("submissions challenge", challengeRes.error)
+    }
 
     const game = gameRes.data
     const existingSolve = existingSolveRes.data

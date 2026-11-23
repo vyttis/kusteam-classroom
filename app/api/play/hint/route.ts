@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { startTeamClock } from "@/lib/game/team-start"
+import { retryLater } from "@/lib/api/retry-later"
 
 // POST /api/play/hint — record that a team revealed a hint and return its
 // text. The play state sends only hints the team already opened, so this is
@@ -33,11 +34,17 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient()
 
-    const { data: team } = (await supabase
+    const { data: team, error: teamError } = (await supabase
       .from("teams")
       .select("*")
       .eq("session_token", parsed.data.session_token)
-      .maybeSingle()) as { data: { id: string; game_id: string; started_at?: string | null } | null }
+      .maybeSingle()) as {
+      error: { code?: string; message?: string } | null
+      data: { id: string; game_id: string; started_at?: string | null } | null
+    }
+
+    // A failed read is not "no such team" (see lib/api/retry-later.ts).
+    if (teamError) return retryLater("play/hint team", teamError)
 
     if (!team) {
       return NextResponse.json(
@@ -48,11 +55,13 @@ export async function POST(request: Request) {
 
     // The challenge must belong to the team's game, and the hint index must
     // exist — otherwise a client could inflate any team's penalty.
-    const { data: challenge } = await supabase
+    const { data: challenge, error: challengeError } = await supabase
       .from("challenges")
       .select("id, game_id, hints")
       .eq("id", parsed.data.challenge_id)
       .maybeSingle()
+
+    if (challengeError) return retryLater("play/hint challenge", challengeError)
 
     if (!challenge || challenge.game_id !== team.game_id) {
       return NextResponse.json({ error: "Užduotis nerasta" }, { status: 404 })
