@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { sendEmail } from "@/lib/email/send"
-import { newRequestEmail, requestReceivedEmail } from "@/lib/email/templates"
-import { publicBaseUrl } from "@/lib/access/approve"
+import { emailDelivery, sendEmail, type EmailDelivery } from "@/lib/email/send"
+import {
+  accountActivatedEmail,
+  accountInviteEmail,
+  newRequestEmail,
+  requestReceivedEmail,
+} from "@/lib/email/templates"
+import { inviteUrl, loginUrl, publicBaseUrl } from "@/lib/access/approve"
 import type { RequestSource } from "@/lib/access/requests"
 
 interface SavedRequest {
@@ -72,4 +77,41 @@ export async function notifyNewRequest(
         )
       : Promise.resolve(),
   ])
+}
+
+/**
+ * The email that follows a granted account, awaited so the administrator is
+ * told the truth about it. A new account gets a one-time link straight to
+ * the registration form (details and password); an existing one is told
+ * where to sign in.
+ */
+export async function sendAccountEmail(
+  admin: SupabaseClient,
+  account: { email: string; firstName: string | null; existing: boolean },
+  origin: string,
+): Promise<EmailDelivery> {
+  const invite = account.existing ? null : await inviteUrl(admin, account.email, origin)
+  const result = await sendEmail(
+    invite
+      ? accountInviteEmail(account.email, account.firstName, invite, loginUrl(origin))
+      : accountActivatedEmail(account.email, account.firstName, loginUrl(origin)),
+  )
+  return emailDelivery(result)
+}
+
+/**
+ * What the administrator reads after an account was granted. The account
+ * part is always true at this point; the email part follows the delivery.
+ */
+export function accountEmailNotice(existing: boolean, delivery: EmailDelivery): string {
+  const account = existing ? "Paskyra jau buvo, ji aktyvuota, rolė nepakeista." : "Paskyra sukurta."
+  if (delivery.sent) {
+    return existing
+      ? `${account} Laiškas su prisijungimo nuoroda išsiųstas.`
+      : `${account} Kvietimas išsiųstas el. paštu: vedėjas atvers nuorodą, patikrins duomenis ir susikurs slaptažodį.`
+  }
+  const what = existing ? "laiškas su prisijungimo nuoroda neišsiųstas" : "kvietimo laiškas neišsiųstas"
+  return delivery.reason === "not_configured"
+    ? `${account} Tačiau ${what}: platformoje nesukonfigūruotas laiškų siuntimas. Vedėjas apie paskyrą dar nežino. Praneškite platformos prižiūrėtojui, o sutvarkius siuntimą spauskite „Siųsti dar kartą“.`
+    : `${account} Tačiau ${what}: laiškų siuntimo paslauga jo nepriėmė. Vedėjas apie paskyrą dar nežino. Po kelių minučių spauskite „Siųsti dar kartą“.`
 }
