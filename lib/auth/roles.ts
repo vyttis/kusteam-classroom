@@ -50,7 +50,19 @@ export async function getUserProfile(
 }
 
 /**
- * Check if user has one of the allowed roles, throw if not
+ * Thrown by requireRole when the signed-in user may not do this. It is an
+ * expected answer (a teacher opening an admin page), not a failure: callers
+ * catch it and redirect or answer 403, so it does not reach the error log.
+ */
+export class AccessDeniedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "AccessDeniedError"
+  }
+}
+
+/**
+ * Check if user has one of the allowed roles, throw AccessDeniedError if not
  */
 export async function requireRole(
   supabase: SupabaseClient,
@@ -58,7 +70,7 @@ export async function requireRole(
 ): Promise<UserRole> {
   const role = await getUserRole(supabase)
   if (!allowedRoles.includes(role)) {
-    throw new Error(`Prieiga uždrausta. Reikalinga rolė: ${allowedRoles.join(" arba ")}`)
+    throw new AccessDeniedError(`Prieiga uždrausta. Reikalinga rolė: ${allowedRoles.join(" arba ")}`)
   }
   // Admin powers need an active account, checked fresh (not from the proxy
   // cache): a blocked admin keeps the role until someone changes it.
@@ -70,7 +82,7 @@ export async function requireRole(
       ? await supabase.from("profiles").select("status").eq("id", user.id).maybeSingle()
       : { data: null }
     if (profile?.status !== "active") {
-      throw new Error("Prieiga uždrausta: paskyra neaktyvi.")
+      throw new AccessDeniedError("Prieiga uždrausta: paskyra neaktyvi.")
     }
   }
   return role

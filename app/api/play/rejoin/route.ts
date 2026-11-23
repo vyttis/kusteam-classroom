@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAiRateLimitAsync } from "@/lib/ai/rate-limit"
 import { verifyRejoinToken } from "@/lib/game/rejoin-token"
 import { clientKey } from "@/lib/client-address"
+import { retryLater } from "@/lib/api/retry-later"
 
 const rejoinSchema = z.object({
   game_code: z.string().length(6),
@@ -35,11 +36,13 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient()
-  const { data: team } = await supabase
+  const { data: team, error: teamError } = await supabase
     .from("teams")
     .select("id, name, session_token, games!inner(game_code, status)")
     .eq("id", check.teamId)
     .maybeSingle()
+  // A failed read is not "the team was removed": the link still works.
+  if (teamError) return retryLater("play/rejoin team", teamError)
   const game = (team?.games ?? null) as unknown as { game_code: string; status: string } | null
   if (!team || !game || game.game_code !== parsed.data.game_code.toUpperCase()) {
     return NextResponse.json({ error: "Komanda nerasta. Gal ji buvo pašalinta?", code: "not_found" }, { status: 404 })
